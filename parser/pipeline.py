@@ -43,7 +43,7 @@ DEFAULT_CONFIG = {
     "widget_always_on_top": True,
     "widget_opacity": 100,          # 50~100 (%)
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
-    "update_url": "",               # version.json 주소 (updater.py 참고)
+    "update_url": "https://raw.githubusercontent.com/dacisosl/coolm-helper/main/version.json"
 }
 
 
