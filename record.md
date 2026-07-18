@@ -102,4 +102,25 @@
 
 ---
 
+## 2026-07-18 (밤) — GitHub 배포 + 자동 업데이트 실제 연결
+
+- GitHub 계정(dacisosl) 연결, 공개 저장소 생성: https://github.com/dacisosl/coolm-helper
+  (저장소 생성은 보안 정책상 사용자가 웹에서 직접, 나머지는 자동)
+- winget으로 GitHub CLI + Inno Setup 설치. Inno로 CoolmHelper-Setup.exe 컴파일 성공.
+- Releases에 v0.2.0 설치파일 업로드, version.json을 main 브랜치에 커밋.
+- update_url 기본값을 raw.githubusercontent.com의 version.json으로 연결 →
+  전체 체인 검증 완료 (버전 조회 200 / 동일 버전 판정 / 설치파일 다운로드 200).
+- 시행착오: git push가 자격증명 GUI를 기다리며 무한 대기 → 저장소에
+  gh를 credential.helper로 지정해 해결. 로컬 브랜치 rename 잠금 오류는
+  `push master:main`으로 우회 후 정리.
+
+### 다음 버전 배포 절차 (요약)
+1. version.py와 installer.iss의 버전을 올린다 (예: 0.3.0)
+2. `python build.py` → ISCC로 installer.iss 컴파일
+3. `gh release create v0.3.0 Output\CoolmHelper-Setup.exe --title ... --notes ...`
+4. version.json의 version/url/notes 갱신 → commit & push
+5. 사용자들은 다음 실행 때 "업데이트 후 재시작하시겠습니까?" 안내를 받는다
+
+---
+
 ## (다음 기록은 여기에 이어서)
