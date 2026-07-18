@@ -1,0 +1,32 @@
+# coolm-helper 작업 규칙
+
+교사용 쿨메신저 일정 추출 도구. 상세 설계는 PRD.md, 개요는 README.md 참고.
+
+## 절대 규칙
+- 쿨메신저 원본(`%LOCALAPPDATA%\CoolMessenger\Memo\*.udb`)은 **읽기 전용**.
+  분석이 필요하면 udb+wal+shm을 임시 폴더에 복사해 복사본만 열 것.
+- 채팅/콘솔에 메시지 내용을 출력할 때: 본문은 앞 20자까지만, 사람 이름은 ○○○로 가릴 것.
+- UI 미리보기에서는 자동 마스킹 금지 — 탐지된 개인정보는 **빨간 표시만** 하고
+  삭제 여부는 사용자가 인라인 편집으로 결정한다 (2026-07-18 사용자 결정).
+
+## 구조 요약
+- `parser/` 파이프라인(로컬 존), `ui/`(PyQt6, 라이트 테마 고정 — `ui/theme.py` 사용),
+  `store/`(로컬 JSON), `calendar_sync/`(온라인 존 — 제목·시작·종료만 받는다)
+- 받은 쪽지: `tbl_recv`, 본문은 `MessageText`(평문) 사용, `MessageBody`(압축)는 무시
+- 쪽지는 날짜가 아니라 **개수 기준**으로 가져온다 (config `recent_count`, 기본 10)
+
+## 빌드·테스트
+- 테스트: `python -m unittest discover -s tests`
+- 빌드: `python build.py` → `dist\CoolmHelper\CoolmHelper.exe`
+  (바탕화면 바로가기가 이 exe를 가리킴)
+- **빌드 전 주의**: dist가 통째로 갈리므로 `dist\CoolmHelper\store\events.json`
+  (사용자 등록 일정)을 백업했다가 빌드 후 복원할 것
+- frozen 모드에서 BASE_DIR를 sys.path에 넣지 말 것 — store 데이터 폴더가
+  store 모듈을 가려 두 번째 실행부터 죽는 버그의 원인이었음 (main.py 주석 참고)
+
+## 기록
+의미 있는 작업(기능 추가, 버그 수정, 설계 변경)을 마치면 **record.md** 맨 아래에
+날짜와 함께 한 일·배운 점을 이어서 적을 것.
+
+## 사용자
+한국어로 소통하는 교사(비전문 개발자). 설명은 쉽게, 전문용어는 풀어서.

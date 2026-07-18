@@ -1,0 +1,17 @@
+# 개인정보·로컬 전용 파일 — 절대 커밋 금지
+students.txt
+config.json
+store/*.json
+*.udb
+*.udb-wal
+*.udb-shm
+token.json
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.spec

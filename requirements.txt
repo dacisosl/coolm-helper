@@ -1,0 +1,12 @@
+# 기본 실행
+PyQt6>=6.6
+
+# Plan B 폴백 (엑셀 내보내기 파싱)
+xlrd>=2.0
+
+# 선택: 구글 캘린더 연동 (calendar_sync/SETUP.md 참고)
+# google-api-python-client
+# google-auth-oauthlib
+
+# 개발·배포용
+# pyinstaller

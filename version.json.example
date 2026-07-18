@@ -1,0 +1,6 @@
+{
+  "_설명": "자동 업데이트용 버전 정보 파일. 새 버전 배포 시 이 파일을 공개 URL(예: GitHub raw)에 올리고, 그 주소를 사용자 config.json의 update_url에 넣으면 됩니다.",
+  "version": "0.2.0",
+  "url": "https://github.com/<계정>/<저장소>/releases/download/v0.2.0/CoolmHelper-Setup.exe",
+  "notes": "- 설정 모달 추가\n- 캘린더 리디자인 (중요도, 아코디언 상세)\n- 자동 업데이트 지원"
+}
