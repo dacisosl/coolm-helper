@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.4.0/CoolmHelper-Setup.exe",
-  "notes": "- 미니 위젯: 오른쪽 벽에 붙는 펭귄, 클릭하면 메뉴 (기본값, 설정에서 상세형으로 전환)\n- 일정 등록 창 개편: 왼쪽 목록 / 오른쪽 상세보기 2분할, 메모 입력 지원\n- 등록한 항목은 목록에서 연두색으로 표시되고 재시작해도 유지, 캘린더에서 지우면 즉시 원복\n- 설정에 '일반' 탭 추가 (위젯 스타일·기능 안내)"
+  "version": "0.4.1",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.4.1/CoolmHelper-Setup.exe",
+  "notes": "- 등록된 항목이 목록에서 확실히 구분됩니다 (연두 배경 + ✓ 등록됨 마크)\n- 요일이 한글로 표시됩니다 (7/21(화))\n- 날짜·시간 선택 UI 개선 (달력 팝업 버튼 + 시간 드롭다운)\n- 상세내용 인라인 편집: 원문이 채워진 칸을 바로 수정하면 일정 상세내용으로 저장\n- 안읽은 쪽지에 파란 점(●) 표시 (안읽음 상태는 건드리지 않습니다)"
 }

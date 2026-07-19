@@ -28,6 +28,7 @@ class Message:
     received: datetime
     title: str
     body: str
+    is_unread: bool = False   # 쿨메신저의 안읽음 상태 (읽기만 하고 바꾸지 않는다)
 
 
 def parse_receive_date(s: str) -> datetime:
@@ -92,19 +93,20 @@ class DbReader:
         """
         cur = self._con.cursor()
         rows = cur.execute(
-            "SELECT MessageKey, Sender, ReceiveDate, Title, MessageText "
+            "SELECT MessageKey, Sender, ReceiveDate, Title, MessageText, IsUnRead "
             "FROM tbl_recv WHERE DeletedDate IS NULL "
             "ORDER BY ReceiveDate DESC LIMIT ?",
             (int(limit),),
         ).fetchall()
         out = []
-        for key, sender, rdate, title, body in rows:
+        for key, sender, rdate, title, body, unread in rows:
             try:
                 received = parse_receive_date(rdate)
             except (ValueError, TypeError):
                 continue
             out.append(Message(key=key, sender=sender or "", received=received,
-                               title=title or "", body=body or ""))
+                               title=title or "", body=body or "",
+                               is_unread=bool(unread)))
         return out
 
     def member_names(self) -> set[str]:

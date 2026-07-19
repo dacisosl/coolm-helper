@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """일정 등록 창 — 2분할 레이아웃 (왼쪽 목록 / 오른쪽 상세보기).
 
-- 왼쪽: 일정 후보 목록. 등록된 항목은 연두색 배경으로 구분되며,
-  이 표시는 재시작해도 유지되고(source_ref) 캘린더에서 삭제하면 즉시 원복된다.
-- 오른쪽: 제목·일시·마감 + 원문(빨간 표시) + 메모(인라인 편집) + 등록 버튼.
+- 왼쪽: 후보 목록. 등록된 항목은 연두 배경 + ✓ 등록됨 마크 (재시작 유지,
+  캘린더에서 삭제 시 실시간 원복).
+- 오른쪽: 제목·일시(모던 피커)·마감 + 상세내용(원문이 채워진 인라인 편집기,
+  빨간 표시 포함, 수정하면 일정의 상세내용으로 저장) + 등록 버튼.
 """
 from __future__ import annotations
 
 import html
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 
-from PyQt6.QtCore import Qt, QDateTime
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QDateTimeEdit, QDialog, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QSplitter, QTextBrowser, QTextEdit, QVBoxLayout, QWidget,
+    QCalendarWidget, QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QPushButton, QSplitter, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from parser.pii_detector import PiiSpan
@@ -23,16 +23,18 @@ from parser.pipeline import Candidate
 from store.event_store import EventStore
 from ui import theme
 
-REGISTERED_BG = QColor("#e9f7ec")   # 등록된 항목의 목록 배경
+WEEK_KO = "월화수목금토일"
+
+
+def kr_date(dt: datetime | date) -> str:
+    return f"{dt.month}/{dt.day}({WEEK_KO[dt.weekday()]})"
 
 
 def cand_ref(cand: Candidate) -> str:
-    """후보의 고유 참조 — Event.source_ref와 대조해 등록 여부를 판단한다."""
     return f"{cand.message.key}|{cand.start.isoformat()}"
 
 
 def highlight_html(text: str, spans: list[PiiSpan]) -> str:
-    """원문 유지 + 탐지 부분만 빨간 글씨 (마스킹하지 않음 — 사용자가 결정)."""
     parts, pos = [], 0
     for s in sorted(spans, key=lambda s: s.start):
         parts.append(html.escape(text[pos:s.start]))
@@ -43,6 +45,138 @@ def highlight_html(text: str, spans: list[PiiSpan]) -> str:
     return "".join(parts).replace("\n", "<br>")
 
 
+# ── 왼쪽 목록의 행 위젯 (배경·마크를 직접 관리해 스타일시트에 안 덮인다) ──
+class CandRow(QFrame):
+    def __init__(self, cand: Candidate, parent=None):
+        super().__init__(parent)
+        self.registered = False
+        self.selected = False
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 7, 10, 7)
+        lay.setSpacing(2)
+
+        top = QHBoxLayout()
+        when = kr_date(cand.start)
+        if not cand.all_day:
+            when += cand.start.strftime(" %H:%M")
+        unread = "● " if cand.message.is_unread else ""   # 안읽은 쪽지 표시
+        date_label = QLabel(unread + when + ("  ⏰" if cand.is_deadline else ""))
+        date_label.setStyleSheet(
+            f"color:{theme.PRIMARY_DARK};font-size:11px;font-weight:bold;"
+            f"background:transparent")
+        top.addWidget(date_label)
+        top.addStretch()
+        self.mark = QLabel("✓ 등록됨")
+        self.mark.setStyleSheet(
+            "background:#2e7d32;color:white;border-radius:8px;"
+            "padding:1px 8px;font-size:10px;font-weight:bold")
+        self.mark.setVisible(False)
+        top.addWidget(self.mark)
+        lay.addLayout(top)
+
+        title = QLabel(cand.suggested_title[:38])
+        title.setStyleSheet(
+            f"color:{theme.TEXT};font-size:12px;background:transparent")
+        lay.addWidget(title)
+        self._restyle()
+
+    def set_registered(self, registered: bool) -> None:
+        self.registered = registered
+        self.mark.setVisible(registered)
+        self._restyle()
+
+    def set_selected(self, selected: bool) -> None:
+        self.selected = selected
+        self._restyle()
+
+    def _restyle(self) -> None:
+        if self.registered:
+            bg = "#dff0e2" if self.selected else theme.SUCCESS_BG
+            border = theme.SUCCESS_BORDER
+        elif self.selected:
+            bg, border = theme.PRIMARY_LIGHT, theme.PRIMARY
+        else:
+            bg, border = "transparent", "transparent"
+        self.setStyleSheet(
+            f"CandRow{{background:{bg};border:1px solid {border};"
+            f"border-radius:8px}}")
+
+
+# ── 모던 날짜·시간 피커 ─────────────────────────────────────
+class DatePickerButton(QPushButton):
+    """클릭하면 테마 적용된 달력 팝업이 뜨는 날짜 버튼."""
+    dateChanged = pyqtSignal(object)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._date = date.today()
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(
+            f"QPushButton{{background:{theme.CARD};color:{theme.TEXT};"
+            f"border:1px solid {theme.BORDER};border-radius:8px;"
+            f"padding:7px 14px;font-size:13px;text-align:left}}"
+            f"QPushButton:hover{{border-color:{theme.PRIMARY}}}")
+        self.clicked.connect(self._open)
+        self._sync()
+
+    def set_date(self, d: date) -> None:
+        self._date = d
+        self._sync()
+
+    def get_date(self) -> date:
+        return self._date
+
+    def _sync(self) -> None:
+        self.setText(f"📅  {self._date.year}-{self._date.month:02d}-"
+                     f"{self._date.day:02d} ({WEEK_KO[self._date.weekday()]})")
+
+    def _open(self) -> None:
+        pop = QWidget(None, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        pop.setStyleSheet(theme.BASE_QSS + theme.CALENDAR_QSS)
+        lay = QVBoxLayout(pop)
+        lay.setContentsMargins(4, 4, 4, 4)
+        cal = QCalendarWidget()
+        cal.setVerticalHeaderFormat(
+            QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        cal.setGridVisible(False)
+        cal.setSelectedDate(QDate(self._date.year, self._date.month, self._date.day))
+
+        def picked(qd: QDate):
+            self._date = date(qd.year(), qd.month(), qd.day())
+            self._sync()
+            self.dateChanged.emit(self._date)
+            pop.close()
+
+        cal.clicked.connect(picked)
+        lay.addWidget(cal)
+        pop.adjustSize()
+        pos = self.mapToGlobal(self.rect().bottomLeft())
+        pop.move(pos.x(), pos.y() + 4)
+        pop.show()
+
+
+class TimeCombo(QComboBox):
+    """30분 단위 드롭다운 + 직접 입력(예: 14:05)도 되는 시간 선택."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setEditable(True)
+        for h in range(0, 24):
+            for m in (0, 30):
+                self.addItem(f"{h:02d}:{m:02d}")
+        self.setFixedWidth(92)
+
+    def set_time(self, h: int, m: int) -> None:
+        self.setCurrentText(f"{h:02d}:{m:02d}")
+
+    def get_time(self) -> tuple[int, int]:
+        try:
+            h, m = self.currentText().strip().split(":")
+            return max(0, min(23, int(h))), max(0, min(59, int(m)))
+        except ValueError:
+            return 0, 0
+
+
 class ReviewDialog(QDialog):
     COUNTS = (10, 50, 100)
 
@@ -51,19 +185,19 @@ class ReviewDialog(QDialog):
                  loader=None, count: int = 10, parent=None):
         super().__init__(parent)
         self.setWindowTitle("일정 등록")
-        self.resize(860, 560)
+        self.resize(880, 580)
         self.setStyleSheet(theme.BASE_QSS)
         self.store = store
         self.google_enabled = google_enabled
         self.loader = loader
         self.candidates: list[Candidate] = []
+        self.rows: list[CandRow] = []
         self.source = source
         self._current: Candidate | None = None
         self.config = getattr(parent, "config", {}) if parent else {}
 
         lay = QVBoxLayout(self)
 
-        # ── 상단 메뉴바: 제목 + 쪽지 개수 ──
         top = QHBoxLayout()
         title = QLabel("일정 등록")
         title.setStyleSheet(
@@ -83,19 +217,17 @@ class ReviewDialog(QDialog):
         top.addWidget(self.count_combo)
         lay.addLayout(top)
 
-        # ── 2분할: 왼쪽 목록 / 오른쪽 상세 ──
         split = QSplitter(Qt.Orientation.Horizontal)
         self.list = QListWidget()
         self.list.setStyleSheet(
             f"QListWidget{{background:{theme.CARD};border:1px solid {theme.BORDER};"
-            f"border-radius:10px;font-size:12px}}"
-            f"QListWidget::item{{padding:9px;border-bottom:1px solid #f0f4f9}}"
-            f"QListWidget::item:selected{{background:{theme.PRIMARY_LIGHT};"
-            f"color:{theme.PRIMARY_DARK}}}")
+            f"border-radius:10px;padding:4px}}"
+            f"QListWidget::item{{border:none;padding:1px}}"
+            f"QListWidget::item:selected{{background:transparent}}")
         self.list.currentRowChanged.connect(self._show_detail)
         split.addWidget(self.list)
         split.addWidget(self._build_detail())
-        split.setSizes([330, 530])
+        split.setSizes([330, 550])
         lay.addWidget(split, stretch=1)
 
         close_btn = QPushButton("닫기")
@@ -103,7 +235,6 @@ class ReviewDialog(QDialog):
         lay.addWidget(close_btn)
 
         self._populate(candidates, source)
-        # 캘린더에서 삭제하면 목록 배경 실시간 원복
         self.store.subscribe(self._refresh_marks)
 
     # ── 상세 패널 ────────────────────────────────────────────
@@ -129,11 +260,13 @@ class ReviewDialog(QDialog):
 
         row = QHBoxLayout()
         row.addWidget(QLabel("일시"))
-        self.start_edit = QDateTimeEdit()
-        self.start_edit.setCalendarPopup(True)
-        self.start_edit.setDisplayFormat("yyyy-MM-dd (ddd) HH:mm")
-        row.addWidget(self.start_edit)
+        self.date_btn = DatePickerButton()
+        row.addWidget(self.date_btn)
+        self.time_combo = TimeCombo()
+        row.addWidget(self.time_combo)
         self.all_day_cb = QCheckBox("종일")
+        self.all_day_cb.toggled.connect(
+            lambda on: self.time_combo.setEnabled(not on))
         row.addWidget(self.all_day_cb)
         self.deadline_cb = QCheckBox("마감(할일)")
         row.addWidget(self.deadline_cb)
@@ -144,14 +277,12 @@ class ReviewDialog(QDialog):
         self.src_info.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
         lay.addWidget(self.src_info)
 
-        self.body_view = QTextBrowser()
-        lay.addWidget(self.body_view, stretch=3)
-
-        self.memo_edit = QTextEdit()
-        self.memo_edit.setPlaceholderText(
-            "일정 메모 (선택) — 등록하면 일정의 상세내용으로 저장됩니다")
-        self.memo_edit.setMaximumHeight(72)
-        lay.addWidget(self.memo_edit, stretch=1)
+        body_head = QLabel("상세내용 — 원문이 채워져 있습니다. 이 자리에서 바로 "
+                           "수정하면 일정의 상세내용으로 저장됩니다.")
+        body_head.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
+        lay.addWidget(body_head)
+        self.body_edit = QTextEdit()      # 인라인 편집 (빨간 표시 포함 리치 텍스트)
+        lay.addWidget(self.body_edit, stretch=1)
 
         btns = QHBoxLayout()
         self.fav_btn = QPushButton("☆ 즐겨찾기")
@@ -184,42 +315,39 @@ class ReviewDialog(QDialog):
             + ("  ※ 데모 일정은 설정→데이터에서 일괄 삭제" if source == "demo" else ""))
         self.list.blockSignals(True)
         self.list.clear()
+        self.rows = []
         refs = self.store.registered_refs()
         for c in candidates:
-            when = c.start.strftime("%m/%d(%a)")
-            if not c.all_day:
-                when += c.start.strftime(" %H:%M")
-            flags = "⏰" if c.is_deadline else ""
-            item = QListWidgetItem(
-                f"{when} {flags}\n{c.suggested_title[:34]}")
-            if cand_ref(c) in refs:
-                item.setBackground(REGISTERED_BG)
+            row = CandRow(c)
+            row.set_registered(cand_ref(c) in refs)
+            item = QListWidgetItem()
+            item.setSizeHint(row.sizeHint())
             self.list.addItem(item)
+            self.list.setItemWidget(item, row)
+            self.rows.append(row)
         self.list.blockSignals(False)
         if candidates:
             self.list.setCurrentRow(0)
         else:
             self._current = None
             self.title_edit.setText("")
-            self.body_view.setHtml(
+            self.body_edit.setHtml(
                 "<i>일정 후보가 없습니다. 위에서 쪽지 개수를 늘려보세요.</i>")
             self.register_btn.setEnabled(False)
 
     def _refresh_marks(self) -> None:
         refs = self.store.registered_refs()
-        for i, c in enumerate(self.candidates):
-            item = self.list.item(i)
-            if item:
-                registered = cand_ref(c) in refs
-                item.setBackground(REGISTERED_BG if registered
-                                   else QColor("transparent"))
+        for c, row in zip(self.candidates, self.rows):
+            row.set_registered(cand_ref(c) in refs)
         self._update_register_btn()
 
     # ── 상세 표시 ────────────────────────────────────────────
-    def _show_detail(self, row: int) -> None:
-        if not (0 <= row < len(self.candidates)):
+    def _show_detail(self, idx: int) -> None:
+        for i, row in enumerate(self.rows):
+            row.set_selected(i == idx)
+        if not (0 <= idx < len(self.candidates)):
             return
-        c = self._current = self.candidates[row]
+        c = self._current = self.candidates[idx]
         self.title_edit.setText(c.suggested_title)
         if c.title_spans:
             found = ", ".join(s.text for s in c.title_spans)
@@ -228,14 +356,16 @@ class ReviewDialog(QDialog):
             self.warn.setVisible(True)
         else:
             self.warn.setVisible(False)
-        self.start_edit.setDateTime(QDateTime(c.start))
+        self.date_btn.set_date(c.start.date())
+        self.time_combo.set_time(c.start.hour, c.start.minute)
         self.all_day_cb.setChecked(c.all_day)
+        self.time_combo.setEnabled(not c.all_day)
         self.deadline_cb.setChecked(c.is_deadline)
         self.src_info.setText(
             f'근거: "{c.source_text.strip()}" · 보낸사람 {c.message.sender} '
-            f'· 받은 시각 {c.message.received:%m/%d %H:%M}')
-        self.body_view.setHtml(highlight_html(c.message.body, c.body_spans))
-        self.memo_edit.setPlainText("")
+            f'· 받은 시각 {kr_date(c.message.received)} '
+            f'{c.message.received:%H:%M}')
+        self.body_edit.setHtml(highlight_html(c.message.body, c.body_spans))
         self._update_register_btn()
 
     def _update_register_btn(self) -> None:
@@ -254,8 +384,10 @@ class ReviewDialog(QDialog):
         if not title:
             QMessageBox.warning(self, "확인", "제목을 입력하세요.")
             return
-        start = self.start_edit.dateTime().toPyDateTime()
         all_day = self.all_day_cb.isChecked()
+        d = self.date_btn.get_date()
+        h, m = (0, 0) if all_day else self.time_combo.get_time()
+        start = datetime(d.year, d.month, d.day, h, m)
         end = c.end if c.end else (None if all_day else start + timedelta(hours=1))
 
         google_id = None
@@ -271,9 +403,8 @@ class ReviewDialog(QDialog):
         self.store.add(title=title, start=start, end=end, all_day=all_day,
                        is_deadline=self.deadline_cb.isChecked(),
                        google_id=google_id, demo=(self.source == "demo"),
-                       memo=self.memo_edit.toPlainText().strip(),
+                       memo=self.body_edit.toPlainText().strip(),
                        source_ref=cand_ref(c))
-        # store._notify() → _refresh_marks가 배경·버튼을 갱신한다
 
     def _reload(self) -> None:
         if not self.loader:
