@@ -56,6 +56,16 @@ class WidgetBase(QWidget):
         QTimer.singleShot(2000, self._auto_update_check)
         QTimer.singleShot(300, self.ensure_desktop_widget)
         QTimer.singleShot(2500, self._show_startup_alerts)   # 세션당 1회
+        # ⚡ 간편 등록이 첫 클릭부터 빠르도록 UIA를 백그라운드에서 미리 초기화
+        threading.Thread(target=self._warmup_capture, daemon=True).start()
+
+    @staticmethod
+    def _warmup_capture() -> None:
+        try:
+            import capture
+            capture.warmup()
+        except Exception:
+            pass
 
     def _show_startup_alerts(self) -> None:
         from ui.alerts import show_startup_alerts
@@ -117,6 +127,14 @@ class WidgetBase(QWidget):
         """안내문구 보정 (공개용 글 전용, 붙여넣기만 지원)."""
         from ui.proof_dialog import ProofDialog
         ProofDialog(self.config, parent=self).exec()
+
+    def open_quick(self) -> None:
+        """⚡ 간편 등록 — 지금 쿨메신저에서 보고 있는 쪽지를 바로 등록."""
+        from ui.quick_dialog import QuickDialog
+        dlg = QuickDialog(self.base_dir, self.store,
+                          google_enabled=self.google_enabled(), parent=self)
+        dlg.exec()
+        self.on_events_changed()
 
     def _swap_style(self, style: str) -> None:
         """설정에서 위젯 스타일 변경 시 즉시 교체."""

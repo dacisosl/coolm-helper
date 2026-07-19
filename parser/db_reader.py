@@ -51,21 +51,35 @@ def _copy_shared(src: str, dst: str) -> None:
 
 
 class DbReader:
-    """복사본 기반 읽기 전용 리더. with 문으로 사용하면 복사본이 자동 삭제된다."""
+    """읽기 전용 리더. with 문으로 사용한다.
 
-    def __init__(self, memo_dir: str):
+    - 기본(direct=False): udb+wal+shm을 임시 폴더에 복사 후 복사본을 연다
+      (가장 보수적 — 대량 조회용).
+    - direct=True: 원본을 복사 없이 읽기 전용으로 연다 (⚡ 간편 등록 등
+      속도가 중요한 경로용). SQLite WAL은 동시 읽기를 공식 지원하며,
+      mode=ro 연결은 데이터에 어떤 쓰기도 하지 않는다. 실패 시 호출부에서
+      복사 방식으로 폴백할 것.
+    """
+
+    def __init__(self, memo_dir: str, direct: bool = False):
         self.memo_dir = memo_dir
+        self.direct = direct
         self._tmp: str | None = None
         self._con: sqlite3.Connection | None = None
 
     def __enter__(self) -> "DbReader":
         src = find_active_udb(self.memo_dir)
-        self._tmp = tempfile.mkdtemp(prefix="coolm_ro_")
-        dst = os.path.join(self._tmp, "copy.udb")
-        for ext in ("", "-wal", "-shm"):
-            if os.path.exists(src + ext):
-                _copy_shared(src + ext, dst + ext)
-        self._con = sqlite3.connect(f"file:{dst}?mode=ro", uri=True)
+        if self.direct:
+            from pathlib import Path
+            uri = Path(src).as_uri() + "?mode=ro"
+            self._con = sqlite3.connect(uri, uri=True, timeout=1.0)
+        else:
+            self._tmp = tempfile.mkdtemp(prefix="coolm_ro_")
+            dst = os.path.join(self._tmp, "copy.udb")
+            for ext in ("", "-wal", "-shm"):
+                if os.path.exists(src + ext):
+                    _copy_shared(src + ext, dst + ext)
+            self._con = sqlite3.connect(f"file:{dst}?mode=ro", uri=True)
         self._validate()
         return self
 

@@ -64,8 +64,19 @@ class FloatingWidget(WidgetBase):
             f"border-radius:9px;padding:5px;font-size:12px;font-weight:bold")
         lay.addWidget(self.today_label)
 
-        add_btn = QPushButton("📅  일정 등록")
-        add_btn.setStyleSheet(theme.PRIMARY_BTN + "QPushButton{font-size:13px}")
+        quick_btn = QPushButton("⚡  간편 등록")
+        quick_btn.setStyleSheet(theme.PRIMARY_BTN + "QPushButton{font-size:13px}")
+        quick_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        quick_btn.setToolTip("쿨메신저에서 지금 보고 있는 쪽지를 바로 등록")
+        quick_btn.clicked.connect(self.open_quick)
+        lay.addWidget(quick_btn)
+
+        add_btn = QPushButton("📅  일정 등록 (전체)")
+        add_btn.setStyleSheet(
+            f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
+            f"border:1.5px solid {theme.PRIMARY};border-radius:8px;"
+            f"padding:8px;font-weight:bold;font-size:13px}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.clicked.connect(self.open_review)
         lay.addWidget(add_btn)

@@ -42,7 +42,9 @@ class _IconBar(QWidget):
         lay.setContentsMargins(6, 8, 6, 8)
         lay.setSpacing(4)
 
-        buttons = [("➕", "일정 등록", owner.open_review)]
+        buttons = [("⚡", "간편 등록 — 지금 보고 있는 쪽지 바로 등록",
+                    owner.open_quick)]
+        buttons.append(("➕", "일정 등록 (전체 목록)", owner.open_review))
         buttons.append(("🗓", "캘린더 · 할일", owner.open_calendar))
         if owner.config.get("proof_enabled"):        # 안내문구 보정 (추후 기능)
             buttons.append(("💬", "안내문구 보정", owner.open_proof))

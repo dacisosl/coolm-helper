@@ -1,5 +1,5 @@
 {
-  "version": "0.7.1",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.7.1/CoolmHelper-Setup.exe",
-  "notes": "- 쪽지 가져오기 개선: 안읽은 쪽지는 개수 제한 없이 전부 + 읽은 쪽지 최근 N개.\n  안읽은 쪽지가 15개, 30개 쌓인 날에도 확인 중인 쪽지가 항상 목록에 나옵니다.\n- 일정 등록 창 상단에 '● 안읽은 쪽지 N건 전부 포함' 안내 표시"
+  "version": "0.8.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.8.0/CoolmHelper-Setup.exe",
+  "notes": "⚡ 간편 등록 추가: 쿨메신저에서 쪽지를 보다가 펭귄의 ⚡ 버튼을 누르면, 지금 보고 있는 그 쪽지가 자동으로 채워진 등록 창이 뜹니다. 수정하고 등록만 누르면 끝. (쪽지 창이 없으면 클립보드 가져오기로 대체 가능)"
 }

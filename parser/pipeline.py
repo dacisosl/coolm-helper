@@ -129,6 +129,61 @@ def candidates_from_message(msg: Message, roster: set[str]) -> list[Candidate]:
     return out
 
 
+def _normalize_for_match(s: str) -> str:
+    return "".join(s.split())
+
+
+def match_captured(messages: list[Message], title: str, body: str) -> Message | None:
+    """화면에서 읽은 제목/본문으로 DB의 원본 쪽지를 찾는다.
+
+    포함 비교는 양쪽 모두 충분히 길 때만 한다 —
+    본문이 짧거나 빈 쪽지가 아무 텍스트와나 매칭되는 오탐 방지.
+    """
+    MIN = 20
+    nb = _normalize_for_match(body)
+    nt = _normalize_for_match(title)
+    for m in messages:
+        mb = _normalize_for_match(m.body)
+        if len(nb) >= MIN and len(mb) >= MIN:
+            if mb[:60] == nb[:60] or nb[:40] in mb or mb[:40] in nb:
+                return m
+    if len(nt) >= 6:
+        for m in messages:
+            mt = _normalize_for_match(m.title)
+            if len(mt) >= 6 and mt[:40] == nt[:40]:
+                return m
+    return None
+
+
+def quick_candidates(base_dir: str, title: str, body: str
+                     ) -> tuple[list[Candidate], Message, bool]:
+    """간편 등록용: 화면/클립보드에서 얻은 텍스트를 일정 후보로 바꾼다.
+
+    DB에서 원본 쪽지를 찾으면 그 쪽지 기준(수신시각·등록표시 연동),
+    못 찾으면 텍스트 자체를 지금 시각 기준으로 파싱한다.
+    반환: (후보들, 사용한 메시지, DB 매칭 여부)
+    """
+    config = load_config(base_dir)
+    matched = None
+    roster = None
+    # 속도 우선: 복사 없는 직접 읽기 → 실패하면 복사 방식 → 그래도 안 되면 텍스트만
+    for direct in (True, False):
+        try:
+            with DbReader(config["memo_dir"], direct=direct) as reader:
+                messages = reader.latest_messages(50)
+                roster = build_roster(base_dir, config, reader)
+                matched = match_captured(messages, title, body)
+            break
+        except Exception:     # 잠금·경로·스키마 문제 등 — 다음 방식으로
+            continue
+    if roster is None:
+        roster = build_roster(base_dir, config, None)
+    msg = matched or Message(
+        key=-1, sender="(화면에서 가져옴)", received=datetime.now(),
+        title=title or body.splitlines()[0][:40], body=body)
+    return candidates_from_message(msg, roster), msg, matched is not None
+
+
 def collect(base_dir: str, count: int | None = None) -> tuple[list[Candidate], list[Message], str]:
     """가장 최근 쪽지 N개에서 일정 후보를 수집한다.
 
