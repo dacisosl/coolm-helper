@@ -182,7 +182,7 @@ class ReviewDialog(QDialog):
 
     def __init__(self, candidates: list[Candidate], store: EventStore,
                  google_enabled: bool = False, source: str = "db",
-                 loader=None, count: int = 10, parent=None):
+                 loader=None, count: int = 10, fav_store=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("일정 등록")
         self.resize(880, 580)
@@ -194,6 +194,7 @@ class ReviewDialog(QDialog):
         self.rows: list[CandRow] = []
         self.source = source
         self._current: Candidate | None = None
+        self.fav_store = fav_store
         self.config = getattr(parent, "config", {}) if parent else {}
 
         lay = QVBoxLayout(self)
@@ -287,7 +288,11 @@ class ReviewDialog(QDialog):
         btns = QHBoxLayout()
         self.fav_btn = QPushButton("☆ 즐겨찾기")
         self.fav_btn.setStyleSheet(theme.TEXT_BTN)
-        self.fav_btn.setVisible(bool(self.config.get("favorites_enabled")))
+        self.fav_btn.setToolTip("제목과 상세내용을 즐겨찾기 보관함에 저장 "
+                                "(캘린더 창 → ★ 즐겨찾기 탭)")
+        self.fav_btn.setVisible(bool(self.config.get("favorites_enabled"))
+                                and self.fav_store is not None)
+        self.fav_btn.clicked.connect(self._save_favorite)
         btns.addWidget(self.fav_btn)
         btns.addStretch()
         if self.google_enabled:
@@ -372,13 +377,49 @@ class ReviewDialog(QDialog):
         if self._current is None:
             return
         registered = cand_ref(self._current) in self.store.registered_refs()
-        self.register_btn.setEnabled(not registered)
-        self.register_btn.setText("등록됨 ✓" if registered else "일정 등록")
+        self.register_btn.setEnabled(True)
+        if registered:
+            self.register_btn.setText("등록 취소")
+            self.register_btn.setStyleSheet(
+                f"QPushButton{{background:{theme.CARD};color:{theme.DANGER};"
+                f"border:1.5px solid {theme.DANGER};border-radius:8px;"
+                f"padding:9px 18px;font-weight:bold}}"
+                f"QPushButton:hover{{background:#fdecea}}")
+        else:
+            self.register_btn.setText("일정 등록")
+            self.register_btn.setStyleSheet(theme.PRIMARY_BTN)
 
-    # ── 등록 ────────────────────────────────────────────────
+    def _save_favorite(self) -> None:
+        if self.fav_store is None or self._current is None:
+            return
+        title = self.title_edit.text().strip() or "(제목 없음)"
+        self.fav_store.add(title, self.body_edit.toPlainText().strip())
+        self.fav_btn.setText("★ 저장됨")
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(1500, lambda: self.fav_btn.setText("☆ 즐겨찾기"))
+
+    # ── 등록 / 등록 취소 ─────────────────────────────────────
+    def _unregister(self, ref: str) -> None:
+        """이 후보로 등록했던 일정을 삭제한다 (구글에 올린 것도 함께 시도)."""
+        for e in list(self.store.all()):
+            if e.source_ref == ref:
+                if e.google_id:
+                    try:
+                        from calendar_sync import google_sync
+                        google_sync.delete_event(e.google_id)
+                    except Exception:
+                        QMessageBox.information(
+                            self, "안내",
+                            "구글 캘린더의 사본은 삭제하지 못했습니다.\n"
+                            "구글 캘린더에서 직접 지워주세요.")
+                self.store.remove(e.id)
+
     def _register(self) -> None:
         c = self._current
         if c is None:
+            return
+        if cand_ref(c) in self.store.registered_refs():   # 등록 취소
+            self._unregister(cand_ref(c))
             return
         title = self.title_edit.text().strip()
         if not title:

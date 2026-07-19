@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 
 from parser import pipeline
 from store.event_store import EventStore
+from store.favorites import FavStore
 from ui.calendar_view import CalendarWindow
 from ui.review_dialog import ReviewDialog
 
@@ -41,6 +42,7 @@ class WidgetBase(QWidget):
         self.base_dir = base_dir
         self.config = pipeline.load_config(base_dir)
         self.store = EventStore(base_dir, self.config.get("store_dir", "store"))
+        self.fav_store = FavStore(base_dir, self.config.get("store_dir", "store"))
         self.cal_win: CalendarWindow | None = None
         self._drag: QPoint | None = None
         QTimer.singleShot(2000, self._auto_update_check)
@@ -69,6 +71,10 @@ class WidgetBase(QWidget):
             return
         self.config = pipeline.load_config(self.base_dir)
         self.apply_config()
+        # 즐겨찾기 탭 등 설정이 바뀌었을 수 있으니 캘린더 창은 다음에 새로 만든다
+        if self.cal_win is not None:
+            self.cal_win.close()
+            self.cal_win = None
         new_style = self.config.get("widget_style", "mini")
         if new_style != old_style:
             self._swap_style(new_style)
@@ -124,13 +130,15 @@ class WidgetBase(QWidget):
                            google_enabled=self.google_enabled(),
                            source=source,
                            loader=lambda n: pipeline.collect(self.base_dir, n),
-                           count=count, parent=self)
+                           count=count, fav_store=self.fav_store, parent=self)
         dlg.exec()
         self.on_events_changed()
 
     def open_calendar(self) -> None:
         if self.cal_win is None:
-            self.cal_win = CalendarWindow(self.store)
+            self.cal_win = CalendarWindow(
+                self.store, fav_store=self.fav_store,
+                favorites_enabled=bool(self.config.get("favorites_enabled")))
         self.cal_win.refresh()
         self.cal_win.show()
         self.cal_win.raise_()

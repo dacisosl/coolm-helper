@@ -78,3 +78,8 @@ def register_event(title: str, start: datetime, end: datetime | None,
         }
     created = _service().events().insert(calendarId="primary", body=body).execute()
     return created["id"]
+
+
+def delete_event(event_id: str) -> None:
+    """등록 취소 시 구글 캘린더의 사본도 삭제한다 (이벤트 ID만 사용)."""
+    _service().events().delete(calendarId="primary", eventId=event_id).execute()

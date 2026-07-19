@@ -218,9 +218,10 @@ class SettingsDialog(QDialog):
         core.setChecked(True)
         core.setEnabled(False)
         lay.addWidget(core)
-        fav = QCheckBox("즐겨찾기 — 다음 업데이트(v0.5) 예정")
-        fav.setEnabled(False)
-        lay.addWidget(fav)
+        self.fav_cb = QCheckBox("즐겨찾기 보관함 — 일정 등록 창의 ☆ 버튼 + "
+                                "캘린더 창의 ★ 탭")
+        self.fav_cb.setChecked(bool(self.config.get("favorites_enabled", False)))
+        lay.addWidget(self.fav_cb)
         proof = QCheckBox("안내문구 보정 — 다음 업데이트(v0.6) 예정")
         proof.setEnabled(False)
         lay.addWidget(proof)
@@ -285,6 +286,7 @@ class SettingsDialog(QDialog):
     def _save(self) -> None:
         self.config["widget_style"] = ("detail" if self.style_detail.isChecked()
                                        else "mini")
+        self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["google_sync_enabled"] = self.google_radio.isChecked()
         self.config["recent_count"] = self.count_spin.value()
         self.config["demo_mode"] = self.demo_cb.isChecked()

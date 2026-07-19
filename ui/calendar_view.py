@@ -13,8 +13,8 @@ from PyQt6.QtCore import Qt, QDate, QRectF, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QTextCharFormat
 from PyQt6.QtWidgets import (
     QCalendarWidget, QCheckBox, QComboBox, QDateTimeEdit, QFrame,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSplitter,
-    QTextEdit, QVBoxLayout, QWidget,
+    QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QScrollArea, QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from store.event_store import Event, EventStore, PRIORITIES
@@ -28,7 +28,7 @@ class EventCalendar(QCalendarWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._counts: dict[date, int] = {}
+        self._counts: dict[date, tuple[int, bool]] = {}   # 날짜 → (개수, 높음 포함)
         self.setVerticalHeaderFormat(
             QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
         self.setGridVisible(False)
@@ -47,15 +47,17 @@ class EventCalendar(QCalendarWidget):
         sun.setForeground(QColor("#e57373"))
         self.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, sun)
 
-    def set_counts(self, counts: dict[date, int]) -> None:
+    def set_counts(self, counts: dict[date, tuple[int, bool]]) -> None:
         self._counts = counts
         self.updateCells()
 
     def paintCell(self, painter: QPainter, rect, qdate: QDate) -> None:
         super().paintCell(painter, rect, qdate)
-        n = self._counts.get(date(qdate.year(), qdate.month(), qdate.day()))
-        if not n:
+        info = self._counts.get(date(qdate.year(), qdate.month(), qdate.day()))
+        if not info:
             return
+        n, has_high = info
+        base = QColor("#e53935") if has_high else QColor(theme.PRIMARY)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         selected = qdate == self.selectedDate()
@@ -63,9 +65,9 @@ class EventCalendar(QCalendarWidget):
         x = rect.center().x() - chip_w / 2
         y = rect.bottom() - chip_h - 3
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("white") if selected else QColor(theme.PRIMARY))
+        painter.setBrush(QColor("white") if selected else base)
         painter.drawRoundedRect(QRectF(x, y, chip_w, chip_h), 7, 7)
-        painter.setPen(QColor(theme.PRIMARY) if selected else QColor("white"))
+        painter.setPen(base if selected else QColor("white"))
         f = QFont(self.font())
         f.setPointSize(7)
         f.setBold(True)
@@ -204,15 +206,64 @@ class EventItemCard(QFrame):
 
 
 class CalendarWindow(QWidget):
-    def __init__(self, store: EventStore, parent=None):
+    """테두리 없는 캘린더 창 — 커스텀 타이틀바(최소화/닫기) + 탭(캘린더/즐겨찾기)."""
+
+    def __init__(self, store: EventStore, fav_store=None,
+                 favorites_enabled: bool = False, parent=None):
         super().__init__(parent)
         self.store = store
         self.setWindowTitle("내 캘린더 — 쿨 일정 도우미")
-        self.resize(780, 500)
-        self.setStyleSheet(theme.BASE_QSS + theme.CALENDAR_QSS)
+        self.resize(800, 540)
+        self.setWindowFlags(Qt.WindowType.Window
+                            | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._drag = None
 
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(14, 14, 14, 14)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(10, 10, 10, 10)
+        card = QFrame()
+        card.setObjectName("calcard")
+        card.setStyleSheet(
+            theme.BASE_QSS + theme.CALENDAR_QSS
+            + f"#calcard{{background:{theme.BG};border-radius:16px;"
+              f"border:1px solid {theme.BORDER}}}")
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(24)
+        shadow.setOffset(0, 4)
+        shadow.setColor(QColor(30, 136, 229, 55))
+        card.setGraphicsEffect(shadow)
+        outer.addWidget(card)
+        root = QVBoxLayout(card)
+        root.setContentsMargins(14, 8, 14, 14)
+
+        # ── 커스텀 타이틀바 ──
+        bar = QHBoxLayout()
+        self._titlebar = QLabel("🗓  내 캘린더")
+        self._titlebar.setStyleSheet(
+            f"font-size:14px;font-weight:bold;color:{theme.PRIMARY_DARK}")
+        bar.addWidget(self._titlebar)
+        bar.addStretch()
+        for text, tip, handler in (("–", "최소화", self.showMinimized),
+                                   ("✕", "닫기", self.close)):
+            b = QPushButton(text)
+            b.setFixedSize(30, 26)
+            b.setToolTip(tip)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            hover = "#fdecea;color:#c62828" if text == "✕" else \
+                f"{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK}"
+            b.setStyleSheet(
+                f"QPushButton{{background:transparent;color:{theme.SUBTLE};"
+                f"border:none;border-radius:6px;font-size:13px}}"
+                f"QPushButton:hover{{background:{hover}}}")
+            b.clicked.connect(handler)
+            bar.addWidget(b)
+        root.addLayout(bar)
+
+        # ── 탭: 캘린더 / 즐겨찾기(옵션) ──
+        self.tabs = QTabWidget()
+        cal_page = QWidget()
+        lay = QHBoxLayout(cal_page)
+        lay.setContentsMargins(0, 8, 0, 0)
         split = QSplitter(Qt.Orientation.Horizontal)
 
         # 왼쪽: 달력 카드
@@ -251,22 +302,45 @@ class CalendarWindow(QWidget):
         split.addWidget(right)
         split.setSizes([420, 340])
         lay.addWidget(split)
+
+        self.tabs.addTab(cal_page, "캘린더")
+        if favorites_enabled and fav_store is not None:
+            from ui.favorites_view import FavoritesTab
+            self.tabs.addTab(FavoritesTab(fav_store), "★ 즐겨찾기")
+        root.addWidget(self.tabs)
+
         self.refresh()
         # 다른 창(일정 등록 등)에서 저장/삭제 시 실시간 반영.
         # 지연 호출: 카드 내부 저장 도중 위젯이 파괴되는 재진입을 피한다.
         store.subscribe(lambda: QTimer.singleShot(0, self.refresh))
 
+    # ── 커스텀 타이틀바 드래그 ───────────────────────────────
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton and \
+                ev.position().y() < 52:      # 타이틀바 영역에서만 이동
+            self._drag = ev.globalPosition().toPoint() - self.pos()
+
+    def mouseMoveEvent(self, ev):
+        if self._drag and ev.buttons() & Qt.MouseButton.LeftButton:
+            self.move(ev.globalPosition().toPoint() - self._drag)
+
+    def mouseReleaseEvent(self, ev):
+        self._drag = None
+
     # ── 갱신 ────────────────────────────────────────────────
-    def refresh(self) -> None:
-        counts: dict[date, int] = {}
+    def _counts(self) -> dict[date, tuple[int, bool]]:
+        out: dict[date, tuple[int, bool]] = {}
         for d in self.store.dates_with_events():
-            counts[d] = len(self.store.on_date(d))
-        self.cal.set_counts(counts)
+            evs = self.store.on_date(d)
+            out[d] = (len(evs), any(e.priority == "높음" for e in evs))
+        return out
+
+    def refresh(self) -> None:
+        self.cal.set_counts(self._counts())
         self.refresh_day()
 
     def _on_item_change(self, reload_day: bool) -> None:
-        self.refresh() if reload_day else self.cal.set_counts(
-            {d: len(self.store.on_date(d)) for d in self.store.dates_with_events()})
+        self.refresh() if reload_day else self.cal.set_counts(self._counts())
 
     def refresh_day(self) -> None:
         qd = self.cal.selectedDate()
