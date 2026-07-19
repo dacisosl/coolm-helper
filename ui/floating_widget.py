@@ -1,57 +1,24 @@
 # -*- coding: utf-8 -*-
-"""플로팅 위젯 — 항상 위에 떠 있는 작은 런처 (쿨메신저 블루 테마).
-
-[일정 등록] 클릭 시에만 메시지함을 읽는다. 백그라운드 감시 없음.
-"""
+"""상세 위젯 — 카드형 플로팅 런처 (쿨메신저 블루 테마)."""
 from __future__ import annotations
 
-import threading
 from datetime import date
 
-from PyQt6.QtCore import Qt, QPoint, QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
-    QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QPushButton, QVBoxLayout,
 )
 
-from parser import pipeline
-from store.event_store import EventStore
 from ui import theme
-from ui.calendar_view import CalendarWindow
-from ui.review_dialog import ReviewDialog
+from ui.widget_base import WidgetBase
 
 
-class _UpdateChecker(QObject):
-    """백그라운드 스레드에서 버전 확인 후 신호로 결과 전달 (UI 비블로킹)."""
-    found = pyqtSignal(dict)
-
-    def __init__(self, url: str, parent=None):
-        super().__init__(parent)
-        self.url = url
-
-    def start(self) -> None:
-        threading.Thread(target=self._run, daemon=True).start()
-
-    def _run(self) -> None:
-        import updater
-        info = updater.check_for_update(self.url)
-        if info:
-            self.found.emit(info)
-
-
-class FloatingWidget(QWidget):
+class FloatingWidget(WidgetBase):
     def __init__(self, base_dir: str):
-        super().__init__()
-        self.base_dir = base_dir
-        self.config = pipeline.load_config(base_dir)
-        self.store = EventStore(base_dir, self.config.get("store_dir", "store"))
-        self.cal_win: CalendarWindow | None = None
-        self._drag: QPoint | None = None
-
-        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint
-                            | Qt.WindowType.FramelessWindowHint
-                            | Qt.WindowType.Tool)
+        super().__init__(base_dir)
+        self.setWindowFlags(self.window_flags())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         outer = QVBoxLayout(self)
@@ -125,120 +92,22 @@ class FloatingWidget(QWidget):
         self.refresh_badge()
         self.resize(190, 205)
         self.apply_config()
-        QTimer.singleShot(2000, self._auto_update_check)   # 시작 2초 후 확인
+        self.store.subscribe(self.refresh_badge)
 
-    # ── 설정 ────────────────────────────────────────────────
-    def apply_config(self) -> None:
-        """설정 저장 후 위젯에 즉시 반영."""
-        self.setWindowOpacity(int(self.config.get("widget_opacity", 100)) / 100)
-        on_top = bool(self.config.get("widget_always_on_top", True))
-        flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool
-        if on_top:
-            flags |= Qt.WindowType.WindowStaysOnTopHint
-        if flags != self.windowFlags():
-            visible = self.isVisible()
-            self.setWindowFlags(flags)
-            if visible:
-                self.show()
-
-    def open_settings(self) -> None:
-        from ui.settings_dialog import SettingsDialog
-        dlg = SettingsDialog(self.base_dir, self.config, self.store, parent=self)
-        if dlg.exec():
-            self.config = pipeline.load_config(self.base_dir)
-            self.apply_config()
-
-    # ── 자동 업데이트 ────────────────────────────────────────
-    def _auto_update_check(self) -> None:
-        url = self.config.get("update_url", "")
-        if not (url and self.config.get("auto_update_check", True)):
-            return
-        self._checker = _UpdateChecker(url, self)
-        self._checker.found.connect(self._offer_update)
-        self._checker.start()
-
-    def _offer_update(self, info: dict) -> None:
-        notes = info.get("notes", "")
-        msg = f"새 버전 v{info.get('version')}이 나왔습니다."
-        if notes:
-            msg += f"\n\n변경사항:\n{notes}"
-        msg += "\n\n업데이트 후 재시작하시겠습니까?"
-        ret = QMessageBox.question(self, "업데이트", msg)
-        if ret != QMessageBox.StandardButton.Yes:
-            return
-        import updater
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            path = updater.download_installer(info["url"])
-        except Exception as e:
-            QApplication.restoreOverrideCursor()
-            QMessageBox.warning(self, "업데이트 실패",
-                                f"다운로드하지 못했습니다.\n{e}")
-            return
-        QApplication.restoreOverrideCursor()
-        updater.run_installer_and_quit(path)
-
-    # ── 동작 ────────────────────────────────────────────────
     def refresh_badge(self) -> None:
         n = len(self.store.on_date(date.today()))
         self.today_label.setText(f"오늘 일정 {n}건")
 
-    def google_enabled(self) -> bool:
-        if not self.config.get("google_sync_enabled"):
-            return False
-        try:
-            from calendar_sync import google_sync
-            return google_sync.is_available(self.base_dir)
-        except Exception:
-            return False
-
-    def open_review(self) -> None:
-        try:
-            candidates, no_event, source = pipeline.collect(self.base_dir)
-        except FileNotFoundError as e:
-            # 쿨메신저가 없는 PC (다른 컴퓨터에서 테스트하는 경우) → 데모 제안
-            ret = QMessageBox.question(
-                self, "안내",
-                "쿨메신저 메시지함을 찾을 수 없습니다.\n\n"
-                "내장된 가짜 쪽지(데모 데이터)로 기능을 체험해 보시겠어요?\n"
-                "데모로 등록한 일정은 설정 → 데이터에서 한 번에 삭제할 수 있습니다.\n\n"
-                f"(원본 안내: {e})")
-            if ret != QMessageBox.StandardButton.Yes:
-                return
-            self.config["demo_mode"] = True
-            pipeline.save_config(self.base_dir, self.config)
-            candidates, no_event, source = pipeline.collect(self.base_dir)
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"메시지함을 읽지 못했습니다.\n{e}")
-            return
-        # 후보가 없어도 창을 연다 — 콤보박스로 개수를 늘려 다시 찾을 수 있게
-        count = int(self.config.get("recent_count", 10))
-        dlg = ReviewDialog(candidates, self.store,
-                           google_enabled=self.google_enabled(),
-                           source=source,
-                           loader=lambda n: pipeline.collect(self.base_dir, n),
-                           count=count, parent=self)
-        dlg.exec()
+    def on_events_changed(self) -> None:
         self.refresh_badge()
-        if self.cal_win:
-            self.cal_win.refresh()
 
-    def open_calendar(self) -> None:
-        if self.cal_win is None:
-            self.cal_win = CalendarWindow(self.store)
-        self.cal_win.refresh()
-        self.cal_win.show()
-        self.cal_win.raise_()
-        self.cal_win.activateWindow()   # 다른 창 뒤에 열리는 문제 방지
-
-    # ── 드래그 이동 ──────────────────────────────────────────
-    def mousePressEvent(self, ev):
-        if ev.button() == Qt.MouseButton.LeftButton:
-            self._drag = ev.globalPosition().toPoint() - self.pos()
-
-    def mouseMoveEvent(self, ev):
-        if self._drag and ev.buttons() & Qt.MouseButton.LeftButton:
-            self.move(ev.globalPosition().toPoint() - self._drag)
-
-    def mouseReleaseEvent(self, ev):
-        self._drag = None
+    def contextMenuEvent(self, ev):
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+        act_mini = menu.addAction("미니 위젯으로 전환")
+        chosen = menu.exec(ev.globalPos())
+        if chosen == act_mini:
+            from parser import pipeline
+            self.config["widget_style"] = "mini"
+            pipeline.save_config(self.base_dir, self.config)
+            self._swap_style("mini")

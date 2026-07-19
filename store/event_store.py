@@ -26,6 +26,7 @@ class Event:
     priority: str = "보통"          # 중요도: 높음 | 보통 | 낮음
     memo: str = ""                  # 상세 메모 (로컬 전용)
     demo: bool = False              # 데모 모드에서 등록된 테스트 일정
+    source_ref: str = ""            # 원본 쪽지 참조 "쪽지key|시작일시" — 등록 표시 유지용
     google_id: str | None = None    # 구글에도 등록한 경우의 이벤트 ID
     created: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -40,11 +41,28 @@ class Event:
 
 
 class EventStore:
+    """로컬 일정 저장소. subscribe()로 변경 알림을 받을 수 있다 (창 간 실시간 동기화)."""
+
     def __init__(self, base_dir: str, store_dir: str = "store"):
         self.path = os.path.join(base_dir, store_dir, "events.json")
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         self._events: list[Event] = []
+        self._listeners: list = []
         self._load()
+
+    def subscribe(self, callback) -> None:
+        self._listeners.append(callback)
+
+    def unsubscribe(self, callback) -> None:
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+
+    def _notify(self) -> None:
+        for cb in list(self._listeners):
+            try:
+                cb()
+            except RuntimeError:      # 이미 닫힌 창의 콜백은 제거
+                self._listeners.remove(cb)
 
     def _load(self) -> None:
         try:
@@ -59,15 +77,18 @@ class EventStore:
             json.dump([asdict(e) for e in self._events], f,
                       ensure_ascii=False, indent=1)
         os.replace(tmp, self.path)
+        self._notify()
 
     # ── CRUD ────────────────────────────────────────────────
     def add(self, title: str, start: datetime, end: datetime | None = None,
             all_day: bool = True, is_deadline: bool = False,
-            google_id: str | None = None, demo: bool = False) -> Event:
+            google_id: str | None = None, demo: bool = False,
+            memo: str = "", source_ref: str = "") -> Event:
         ev = Event(title=title, start=start.isoformat(),
                    end=end.isoformat() if end else None,
                    all_day=all_day, is_deadline=is_deadline,
-                   google_id=google_id, demo=demo,
+                   google_id=google_id, demo=demo, memo=memo,
+                   source_ref=source_ref,
                    created=datetime.now().isoformat())
         self._events.append(ev)
         self._save()
@@ -76,6 +97,10 @@ class EventStore:
     def remove(self, event_id: str) -> None:
         self._events = [e for e in self._events if e.id != event_id]
         self._save()
+
+    def registered_refs(self) -> set[str]:
+        """등록된 일정들의 원본 쪽지 참조 — 일정등록 목록의 '등록됨' 배경 표시용."""
+        return {e.source_ref for e in self._events if e.source_ref}
 
     def demo_count(self) -> int:
         return sum(1 for e in self._events if e.demo)

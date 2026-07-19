@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from PyQt6.QtCore import Qt, QDate, QRectF
+from PyQt6.QtCore import Qt, QDate, QRectF, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QTextCharFormat
 from PyQt6.QtWidgets import (
     QCalendarWidget, QCheckBox, QComboBox, QDateTimeEdit, QFrame,
@@ -252,6 +252,9 @@ class CalendarWindow(QWidget):
         split.setSizes([420, 340])
         lay.addWidget(split)
         self.refresh()
+        # 다른 창(일정 등록 등)에서 저장/삭제 시 실시간 반영.
+        # 지연 호출: 카드 내부 저장 도중 위젯이 파괴되는 재진입을 피한다.
+        store.subscribe(lambda: QTimer.singleShot(0, self.refresh))
 
     # ── 갱신 ────────────────────────────────────────────────
     def refresh(self) -> None:

@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.3.0/CoolmHelper-Setup.exe",
-  "notes": "데모 모드 추가 — 쿨메신저가 없는 컴퓨터에서도 가짜 쪽지로 전체 기능을 체험할 수 있습니다. 설정 → 데이터에서 켜고 끄며, 데모로 등록한 일정은 버튼 한 번으로 일괄 삭제됩니다."
+  "version": "0.4.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.4.0/CoolmHelper-Setup.exe",
+  "notes": "- 미니 위젯: 오른쪽 벽에 붙는 펭귄, 클릭하면 메뉴 (기본값, 설정에서 상세형으로 전환)\n- 일정 등록 창 개편: 왼쪽 목록 / 오른쪽 상세보기 2분할, 메모 입력 지원\n- 등록한 항목은 목록에서 연두색으로 표시되고 재시작해도 유지, 캘린더에서 지우면 즉시 원복\n- 설정에 '일반' 탭 추가 (위젯 스타일·기능 안내)"
 }

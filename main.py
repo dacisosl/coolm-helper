@@ -42,17 +42,22 @@ sys.excepthook = _excepthook
 
 from PyQt6.QtWidgets import QApplication
 
-from ui.floating_widget import FloatingWidget
-
 
 def main() -> None:
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)    # 캘린더 창 닫아도 위젯은 유지
-    w = FloatingWidget(BASE_DIR)
-    # 우측 하단에 배치
-    screen = app.primaryScreen().availableGeometry()
-    w.move(screen.right() - w.width() - 24, screen.bottom() - w.height() - 24)
+
+    from parser import pipeline
+    style = pipeline.load_config(BASE_DIR).get("widget_style", "mini")
+    if style == "mini":
+        from ui.mini_widget import MiniWidget
+        w = MiniWidget(BASE_DIR)
+    else:
+        from ui.floating_widget import FloatingWidget
+        w = FloatingWidget(BASE_DIR)
+    w.place_default()
     w.show()
+    app._coolm_widget = w                   # 스타일 전환 시 참조 유지
     sys.exit(app.exec())
 
 

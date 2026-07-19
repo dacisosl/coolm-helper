@@ -40,8 +40,11 @@ DEFAULT_CONFIG = {
     "store_dir": "store",
     "recent_count": 10,          # 가장 최근 쪽지 N개 (날짜 기준 아님)
     "google_sync_enabled": False,   # 저장 모드: False=로컬(기본) / True=구글 연동
+    "widget_style": "mini",         # mini(펭귄 도킹) | detail(카드형)
     "widget_always_on_top": True,
     "widget_opacity": 100,          # 50~100 (%)
+    "favorites_enabled": False,     # 즐겨찾기 (v0.5)
+    "proof_enabled": False,         # 안내문구 보정 (v0.6)
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
     "update_url": "https://raw.githubusercontent.com/dacisosl/coolm-helper/main/version.json"

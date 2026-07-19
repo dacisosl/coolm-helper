@@ -38,10 +38,10 @@ class SettingsDialog(QDialog):
 
         lay = QVBoxLayout(self)
         tabs = QTabWidget()
+        tabs.addTab(self._general_tab(), "일반")
         tabs.addTab(self._account_tab(), "계정")
         tabs.addTab(self._data_tab(), "데이터")
         tabs.addTab(self._privacy_tab(), "개인정보")
-        tabs.addTab(self._widget_tab(), "위젯")
         lay.addWidget(tabs)
 
         btns = QHBoxLayout()
@@ -181,16 +181,26 @@ class SettingsDialog(QDialog):
         lay.addStretch()
         return w
 
-    # ── 위젯 ────────────────────────────────────────────────
-    def _widget_tab(self) -> QWidget:
+    # ── 일반: 위젯 스타일 + 기능 온오프 ──────────────────────
+    def _general_tab(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
-        lay.addWidget(_section_label("플로팅 위젯"))
+        lay.addWidget(_section_label("위젯 스타일"))
+        self.style_mini = QRadioButton(
+            "미니 (기본) — 오른쪽 벽의 펭귄, 클릭하면 메뉴가 나옵니다")
+        self.style_detail = QRadioButton("상세 — 버튼이 다 보이는 카드형")
+        if self.config.get("widget_style", "mini") == "detail":
+            self.style_detail.setChecked(True)
+        else:
+            self.style_mini.setChecked(True)
+        lay.addWidget(self.style_mini)
+        lay.addWidget(self.style_detail)
+
+        lay.addWidget(_section_label("위젯 동작"))
         self.on_top_cb = QCheckBox("항상 다른 창 위에 표시")
         self.on_top_cb.setChecked(
             bool(self.config.get("widget_always_on_top", True)))
         lay.addWidget(self.on_top_cb)
-
         row = QHBoxLayout()
         row.addWidget(QLabel("투명도"))
         self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
@@ -202,6 +212,18 @@ class SettingsDialog(QDialog):
             lambda v: self.opacity_label.setText(f"{v}%"))
         row.addWidget(self.opacity_label)
         lay.addLayout(row)
+
+        lay.addWidget(_section_label("기능"))
+        core = QCheckBox("일정 등록 (기본 기능)")
+        core.setChecked(True)
+        core.setEnabled(False)
+        lay.addWidget(core)
+        fav = QCheckBox("즐겨찾기 — 다음 업데이트(v0.5) 예정")
+        fav.setEnabled(False)
+        lay.addWidget(fav)
+        proof = QCheckBox("안내문구 보정 — 다음 업데이트(v0.6) 예정")
+        proof.setEnabled(False)
+        lay.addWidget(proof)
         lay.addStretch()
         return w
 
@@ -261,6 +283,8 @@ class SettingsDialog(QDialog):
         self.parent()._offer_update(info)   # 플로팅 위젯의 공용 업데이트 안내 사용
 
     def _save(self) -> None:
+        self.config["widget_style"] = ("detail" if self.style_detail.isChecked()
+                                       else "mini")
         self.config["google_sync_enabled"] = self.google_radio.isChecked()
         self.config["recent_count"] = self.count_spin.value()
         self.config["demo_mode"] = self.demo_cb.isChecked()
