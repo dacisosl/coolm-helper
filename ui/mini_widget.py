@@ -126,6 +126,3 @@ class MiniWidget(WidgetBase):
             self._swap_style("detail")
         elif chosen == act_quit:
             QApplication.instance().quit()
-
-    def open_proof(self) -> None:
-        """안내문구 보정 — v0.6.0에서 구현 예정."""

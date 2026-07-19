@@ -43,8 +43,13 @@ DEFAULT_CONFIG = {
     "widget_style": "mini",         # mini(펭귄 도킹) | detail(카드형)
     "widget_always_on_top": True,
     "widget_opacity": 100,          # 50~100 (%)
-    "favorites_enabled": False,     # 즐겨찾기 (v0.5)
-    "proof_enabled": False,         # 안내문구 보정 (v0.6)
+    "favorites_enabled": False,     # 즐겨찾기 보관함
+    "proof_enabled": False,         # 안내문구 보정 (공개용 글 전용)
+    "proof_provider": "gemini",
+    "proof_model": "gemini-2.0-flash",
+    "proof_api_key": "",            # 로컬에만 저장 (gitignore 대상 config.json)
+    "desktop_widget_enabled": False,   # 바탕화면 반절 캘린더 위젯
+    "desktop_widget_opacity": 90,      # 40~100 (%)
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
     "update_url": "https://raw.githubusercontent.com/dacisosl/coolm-helper/main/version.json"

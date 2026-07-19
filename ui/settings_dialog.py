@@ -7,8 +7,9 @@ import shutil
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-    QRadioButton, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QRadioButton, QSlider, QSpinBox, QTabWidget, QVBoxLayout,
+    QWidget,
 )
 
 from parser import pipeline
@@ -105,6 +106,26 @@ class SettingsDialog(QDialog):
             f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
             f"border-radius:8px;padding:8px;font-size:11px")
         lay.addWidget(note)
+
+        lay.addWidget(_section_label("안내문구 보정 — Gemini API 키"))
+        self.proof_key_edit = QLineEdit(self.config.get("proof_api_key", ""))
+        self.proof_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.proof_key_edit.setPlaceholderText(
+            "AIza… 로 시작하는 키를 붙여넣으세요 (이 PC에만 저장됩니다)")
+        lay.addWidget(self.proof_key_edit)
+        key_row = QHBoxLayout()
+        key_guide = QPushButton("무료 키 발급 페이지 열기")
+        key_guide.clicked.connect(lambda: __import__("webbrowser").open(
+            "https://aistudio.google.com/apikey"))
+        key_row.addWidget(key_guide)
+        key_row.addStretch()
+        lay.addLayout(key_row)
+        key_note = QLabel("보정 기능은 입력창에 직접 붙여넣은 글만 전송합니다. "
+                          "예전에 쪽지 등으로 공유된 적 있는 키는 쓰지 말고 "
+                          "새 키를 발급받으세요.")
+        key_note.setWordWrap(True)
+        key_note.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
+        lay.addWidget(key_note)
         lay.addStretch()
         return w
 
@@ -222,9 +243,28 @@ class SettingsDialog(QDialog):
                                 "캘린더 창의 ★ 탭")
         self.fav_cb.setChecked(bool(self.config.get("favorites_enabled", False)))
         lay.addWidget(self.fav_cb)
-        proof = QCheckBox("안내문구 보정 — 다음 업데이트(v0.6) 예정")
-        proof.setEnabled(False)
-        lay.addWidget(proof)
+        self.proof_cb = QCheckBox("안내문구 보정 — 공개용 글을 AI로 다듬기 "
+                                  "(계정 탭에서 API 키 필요)")
+        self.proof_cb.setChecked(bool(self.config.get("proof_enabled", False)))
+        lay.addWidget(self.proof_cb)
+
+        lay.addWidget(_section_label("바탕화면 캘린더 위젯"))
+        self.desk_cb = QCheckBox("바탕화면 반절 캘린더 표시 (주간+월간, 항상 맨 뒤)")
+        self.desk_cb.setChecked(
+            bool(self.config.get("desktop_widget_enabled", False)))
+        lay.addWidget(self.desk_cb)
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("위젯 투명도"))
+        self.desk_opacity = QSlider(Qt.Orientation.Horizontal)
+        self.desk_opacity.setRange(40, 100)
+        self.desk_opacity.setValue(
+            int(self.config.get("desktop_widget_opacity", 90)))
+        row2.addWidget(self.desk_opacity)
+        self.desk_opacity_label = QLabel(f"{self.desk_opacity.value()}%")
+        self.desk_opacity.valueChanged.connect(
+            lambda v: self.desk_opacity_label.setText(f"{v}%"))
+        row2.addWidget(self.desk_opacity_label)
+        lay.addLayout(row2)
         lay.addStretch()
         return w
 
@@ -287,6 +327,10 @@ class SettingsDialog(QDialog):
         self.config["widget_style"] = ("detail" if self.style_detail.isChecked()
                                        else "mini")
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
+        self.config["proof_enabled"] = self.proof_cb.isChecked()
+        self.config["proof_api_key"] = self.proof_key_edit.text().strip()
+        self.config["desktop_widget_enabled"] = self.desk_cb.isChecked()
+        self.config["desktop_widget_opacity"] = self.desk_opacity.value()
         self.config["google_sync_enabled"] = self.google_radio.isChecked()
         self.config["recent_count"] = self.count_spin.value()
         self.config["demo_mode"] = self.demo_cb.isChecked()

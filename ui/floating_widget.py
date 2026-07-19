@@ -80,6 +80,17 @@ class FloatingWidget(WidgetBase):
         cal_btn.clicked.connect(self.open_calendar)
         lay.addWidget(cal_btn)
 
+        if self.config.get("proof_enabled"):
+            proof_btn = QPushButton("💬  안내문구 보정")
+            proof_btn.setStyleSheet(
+                f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
+                f"border:1.5px solid {theme.BORDER};border-radius:8px;"
+                f"padding:8px;font-size:13px}}"
+                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            proof_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            proof_btn.clicked.connect(self.open_proof)
+            lay.addWidget(proof_btn)
+
         quit_btn = QPushButton("종료")
         quit_btn.setStyleSheet(
             f"QPushButton{{background:transparent;color:{theme.SUBTLE};"

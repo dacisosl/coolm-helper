@@ -41,11 +41,20 @@ class WidgetBase(QWidget):
         super().__init__()
         self.base_dir = base_dir
         self.config = pipeline.load_config(base_dir)
-        self.store = EventStore(base_dir, self.config.get("store_dir", "store"))
-        self.fav_store = FavStore(base_dir, self.config.get("store_dir", "store"))
+        # 저장소는 앱 전체에서 하나만 공유 — 창 간 실시간 동기화의 기반
+        app = QApplication.instance()
+        shared = getattr(app, "_coolm_stores", None)
+        if shared is None:
+            store_dir = self.config.get("store_dir", "store")
+            shared = {"events": EventStore(base_dir, store_dir),
+                      "favs": FavStore(base_dir, store_dir)}
+            app._coolm_stores = shared
+        self.store: EventStore = shared["events"]
+        self.fav_store: FavStore = shared["favs"]
         self.cal_win: CalendarWindow | None = None
         self._drag: QPoint | None = None
         QTimer.singleShot(2000, self._auto_update_check)
+        QTimer.singleShot(300, self.ensure_desktop_widget)
 
     # ── 설정 ────────────────────────────────────────────────
     def window_flags(self) -> Qt.WindowType:
@@ -71,6 +80,7 @@ class WidgetBase(QWidget):
             return
         self.config = pipeline.load_config(self.base_dir)
         self.apply_config()
+        self.ensure_desktop_widget()
         # 즐겨찾기 탭 등 설정이 바뀌었을 수 있으니 캘린더 창은 다음에 새로 만든다
         if self.cal_win is not None:
             self.cal_win.close()
@@ -78,6 +88,30 @@ class WidgetBase(QWidget):
         new_style = self.config.get("widget_style", "mini")
         if new_style != old_style:
             self._swap_style(new_style)
+
+    def ensure_desktop_widget(self) -> None:
+        """바탕화면 캘린더 위젯을 설정에 맞춰 켜거나 끈다."""
+        app = QApplication.instance()
+        cur = getattr(app, "_coolm_desktop", None)
+        if self.config.get("desktop_widget_enabled"):
+            if cur is None:
+                from ui.desktop_calendar import DesktopCalendar
+                cur = DesktopCalendar(self.store, self.config)
+                cur.place_default()
+                cur.show()
+                app._coolm_desktop = cur
+            else:
+                cur.config = self.config
+                cur.setWindowOpacity(
+                    max(40, int(self.config.get("desktop_widget_opacity", 90))) / 100)
+        elif cur is not None:
+            cur.close()
+            app._coolm_desktop = None
+
+    def open_proof(self) -> None:
+        """안내문구 보정 (공개용 글 전용, 붙여넣기만 지원)."""
+        from ui.proof_dialog import ProofDialog
+        ProofDialog(self.config, parent=self).exec()
 
     def _swap_style(self, style: str) -> None:
         """설정에서 위젯 스타일 변경 시 즉시 교체."""
