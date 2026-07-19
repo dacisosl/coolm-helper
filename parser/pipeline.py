@@ -42,6 +42,7 @@ DEFAULT_CONFIG = {
     "google_sync_enabled": False,   # 저장 모드: False=로컬(기본) / True=구글 연동
     "widget_always_on_top": True,
     "widget_opacity": 100,          # 50~100 (%)
+    "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
     "update_url": "https://raw.githubusercontent.com/dacisosl/coolm-helper/main/version.json"
 }
@@ -127,6 +128,18 @@ def collect(base_dir: str, count: int | None = None) -> tuple[list[Candidate], l
     """
     config = load_config(base_dir)
     count = count or int(config.get("recent_count", 10))
+
+    # 데모 모드: 쿨메신저 없이 내장 가짜 쪽지로 전체 기능 체험
+    if config.get("demo_mode"):
+        from . import demo_data
+        messages = demo_data.demo_messages()[:count]
+        roster = build_roster(base_dir, config, None) | demo_data.demo_roster()
+        candidates, no_event = [], []
+        for msg in messages:
+            found = candidates_from_message(msg, roster)
+            candidates.extend(found) if found else no_event.append(msg)
+        return candidates, no_event, "demo"
+
     source = "db"
     try:
         with DbReader(config["memo_dir"]) as reader:

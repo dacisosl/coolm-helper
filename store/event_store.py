@@ -25,6 +25,7 @@ class Event:
     done: bool = False              # 할일(마감형)의 완료 여부
     priority: str = "보통"          # 중요도: 높음 | 보통 | 낮음
     memo: str = ""                  # 상세 메모 (로컬 전용)
+    demo: bool = False              # 데모 모드에서 등록된 테스트 일정
     google_id: str | None = None    # 구글에도 등록한 경우의 이벤트 ID
     created: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -62,11 +63,12 @@ class EventStore:
     # ── CRUD ────────────────────────────────────────────────
     def add(self, title: str, start: datetime, end: datetime | None = None,
             all_day: bool = True, is_deadline: bool = False,
-            google_id: str | None = None) -> Event:
+            google_id: str | None = None, demo: bool = False) -> Event:
         ev = Event(title=title, start=start.isoformat(),
                    end=end.isoformat() if end else None,
                    all_day=all_day, is_deadline=is_deadline,
-                   google_id=google_id, created=datetime.now().isoformat())
+                   google_id=google_id, demo=demo,
+                   created=datetime.now().isoformat())
         self._events.append(ev)
         self._save()
         return ev
@@ -74,6 +76,16 @@ class EventStore:
     def remove(self, event_id: str) -> None:
         self._events = [e for e in self._events if e.id != event_id]
         self._save()
+
+    def demo_count(self) -> int:
+        return sum(1 for e in self._events if e.demo)
+
+    def remove_demo(self) -> int:
+        """데모 모드에서 등록한 테스트 일정을 모두 삭제한다."""
+        n = self.demo_count()
+        self._events = [e for e in self._events if not e.demo]
+        self._save()
+        return n
 
     def set_done(self, event_id: str, done: bool) -> None:
         for e in self._events:

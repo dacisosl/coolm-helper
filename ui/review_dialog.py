@@ -40,10 +40,11 @@ def highlight_html(text: str, spans: list[PiiSpan]) -> str:
 
 class CandidateCard(QFrame):
     def __init__(self, cand: Candidate, store: EventStore,
-                 google_enabled: bool, parent=None):
+                 google_enabled: bool, demo: bool = False, parent=None):
         super().__init__(parent)
         self.cand = cand
         self.store = store
+        self.demo = demo   # 데모 모드 등록분은 표식을 남겨 나중에 일괄 삭제 가능
         self.registered = False
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(
@@ -144,7 +145,7 @@ class CandidateCard(QFrame):
 
         self.store.add(title=title, start=start, end=end, all_day=all_day,
                        is_deadline=self.deadline_cb.isChecked(),
-                       google_id=google_id)
+                       google_id=google_id, demo=self.demo)
         self.registered = True
         self.setStyleSheet(
             f"CandidateCard{{background:{theme.SUCCESS_BG};"
@@ -213,17 +214,21 @@ class ReviewDialog(QDialog):
             if item.widget():
                 item.widget().deleteLater()
         self.cards = []
+        demo = source == "demo"
         for c in candidates:
-            card = CandidateCard(c, self.store, self.google_enabled)
+            card = CandidateCard(c, self.store, self.google_enabled, demo=demo)
             self.cards.append(card)
             self.cards_lay.addWidget(card)
         self.cards_lay.addStretch()
-        src_label = "쿨메신저 DB" if source == "db" else "엑셀 내보내기(Plan B)"
-        self.head.setText(
-            f"최근 쪽지 {self.count_combo.currentData()}개에서 "
-            f"일정 후보 {len(candidates)}건을 찾았습니다. (소스: {src_label})\n"
-            "빨간 글씨는 전화번호·이름으로 보이는 부분입니다. "
-            "지울지 여부는 제목을 직접 편집해서 결정하세요.")
+        src_label = {"db": "쿨메신저 DB", "excel": "엑셀 내보내기(Plan B)",
+                     "demo": "데모 데이터 (가짜 쪽지, 테스트용)"}.get(source, source)
+        head = (f"최근 쪽지 {self.count_combo.currentData()}개에서 "
+                f"일정 후보 {len(candidates)}건을 찾았습니다. (소스: {src_label})\n"
+                "빨간 글씨는 전화번호·이름으로 보이는 부분입니다. "
+                "지울지 여부는 제목을 직접 편집해서 결정하세요.")
+        if demo:
+            head += "\n※ 데모 일정은 설정 → 데이터에서 한 번에 삭제할 수 있습니다."
+        self.head.setText(head)
 
     def _reload(self) -> None:
         if not self.loader:

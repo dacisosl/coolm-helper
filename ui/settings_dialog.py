@@ -130,6 +130,17 @@ class SettingsDialog(QDialog):
             os.path.join(self.base_dir, self.config.get("store_dir", "store"))))
         lay.addWidget(open_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        lay.addWidget(_section_label("데모 모드 (테스트)"))
+        self.demo_cb = QCheckBox("데모 모드 — 내장된 가짜 쪽지로 기능 체험 "
+                                 "(쿨메신저가 없어도 동작)")
+        self.demo_cb.setChecked(bool(self.config.get("demo_mode", False)))
+        lay.addWidget(self.demo_cb)
+        self.demo_del_btn = QPushButton(
+            f"데모로 등록한 일정 모두 삭제 ({self.store.demo_count()}건)")
+        self.demo_del_btn.clicked.connect(self._delete_demo_events)
+        self.demo_del_btn.setEnabled(self.store.demo_count() > 0)
+        lay.addWidget(self.demo_del_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+
         lay.addWidget(_section_label("업데이트"))
         lay.addWidget(QLabel(f"현재 버전: v{APP_VERSION}"))
         self.auto_update_cb = QCheckBox("시작할 때 새 버전 자동 확인")
@@ -223,6 +234,17 @@ class SettingsDialog(QDialog):
                     f.write("# 한 줄에 학생 이름 하나씩 적으세요.\n")
         os.startfile(path)
 
+    def _delete_demo_events(self) -> None:
+        n = self.store.remove_demo()
+        self.demo_del_btn.setText("데모로 등록한 일정 모두 삭제 (0건)")
+        self.demo_del_btn.setEnabled(False)
+        QMessageBox.information(self, "완료", f"데모 일정 {n}건을 삭제했습니다.")
+        parent = self.parent()
+        if parent is not None:
+            parent.refresh_badge()
+            if getattr(parent, "cal_win", None):
+                parent.cal_win.refresh()
+
     def _check_update_now(self) -> None:
         import updater
         url = self.config.get("update_url", "")
@@ -241,6 +263,7 @@ class SettingsDialog(QDialog):
     def _save(self) -> None:
         self.config["google_sync_enabled"] = self.google_radio.isChecked()
         self.config["recent_count"] = self.count_spin.value()
+        self.config["demo_mode"] = self.demo_cb.isChecked()
         self.config["auto_update_check"] = self.auto_update_cb.isChecked()
         self.config["widget_always_on_top"] = self.on_top_cb.isChecked()
         self.config["widget_opacity"] = self.opacity_slider.value()

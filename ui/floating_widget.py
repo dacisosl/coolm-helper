@@ -196,8 +196,18 @@ class FloatingWidget(QWidget):
         try:
             candidates, no_event, source = pipeline.collect(self.base_dir)
         except FileNotFoundError as e:
-            QMessageBox.information(self, "안내", str(e))
-            return
+            # 쿨메신저가 없는 PC (다른 컴퓨터에서 테스트하는 경우) → 데모 제안
+            ret = QMessageBox.question(
+                self, "안내",
+                "쿨메신저 메시지함을 찾을 수 없습니다.\n\n"
+                "내장된 가짜 쪽지(데모 데이터)로 기능을 체험해 보시겠어요?\n"
+                "데모로 등록한 일정은 설정 → 데이터에서 한 번에 삭제할 수 있습니다.\n\n"
+                f"(원본 안내: {e})")
+            if ret != QMessageBox.StandardButton.Yes:
+                return
+            self.config["demo_mode"] = True
+            pipeline.save_config(self.base_dir, self.config)
+            candidates, no_event, source = pipeline.collect(self.base_dir)
         except Exception as e:
             QMessageBox.critical(self, "오류", f"메시지함을 읽지 못했습니다.\n{e}")
             return
