@@ -1,5 +1,5 @@
 {
-  "version": "0.7.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.7.0/CoolmHelper-Setup.exe",
-  "notes": "- 시작 알림: 프로그램을 켜면 말풍선으로 마감 알림(3일/1일 전)과 오늘 일정 개수를 차례로 알려줍니다 (클릭하면 다음, 세션당 1회)\n- 미니 위젯은 펭귄 머리 위, 상세 위젯은 위젯 위에 말풍선 표시\n- Windows 시작 시 자동 실행 (설정 → 일반에서 켜고 끄기)"
+  "version": "0.7.1",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.7.1/CoolmHelper-Setup.exe",
+  "notes": "- 쪽지 가져오기 개선: 안읽은 쪽지는 개수 제한 없이 전부 + 읽은 쪽지 최근 N개.\n  안읽은 쪽지가 15개, 30개 쌓인 날에도 확인 중인 쪽지가 항상 목록에 나옵니다.\n- 일정 등록 창 상단에 '● 안읽은 쪽지 N건 전부 포함' 안내 표시"
 }

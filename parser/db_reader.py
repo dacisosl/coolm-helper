@@ -86,15 +86,26 @@ class DbReader:
         if missing:
             raise SchemaMismatch(f"tbl_recv에 필수 컬럼이 없습니다: {missing}")
 
-    def latest_messages(self, limit: int = 10) -> list[Message]:
-        """가장 최근에 받은 쪽지 N개 (삭제된 쪽지 제외, 최신순).
+    UNREAD_CAP = 200   # 안읽은 쪽지 안전 상한 (사실상 무제한)
 
-        날짜 기준이 아니라 개수 기준 — 공휴일·연휴가 껴도 항상 마지막 쪽지가 나온다.
+    def latest_messages(self, limit: int = 10) -> list[Message]:
+        """안읽은 쪽지는 전부 + 읽은 쪽지 최근 N개 (삭제 제외, 최신순).
+
+        안읽은 쪽지가 15개, 30개 쌓인 날에도 확인 중인 쪽지가 항상 목록에
+        있도록, 안읽음은 개수 제한 없이 포함한다. 평소(안읽음 0~2개)에는
+        기존의 '최근 N개'와 사실상 동일하게 동작한다.
         """
         cur = self._con.cursor()
+        cols = "MessageKey, Sender, ReceiveDate, Title, MessageText, IsUnRead"
         rows = cur.execute(
-            "SELECT MessageKey, Sender, ReceiveDate, Title, MessageText, IsUnRead "
-            "FROM tbl_recv WHERE DeletedDate IS NULL "
+            f"SELECT {cols} FROM tbl_recv "
+            "WHERE DeletedDate IS NULL AND IsUnRead = 1 "
+            "ORDER BY ReceiveDate DESC LIMIT ?",
+            (self.UNREAD_CAP,),
+        ).fetchall()
+        rows += cur.execute(
+            f"SELECT {cols} FROM tbl_recv "
+            "WHERE DeletedDate IS NULL AND (IsUnRead IS NULL OR IsUnRead != 1) "
             "ORDER BY ReceiveDate DESC LIMIT ?",
             (int(limit),),
         ).fetchall()
@@ -107,6 +118,7 @@ class DbReader:
             out.append(Message(key=key, sender=sender or "", received=received,
                                title=title or "", body=body or "",
                                is_unread=bool(unread)))
+        out.sort(key=lambda m: m.received, reverse=True)
         return out
 
     def member_names(self) -> set[str]:

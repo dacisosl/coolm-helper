@@ -315,8 +315,10 @@ class ReviewDialog(QDialog):
         self.source = source
         src_label = {"db": "쿨메신저 DB", "excel": "엑셀 내보내기(Plan B)",
                      "demo": "데모 데이터 (테스트용)"}.get(source, source)
+        unread = len({c.message.key for c in candidates if c.message.is_unread})
+        unread_note = f" · ● 안읽은 쪽지 {unread}건 전부 포함" if unread else ""
         self.src_label.setText(
-            f"후보 {len(candidates)}건 · 소스: {src_label}"
+            f"후보 {len(candidates)}건 · 소스: {src_label}{unread_note}"
             + ("  ※ 데모 일정은 설정→데이터에서 일괄 삭제" if source == "demo" else ""))
         self.list.blockSignals(True)
         self.list.clear()
