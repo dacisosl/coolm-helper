@@ -155,6 +155,53 @@ def match_captured(messages: list[Message], title: str, body: str) -> Message | 
     return None
 
 
+_quick_cache: dict = {}   # 매칭용 축약 쪽지 + 명단 캐시 (DB 변경 감지로 무효화)
+
+
+def _db_stamp(config: dict):
+    """DB가 바뀌었는지 감지하는 스탬프 (원본 파일 수정시각·WAL 크기)."""
+    import glob as _glob
+    try:
+        src = max(_glob.glob(os.path.join(config["memo_dir"], "*.udb")),
+                  key=os.path.getmtime)
+        wal = src + "-wal"
+        return (src, os.path.getmtime(src),
+                os.path.getsize(wal) if os.path.exists(wal) else 0)
+    except (ValueError, OSError, KeyError):
+        return None
+
+
+def _quick_rows(base_dir: str, config: dict):
+    """매칭용 쪽지(축약)와 명단을 캐시와 함께 가져온다."""
+    import time as _time
+    stamp = _db_stamp(config)
+    c = _quick_cache
+    if (stamp is not None and c.get("stamp") == stamp
+            and _time.time() - c.get("t", 0) < 120):
+        return c["rows"], c["roster"]
+    rows, roster = None, None
+    for direct in (True, False):   # 직접 읽기 → 복사 폴백
+        try:
+            with DbReader(config["memo_dir"], direct=direct) as reader:
+                rows = reader.match_rows(50)
+                roster = build_roster(base_dir, config, reader)
+            break
+        except Exception:
+            continue
+    if roster is None:
+        roster = build_roster(base_dir, config, None)
+    c.update(stamp=stamp, rows=rows or [], roster=roster, t=_time.time())
+    return rows or [], roster
+
+
+def prefetch_quick(base_dir: str) -> None:
+    """⚡ 클릭 전에 미리 데이터를 데워둔다 (펭귄 메뉴 열릴 때 호출)."""
+    try:
+        _quick_rows(base_dir, load_config(base_dir))
+    except Exception:
+        pass
+
+
 def quick_candidates(base_dir: str, title: str, body: str
                      ) -> tuple[list[Candidate], Message, bool]:
     """간편 등록용: 화면/클립보드에서 얻은 텍스트를 일정 후보로 바꾼다.
@@ -164,20 +211,19 @@ def quick_candidates(base_dir: str, title: str, body: str
     반환: (후보들, 사용한 메시지, DB 매칭 여부)
     """
     config = load_config(base_dir)
+    rows, roster = _quick_rows(base_dir, config)
+    matched_row = match_captured(rows, title, body)
     matched = None
-    roster = None
-    # 속도 우선: 복사 없는 직접 읽기 → 실패하면 복사 방식 → 그래도 안 되면 텍스트만
-    for direct in (True, False):
-        try:
-            with DbReader(config["memo_dir"], direct=direct) as reader:
-                messages = reader.latest_messages(50)
-                roster = build_roster(base_dir, config, reader)
-                matched = match_captured(messages, title, body)
-            break
-        except Exception:     # 잠금·경로·스키마 문제 등 — 다음 방식으로
-            continue
-    if roster is None:
-        roster = build_roster(base_dir, config, None)
+    if matched_row is not None:
+        # 축약본으로 매칭했으니 전문은 한 건만 빠르게 가져온다
+        for direct in (True, False):
+            try:
+                with DbReader(config["memo_dir"], direct=direct) as reader:
+                    matched = reader.get_message(matched_row.key)
+                break
+            except Exception:
+                continue
+        matched = matched or matched_row
     msg = matched or Message(
         key=-1, sender="(화면에서 가져옴)", received=datetime.now(),
         title=title or body.splitlines()[0][:40], body=body)

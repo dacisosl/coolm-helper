@@ -88,6 +88,11 @@ class MiniWidget(WidgetBase):
         self.move(screen.right() - self.WIDTH, screen.center().y() - 27)
 
     def _open_bar(self) -> None:
+        # 메뉴를 여는 순간 ⚡용 데이터를 미리 데워둔다 (클릭 시 즉시 채움)
+        import threading
+        from parser import pipeline
+        threading.Thread(target=pipeline.prefetch_quick,
+                         args=(self.base_dir,), daemon=True).start()
         self._bar = _IconBar(self)
         self._bar.adjustSize()
         x = self.x() - self._bar.width() + 6

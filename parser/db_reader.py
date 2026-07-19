@@ -102,6 +102,50 @@ class DbReader:
 
     UNREAD_CAP = 200   # 안읽은 쪽지 안전 상한 (사실상 무제한)
 
+    def match_rows(self, limit: int = 50) -> list[Message]:
+        """간편 등록 매칭 전용 고속 조회 — 본문을 앞 600자만 가져온다.
+
+        본문 전체를 읽으면 큰 DB에서 수 초가 걸리므로, 매칭에 필요한
+        만큼만 읽는다. 매칭된 쪽지의 전문은 get_message()로 가져올 것.
+        """
+        cur = self._con.cursor()
+        cols = ("MessageKey, Sender, ReceiveDate, Title, "
+                "substr(MessageText, 1, 600), IsUnRead")
+        rows = cur.execute(
+            f"SELECT {cols} FROM tbl_recv "
+            "WHERE DeletedDate IS NULL AND IsUnRead = 1 "
+            "ORDER BY ReceiveDate DESC LIMIT ?", (self.UNREAD_CAP,)).fetchall()
+        rows += cur.execute(
+            f"SELECT {cols} FROM tbl_recv "
+            "WHERE DeletedDate IS NULL AND (IsUnRead IS NULL OR IsUnRead != 1) "
+            "ORDER BY ReceiveDate DESC LIMIT ?", (int(limit),)).fetchall()
+        out = []
+        for key, sender, rdate, title, body, unread in rows:
+            try:
+                received = parse_receive_date(rdate)
+            except (ValueError, TypeError):
+                continue
+            out.append(Message(key=key, sender=sender or "", received=received,
+                               title=title or "", body=body or "",
+                               is_unread=bool(unread)))
+        return out
+
+    def get_message(self, key: int) -> Message | None:
+        """쪽지 한 건의 전문 조회 (매칭 후 상세 채우기용)."""
+        row = self._con.execute(
+            "SELECT MessageKey, Sender, ReceiveDate, Title, MessageText, IsUnRead "
+            "FROM tbl_recv WHERE MessageKey = ?", (int(key),)).fetchone()
+        if not row:
+            return None
+        key, sender, rdate, title, body, unread = row
+        try:
+            received = parse_receive_date(rdate)
+        except (ValueError, TypeError):
+            return None
+        return Message(key=key, sender=sender or "", received=received,
+                       title=title or "", body=body or "",
+                       is_unread=bool(unread))
+
     def latest_messages(self, limit: int = 10) -> list[Message]:
         """안읽은 쪽지는 전부 + 읽은 쪽지 최근 N개 (삭제 제외, 최신순).
 

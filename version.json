@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.8.0/CoolmHelper-Setup.exe",
-  "notes": "⚡ 간편 등록 추가: 쿨메신저에서 쪽지를 보다가 펭귄의 ⚡ 버튼을 누르면, 지금 보고 있는 그 쪽지가 자동으로 채워진 등록 창이 뜹니다. 수정하고 등록만 누르면 끝. (쪽지 창이 없으면 클립보드 가져오기로 대체 가능)"
+  "version": "0.8.1",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.8.1/CoolmHelper-Setup.exe",
+  "notes": "⚡ 간편 등록이 더 빨라졌습니다 — 펭귄 메뉴를 여는 순간 데이터를 미리 준비해서, 클릭하면 사실상 즉시(약 0.05초) 내용이 채워집니다."
 }

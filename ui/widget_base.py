@@ -59,11 +59,11 @@ class WidgetBase(QWidget):
         # ⚡ 간편 등록이 첫 클릭부터 빠르도록 UIA를 백그라운드에서 미리 초기화
         threading.Thread(target=self._warmup_capture, daemon=True).start()
 
-    @staticmethod
-    def _warmup_capture() -> None:
+    def _warmup_capture(self) -> None:
         try:
             import capture
             capture.warmup()
+            pipeline.prefetch_quick(self.base_dir)   # 첫 ⚡ 클릭도 빠르게
         except Exception:
             pass
 
