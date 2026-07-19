@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쿨메신저 일정 도우미 — 사용 설명서</title>
+<style>
+  :root{
+    --primary:#1e88e5; --primary-dark:#1565c0; --primary-light:#e8f2fd;
+    --bg:#f4f8fd; --card:#fff; --border:#dce6f2; --text:#222b36;
+    --subtle:#78859a; --danger:#e53935; --accent:#f5a623;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Malgun Gothic','Segoe UI',sans-serif}
+  body{background:var(--bg);color:var(--text);min-height:100vh;
+       display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+  .carousel{width:min(680px,94vw)}
+  .stage{position:relative;overflow:hidden;border-radius:20px;
+         box-shadow:0 8px 40px rgba(30,136,229,.18);background:var(--card)}
+  .track{display:flex;transition:transform .35s ease}
+  .slide{min-width:100%;padding:44px 52px 36px;min-height:500px;
+         display:flex;flex-direction:column}
+  .slide h2{color:var(--primary-dark);font-size:24px;margin-bottom:6px}
+  .slide .sub{color:var(--subtle);font-size:13px;margin-bottom:20px}
+  .slide p{font-size:15px;line-height:1.75;margin-bottom:12px}
+  .slide li{font-size:15px;line-height:1.85;margin-left:22px}
+  .tag{display:inline-block;background:var(--primary-light);color:var(--primary-dark);
+       border-radius:20px;padding:3px 14px;font-size:12px;font-weight:bold;margin-bottom:14px}
+  .tip{background:#fff8e6;border-left:4px solid var(--accent);border-radius:8px;
+       padding:12px 16px;font-size:13.5px;line-height:1.7;margin-top:auto}
+  .tip b{color:#8d6e00}
+  .step{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
+  .step .n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--primary);
+           color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .step p{margin:2px 0 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .cell{background:var(--bg);border:1px solid var(--border);border-radius:12px;
+        padding:14px 16px;font-size:13.5px;line-height:1.6}
+  .cell b{color:var(--primary-dark);display:block;margin-bottom:4px;font-size:14px}
+  .feature{background:var(--bg);border:1px solid var(--border);border-radius:12px;
+           padding:16px 18px;margin-bottom:14px}
+  .feature h3{color:var(--primary-dark);font-size:16px;margin-bottom:6px}
+  .feature p{font-size:14px;margin-bottom:0;line-height:1.7}
+  .red{color:var(--danger);font-weight:bold}
+  /* 표지 */
+  .cover{align-items:center;justify-content:center;text-align:center}
+  .cover h1{color:var(--primary-dark);font-size:30px;margin:18px 0 10px}
+  .cover .tagline{font-size:17px;color:var(--text);font-weight:bold}
+  .cover .ver{margin-top:16px;color:var(--subtle);font-size:13px}
+  .cover .hint{margin-top:30px;color:var(--primary);font-size:14px;font-weight:bold}
+  /* 내비게이션 */
+  .arrow{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;
+         border:none;border-radius:50%;background:rgba(255,255,255,.92);color:var(--primary-dark);
+         font-size:20px;font-weight:bold;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.12);
+         transition:background .15s;z-index:2}
+  .arrow:hover{background:var(--primary);color:#fff}
+  .arrow.prev{left:12px}.arrow.next{right:12px}
+  .dots{display:flex;gap:9px;justify-content:center;margin-top:20px}
+  .dot{width:10px;height:10px;border-radius:50%;background:#c3d2e5;border:none;cursor:pointer;
+       transition:all .2s;padding:0}
+  .dot.on{background:var(--primary);width:26px;border-radius:6px}
+  .pagenum{text-align:center;color:var(--subtle);font-size:12px;margin-top:8px}
+  .penguin{width:110px;height:130px}
+  @media (max-width:560px){.slide{padding:34px 26px 28px;min-height:540px}
+    .grid2{grid-template-columns:1fr}.arrow{width:36px;height:36px;font-size:16px}}
+</style>
+</head>
+<body>
+<div class="carousel">
+  <div class="stage">
+    <button class="arrow prev" onclick="go(-1)" aria-label="이전">‹</button>
+    <button class="arrow next" onclick="go(1)" aria-label="다음">›</button>
+    <div class="track" id="track">
+
+      <!-- 1. 표지 -->
+      <section class="slide cover">
+        <svg class="penguin" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="52" cy="66" rx="38" ry="48" fill="#1d1f24"/>
+          <ellipse cx="52" cy="78" rx="24" ry="30" fill="#fff"/>
+          <circle cx="38" cy="42" r="12" fill="#fff"/><circle cx="66" cy="42" r="12" fill="#fff"/>
+          <circle cx="40" cy="44" r="5" fill="#1d1f24"/><circle cx="64" cy="44" r="5" fill="#1d1f24"/>
+          <ellipse cx="52" cy="57" rx="10" ry="6" fill="#f5a623"/>
+          <path d="M14 52 Q2 38 12 28 Q20 22 26 34 L20 56 Z" fill="#1d1f24"/>
+          <path d="M90 66 Q100 74 94 88 Q88 96 82 86 Z" fill="#1d1f24"/>
+          <ellipse cx="40" cy="112" rx="10" ry="5" fill="#f5a623"/>
+          <ellipse cx="64" cy="112" rx="10" ry="5" fill="#f5a623"/>
+        </svg>
+        <h1>쿨메신저 일정 도우미</h1>
+        <p class="tagline">쿨메신저 중요 내용, 바로 일정 등록해서 관리하자!</p>
+        <p class="ver">v0.9 · 교사용 · 무료</p>
+        <p class="hint">→ 화살표(또는 키보드 ←→)로 넘겨보세요</p>
+      </section>
+
+      <!-- 2. 핵심 기능 -->
+      <section class="slide">
+        <span class="tag">핵심 기능</span>
+        <h2>일정 등록, 두 가지 방법</h2>
+        <p class="sub">가장 많이 쓰게 될 기능입니다.</p>
+        <div class="feature">
+          <h3>⚡ 현재 보고 있는 메시지 일정 등록하기</h3>
+          <p>쿨메신저에서 쪽지를 읽다가 <b>펭귄을 더블클릭</b>(또는 메뉴의 번개 아이콘)하세요.
+             지금 화면에 떠 있는 그 쪽지의 <b>제목·날짜·내용이 자동으로 채워진 창</b>이 즉시 뜹니다.
+             필요한 부분만 고치고 [일정 등록]을 누르면 끝!</p>
+        </div>
+        <div class="feature">
+          <h3>📥 최근 메시지함에서 일정 등록하기</h3>
+          <p>펭귄 메뉴의 <b>쪽지 목록</b>을 누르면 최근 쪽지에서 찾은 일정 후보가 한 번에 보여요.
+             왼쪽에서 고르고 오른쪽에서 확인·수정 후 등록. 안읽은 쪽지(●)는 전부 포함되고,
+             등록한 항목은 <b style="color:#2e7d32">✓ 연두색</b>으로 표시됩니다.</p>
+        </div>
+        <div class="tip"><b>실수해도 괜찮아요.</b> 등록 취소를 누르면 [되돌리기]가 5초간 뜹니다.</div>
+      </section>
+
+      <!-- 3. 주요 기능: 캘린더 -->
+      <section class="slide">
+        <span class="tag">주요 기능 ①</span>
+        <h2>🗓 캘린더 · 할일</h2>
+        <p class="sub">등록한 일정은 전부 여기서 확인·관리합니다. 인터넷 없이도 돼요.</p>
+        <ul>
+          <li>날짜 아래 <b style="color:var(--primary)">파란 배지</b> = 그날 일정 개수, <span class="red">빨간 배지</span> = 중요도 '높음' 포함</li>
+          <li>날짜 클릭 → 오른쪽에 그날 일정 목록</li>
+          <li>일정 클릭 → <b>아래로 펼쳐지며</b> 제목·일시·중요도·메모 수정 → [저장]</li>
+          <li><b>마감</b> 체크한 일정 = 할일 — 알림 대상이 됩니다</li>
+        </ul>
+        <div class="tip"><b>수정하면 구글도 같이.</b> 구글 캘린더 모드를 켠 경우, 여기서 고치거나 지우면 구글 사본도 함께 바뀝니다.</div>
+      </section>
+
+      <!-- 4. 주요 기능: 알림 -->
+      <section class="slide">
+        <span class="tag">주요 기능 ②</span>
+        <h2>🔔 시작 알림</h2>
+        <p class="sub">컴퓨터를 켜면 펭귄이 먼저 알려줍니다.</p>
+        <ul>
+          <li>프로그램이 켜지면 펭귄 머리 위에 <b>말풍선</b>이 떠요</li>
+          <li>내용: <b>마감 7·3·1일 전</b> 할일 → <b>오늘 일정 N건</b> 순서</li>
+          <li>말풍선을 <b>클릭하면 다음</b> 알림, 마지막 클릭에 닫힘</li>
+          <li>한 번 보면 다시 켜기 전까진 반복되지 않아요</li>
+        </ul>
+        <div class="tip"><b>추천:</b> 설정 → 일반에서 <b>"Windows 시작 시 자동 실행"</b>을 켜두세요.
+          노트북만 열면 오늘 일정이 자동으로 맞아줍니다.</div>
+      </section>
+
+      <!-- 5. 개인정보 원리 -->
+      <section class="slide">
+        <span class="tag">안심하고 쓰세요</span>
+        <h2>🔒 개인정보는 이렇게 지켜집니다</h2>
+        <p class="sub">학생 정보를 다루는 만큼, 구조부터 안전하게 만들었습니다.</p>
+        <ul>
+          <li>쪽지 분석·일정 추출은 <b>전부 선생님 PC 안에서만</b> 처리됩니다</li>
+          <li>쪽지 원문·학생 명단은 <b>절대 밖으로 나가지 않습니다</b></li>
+          <li><span class="red">빨간 글씨</span> = 전화번호·이름으로 보이는 부분 <b>표시</b> — 자동으로 지우진 않으니 등록 전에 직접 확인·삭제하세요</li>
+          <li>구글 모드를 켠 경우에도 나가는 건 <b>확인을 거친 제목과 날짜뿐</b></li>
+          <li>쿨메신저는 <b>읽기만</b> 해요 — 쪽지·안읽음 상태가 바뀌지 않습니다</li>
+        </ul>
+        <div class="tip"><b>학생 명단 등록(선택):</b> 설정 → 개인정보에서 명단 파일에 학생 이름을 넣어두면 그 이름들이 자동으로 빨갛게 표시됩니다.</div>
+      </section>
+
+      <!-- 6. 부가기능 -->
+      <section class="slide">
+        <span class="tag">필요할 때 켜세요</span>
+        <h2>🧩 부가 기능</h2>
+        <p class="sub">기본은 꺼져 있어요. 설정에서 필요한 것만 켜면 됩니다.</p>
+        <div class="grid2">
+          <div class="cell"><b>📱 구글 캘린더 연동</b>휴대폰에서도 일정 확인. 최초 1회 설정 필요 (동봉 '구글연동설정' 문서)</div>
+          <div class="cell"><b>★ 즐겨찾기 보관함</b>중요한 쪽지 내용을 제목 붙여 모아두고 계속 보기</div>
+          <div class="cell"><b>🖥 바탕화면 캘린더</b>화면 반쪽에 주간+월간 일정이 늘 깔려 있는 투명 위젯</div>
+          <div class="cell"><b>💬 문구 보정</b>공개용 글(가정통신문 등)을 AI가 다듬어줘요 (무료 키 필요)</div>
+          <div class="cell"><b>🧪 데모 모드</b>쿨메신저 없는 PC에서 가짜 쪽지로 체험 (켜지면 펭귄에 D 표시)</div>
+          <div class="cell"><b>🔄 자동 업데이트</b>새 버전이 나오면 안내가 뜨고, 예만 누르면 자동 설치</div>
+        </div>
+      </section>
+
+      <!-- 7. 설정 -->
+      <section class="slide">
+        <span class="tag">내 마음대로</span>
+        <h2>⚙ 설정 한눈에</h2>
+        <p class="sub">펭귄 메뉴의 톱니 아이콘에서 엽니다.</p>
+        <div class="grid2">
+          <div class="cell"><b>일반</b>위젯 스타일(미니/카드형) · 항상 위 · 투명도 · 마감 알림 일수(7/3/1) · 기능 켜기/끄기 · Windows 자동 실행</div>
+          <div class="cell"><b>계정</b>저장 모드(내 PC만/구글 연동) · 문구 보정용 키</div>
+          <div class="cell"><b>데이터</b>가져올 쪽지 개수 · 지난 일정 자동 보관(기본 90일) · 데모 일정 정리 · 업데이트 확인</div>
+          <div class="cell"><b>개인정보</b>학생 명단 파일 관리 · 감지 정책 안내</div>
+        </div>
+        <div class="tip"><b>기본값 그대로도 충분해요.</b> 처음엔 아무것도 만지지 말고 ⚡ 바로 등록만 써보세요.</div>
+      </section>
+
+      <!-- 8. 문제 해결 -->
+      <section class="slide">
+        <span class="tag">막힐 때</span>
+        <h2>❓ 문제 해결</h2>
+        <p class="sub">대부분 여기서 해결됩니다.</p>
+        <ul>
+          <li><b>설치할 때 파란 경고("Windows의 PC 보호")가 떠요</b> → 개인 제작 프로그램이라 뜨는 정상 안내예요. <b>추가 정보 → 실행</b>.</li>
+          <li><b>"보고 있는 쪽지를 찾지 못했습니다"</b> → 쿨메신저에서 쪽지 창을 연 상태에서 더블클릭하세요. 그래도 안 되면 [클립보드에서 가져오기].</li>
+          <li><b>펭귄에 주황색 D가 떠 있어요</b> → 데모 모드입니다. 설정 → 데이터에서 끄세요.</li>
+          <li><b>날짜가 이상하게 잡혔어요</b> → 등록 전에 날짜 버튼을 눌러 달력에서 고르면 됩니다. 이상한 사례는 알려주시면 다음 버전에서 개선돼요!</li>
+          <li><b>그 밖의 문제</b> → 배포해 주신 선생님께 문의해 주세요.</li>
+        </ul>
+        <div class="tip"><b>고맙습니다!</b> 이 프로그램이 선생님의 아침을 조금 더 가볍게 만들어주길 바랍니다. 🐧</div>
+      </section>
+
+    </div>
+  </div>
+  <div class="dots" id="dots"></div>
+  <div class="pagenum" id="pagenum"></div>
+</div>
+
+<script>
+  const track = document.getElementById('track');
+  const slides = track.children.length;
+  const dotsBox = document.getElementById('dots');
+  let cur = 0;
+  for (let i = 0; i < slides; i++) {
+    const d = document.createElement('button');
+    d.className = 'dot';
+    d.setAttribute('aria-label', (i + 1) + '번 슬라이드');
+    d.onclick = () => show(i);
+    dotsBox.appendChild(d);
+  }
+  function show(i) {
+    cur = Math.max(0, Math.min(slides - 1, i));
+    track.style.transform = `translateX(-${cur * 100}%)`;
+    [...dotsBox.children].forEach((d, k) => d.classList.toggle('on', k === cur));
+    document.getElementById('pagenum').textContent = (cur + 1) + ' / ' + slides;
+  }
+  function go(delta) { show(cur + delta); }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') go(1);
+    if (e.key === 'ArrowLeft') go(-1);
+  });
+  let sx = null;
+  track.addEventListener('touchstart', e => sx = e.touches[0].clientX, {passive: true});
+  track.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+    sx = null;
+  }, {passive: true});
+  show(0);
+</script>
+</body>
+</html>

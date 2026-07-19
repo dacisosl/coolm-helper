@@ -33,6 +33,7 @@ def main() -> int:
     dist = os.path.join(BASE, "dist", "CoolmHelper")
     bundle = [
         ("students.txt.example", "students.txt.example"),
+        (os.path.join("docs", "사용설명서.html"), "사용설명서.html"),
         (os.path.join("docs", "설치안내.md"), "설치안내.md"),
         (os.path.join("docs", "개인정보고지.md"), "개인정보고지.md"),
         (os.path.join("calendar_sync", "SETUP.md"), "구글연동설정.md"),
