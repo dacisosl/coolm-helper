@@ -55,6 +55,11 @@ class WidgetBase(QWidget):
         self._drag: QPoint | None = None
         QTimer.singleShot(2000, self._auto_update_check)
         QTimer.singleShot(300, self.ensure_desktop_widget)
+        QTimer.singleShot(2500, self._show_startup_alerts)   # 세션당 1회
+
+    def _show_startup_alerts(self) -> None:
+        from ui.alerts import show_startup_alerts
+        show_startup_alerts(self)
 
     # ── 설정 ────────────────────────────────────────────────
     def window_flags(self) -> Qt.WindowType:

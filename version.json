@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.6.0/CoolmHelper-Setup.exe",
-  "notes": "- 바탕화면 캘린더 위젯(설정 → 일반에서 켜기): 화면 반절, 주간(월~금+토일)·월간 보기, 날짜 클릭 상세, 투명도 조절, 항상 다른 창 아래\n- 안내문구 보정(설정 → 일반에서 켜기): 공개용 글을 붙여넣으면 AI가 다듬어줍니다. Gemini API 키를 설정 → 계정에 입력하세요\n- 대규모 UI 개편 3단계 완료"
+  "version": "0.7.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.7.0/CoolmHelper-Setup.exe",
+  "notes": "- 시작 알림: 프로그램을 켜면 말풍선으로 마감 알림(3일/1일 전)과 오늘 일정 개수를 차례로 알려줍니다 (클릭하면 다음, 세션당 1회)\n- 미니 위젯은 펭귄 머리 위, 상세 위젯은 위젯 위에 말풍선 표시\n- Windows 시작 시 자동 실행 (설정 → 일반에서 켜고 끄기)"
 }

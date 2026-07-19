@@ -107,6 +107,9 @@ class MiniWidget(WidgetBase):
             y = max(screen.top(), min(target.y(), screen.bottom() - self.height()))
             self.move(screen.right() - self.WIDTH, y)   # x는 벽에 고정
             self._moved = True
+            bubble = getattr(self, "_alert_bubble", None)
+            if bubble is not None and bubble.isVisible():
+                bubble.reposition()                      # 말풍선도 따라온다
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton and not self._moved:

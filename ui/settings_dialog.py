@@ -217,6 +217,12 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.style_mini)
         lay.addWidget(self.style_detail)
 
+        lay.addWidget(_section_label("시작"))
+        import autostart
+        self.autostart_cb = QCheckBox("Windows 시작 시 자동 실행")
+        self.autostart_cb.setChecked(autostart.is_enabled())
+        lay.addWidget(self.autostart_cb)
+
         lay.addWidget(_section_label("위젯 동작"))
         self.on_top_cb = QCheckBox("항상 다른 창 위에 표시")
         self.on_top_cb.setChecked(
@@ -331,6 +337,14 @@ class SettingsDialog(QDialog):
         self.config["proof_api_key"] = self.proof_key_edit.text().strip()
         self.config["desktop_widget_enabled"] = self.desk_cb.isChecked()
         self.config["desktop_widget_opacity"] = self.desk_opacity.value()
+        import autostart
+        try:
+            if self.autostart_cb.isChecked():
+                autostart.enable(self.base_dir)
+            else:
+                autostart.disable()
+        except OSError as e:
+            QMessageBox.warning(self, "자동 시작", f"설정하지 못했습니다.\n{e}")
         self.config["google_sync_enabled"] = self.google_radio.isChecked()
         self.config["recent_count"] = self.count_spin.value()
         self.config["demo_mode"] = self.demo_cb.isChecked()
