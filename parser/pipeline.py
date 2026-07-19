@@ -51,6 +51,9 @@ DEFAULT_CONFIG = {
     "desktop_widget_enabled": False,   # 바탕화면 반절 캘린더 위젯
     "desktop_widget_opacity": 90,      # 40~100 (%)
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
+    "alert_days": [3, 1],           # 마감 며칠 전에 알림할지
+    "auto_archive_days": 90,        # 지난 일정 자동 보관 (0=끔)
+    "intro_done": False,            # 첫 실행 기능 안내를 봤는지
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
     "update_url": "https://raw.githubusercontent.com/dacisosl/coolm-helper/main/version.json"
 }

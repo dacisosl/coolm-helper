@@ -151,6 +151,22 @@ class SettingsDialog(QDialog):
             os.path.join(self.base_dir, self.config.get("store_dir", "store"))))
         lay.addWidget(open_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        lay.addWidget(_section_label("지난 일정 정리"))
+        arch_row = QHBoxLayout()
+        arch_row.addWidget(QLabel("지난 지"))
+        from PyQt6.QtWidgets import QComboBox
+        self.archive_combo = QComboBox()
+        for label, days in (("보관 안 함", 0), ("30일", 30),
+                            ("90일 (기본)", 90), ("180일", 180)):
+            self.archive_combo.addItem(label, days)
+        cur = int(self.config.get("auto_archive_days", 90))
+        idx = {0: 0, 30: 1, 90: 2, 180: 3}.get(cur, 2)
+        self.archive_combo.setCurrentIndex(idx)
+        arch_row.addWidget(self.archive_combo)
+        arch_row.addWidget(QLabel("넘은 일정은 보관함 파일로 이동"))
+        arch_row.addStretch()
+        lay.addLayout(arch_row)
+
         lay.addWidget(_section_label("데모 모드 (테스트)"))
         self.demo_cb = QCheckBox("데모 모드 — 내장된 가짜 쪽지로 기능 체험 "
                                  "(쿨메신저가 없어도 동작)")
@@ -239,6 +255,18 @@ class SettingsDialog(QDialog):
             lambda v: self.opacity_label.setText(f"{v}%"))
         row.addWidget(self.opacity_label)
         lay.addLayout(row)
+
+        lay.addWidget(_section_label("알림 — 마감 며칠 전에 알려드릴까요?"))
+        alert_row = QHBoxLayout()
+        self.alert_cbs = {}
+        current_days = set(self.config.get("alert_days", [3, 1]))
+        for d in (7, 3, 1):
+            cb = QCheckBox(f"{d}일 전")
+            cb.setChecked(d in current_days)
+            self.alert_cbs[d] = cb
+            alert_row.addWidget(cb)
+        alert_row.addStretch()
+        lay.addLayout(alert_row)
 
         lay.addWidget(_section_label("기능"))
         core = QCheckBox("일정 등록 (기본 기능)")
@@ -334,6 +362,10 @@ class SettingsDialog(QDialog):
                                        else "mini")
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
+        self.config["alert_days"] = sorted(
+            (d for d, cb in self.alert_cbs.items() if cb.isChecked()),
+            reverse=True) or [3, 1]
+        self.config["auto_archive_days"] = self.archive_combo.currentData()
         self.config["proof_api_key"] = self.proof_key_edit.text().strip()
         self.config["desktop_widget_enabled"] = self.desk_cb.isChecked()
         self.config["desktop_widget_opacity"] = self.desk_opacity.value()

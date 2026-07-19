@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ui import theme
+from ui.icons import icon, ICON_SIZE
 from ui.widget_base import WidgetBase
 
 
@@ -41,16 +42,17 @@ class FloatingWidget(WidgetBase):
         lay.setSpacing(8)
 
         title_row = QHBoxLayout()
-        title = QLabel("쿨 일정 도우미")
+        demo_suffix = " · 데모" if self.config.get("demo_mode") else ""
+        title = QLabel("쿨 일정 도우미" + demo_suffix)
         title.setStyleSheet(
             f"color:{theme.PRIMARY_DARK};font-weight:bold;font-size:14px")
         title_row.addWidget(title, stretch=1)
-        gear = QPushButton("⚙")
+        gear = QPushButton()
+        gear.setIcon(icon("gear", 18))
         gear.setFixedSize(26, 26)
         gear.setStyleSheet(
-            f"QPushButton{{background:transparent;color:{theme.SUBTLE};"
-            f"border:none;font-size:15px}}"
-            f"QPushButton:hover{{color:{theme.PRIMARY_DARK}}}")
+            "QPushButton{background:transparent;border:none;border-radius:6px}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
         gear.setCursor(Qt.CursorShape.PointingHandCursor)
         gear.setToolTip("설정")
         gear.clicked.connect(self.open_settings)
@@ -64,40 +66,43 @@ class FloatingWidget(WidgetBase):
             f"border-radius:9px;padding:5px;font-size:12px;font-weight:bold")
         lay.addWidget(self.today_label)
 
-        quick_btn = QPushButton("⚡  간편 등록")
+        secondary = (
+            f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
+            f"border:1.5px solid {theme.PRIMARY};border-radius:8px;"
+            f"padding:8px;font-weight:bold;font-size:13px;text-align:left}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+
+        quick_btn = QPushButton(" 바로 등록")
+        quick_btn.setIcon(icon("bolt"))
+        quick_btn.setIconSize(ICON_SIZE)
         quick_btn.setStyleSheet(theme.PRIMARY_BTN + "QPushButton{font-size:13px}")
         quick_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        quick_btn.setToolTip("쿨메신저에서 지금 보고 있는 쪽지를 바로 등록")
+        quick_btn.setToolTip("쿨메신저에서 지금 보고 있는 쪽지를 즉시 등록")
         quick_btn.clicked.connect(self.open_quick)
         lay.addWidget(quick_btn)
 
-        add_btn = QPushButton("📅  일정 등록 (전체)")
-        add_btn.setStyleSheet(
-            f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
-            f"border:1.5px solid {theme.PRIMARY};border-radius:8px;"
-            f"padding:8px;font-weight:bold;font-size:13px}}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+        add_btn = QPushButton(" 쪽지 목록")
+        add_btn.setIcon(icon("inbox"))
+        add_btn.setIconSize(ICON_SIZE)
+        add_btn.setStyleSheet(secondary)
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.setToolTip("최근 쪽지에서 일정 고르기")
         add_btn.clicked.connect(self.open_review)
         lay.addWidget(add_btn)
 
-        cal_btn = QPushButton("🗓  캘린더 · 할일")
-        cal_btn.setStyleSheet(
-            f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
-            f"border:1.5px solid {theme.PRIMARY};border-radius:8px;"
-            f"padding:8px;font-weight:bold;font-size:13px}}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+        cal_btn = QPushButton(" 캘린더 · 할일")
+        cal_btn.setIcon(icon("calendar"))
+        cal_btn.setIconSize(ICON_SIZE)
+        cal_btn.setStyleSheet(secondary)
         cal_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         cal_btn.clicked.connect(self.open_calendar)
         lay.addWidget(cal_btn)
 
         if self.config.get("proof_enabled"):
-            proof_btn = QPushButton("💬  안내문구 보정")
-            proof_btn.setStyleSheet(
-                f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
-                f"border:1.5px solid {theme.BORDER};border-radius:8px;"
-                f"padding:8px;font-size:13px}}"
-                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            proof_btn = QPushButton(" 문구 보정")
+            proof_btn.setIcon(icon("chat"))
+            proof_btn.setIconSize(ICON_SIZE)
+            proof_btn.setStyleSheet(secondary.replace(theme.PRIMARY, theme.BORDER, 1))
             proof_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             proof_btn.clicked.connect(self.open_proof)
             lay.addWidget(proof_btn)

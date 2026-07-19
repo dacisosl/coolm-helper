@@ -1,5 +1,5 @@
 {
-  "version": "0.8.1",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.8.1/CoolmHelper-Setup.exe",
-  "notes": "⚡ 간편 등록이 더 빨라졌습니다 — 펭귄 메뉴를 여는 순간 데이터를 미리 준비해서, 클릭하면 사실상 즉시(약 0.05초) 내용이 채워집니다."
+  "version": "0.9.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.9.0/CoolmHelper-Setup.exe",
+  "notes": "- 펭귄 앱 아이콘 + SVG 아이콘으로 디자인 통일\n- 버튼 이름 개편: 바로 등록 / 쪽지 목록 / 캘린더 / 문구 보정\n- 등록 취소 시 [되돌리기] 토스트\n- 첫 실행 기능 안내(말풍선 3장), 데모 모드 D 뱃지\n- 펭귄 더블클릭 = 바로 등록\n- 마감 알림 일수 선택(7/3/1일 전), 지난 일정 자동 보관(기본 90일)\n- 캘린더에서 수정·삭제하면 구글 캘린더 사본도 함께 갱신\n- 주말에 일정이 있으면 주간 보기에서 주황색으로 강조"
 }

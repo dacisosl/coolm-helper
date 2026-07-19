@@ -270,6 +270,9 @@ class ReviewDialog(QDialog):
             lambda on: self.time_combo.setEnabled(not on))
         row.addWidget(self.all_day_cb)
         self.deadline_cb = QCheckBox("마감(할일)")
+        self.deadline_cb.setToolTip(
+            "체크하면 '할일'로 표시되고, 마감 며칠 전에 시작 알림을 받아요.\n"
+            "(알림 일수는 설정 → 일반에서 바꿀 수 있어요)")
         row.addWidget(self.deadline_cb)
         row.addStretch()
         lay.addLayout(row)
@@ -402,7 +405,8 @@ class ReviewDialog(QDialog):
 
     # ── 등록 / 등록 취소 ─────────────────────────────────────
     def _unregister(self, ref: str) -> None:
-        """이 후보로 등록했던 일정을 삭제한다 (구글에 올린 것도 함께 시도)."""
+        """이 후보로 등록했던 일정을 삭제한다 (구글 사본 포함, 되돌리기 지원)."""
+        removed = []
         for e in list(self.store.all()):
             if e.source_ref == ref:
                 if e.google_id:
@@ -414,7 +418,21 @@ class ReviewDialog(QDialog):
                             self, "안내",
                             "구글 캘린더의 사본은 삭제하지 못했습니다.\n"
                             "구글 캘린더에서 직접 지워주세요.")
+                removed.append(e)
                 self.store.remove(e.id)
+
+        def restore():
+            from datetime import datetime as _dt
+            for e in removed:
+                self.store.add(
+                    title=e.title, start=_dt.fromisoformat(e.start),
+                    end=_dt.fromisoformat(e.end) if e.end else None,
+                    all_day=e.all_day, is_deadline=e.is_deadline,
+                    demo=e.demo, memo=e.memo, source_ref=e.source_ref)
+
+        if removed:
+            from ui.toast import show_toast
+            show_toast(self, "등록을 취소했습니다", "되돌리기", restore)
 
     def _register(self) -> None:
         c = self._current

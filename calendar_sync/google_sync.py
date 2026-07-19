@@ -81,5 +81,23 @@ def register_event(title: str, start: datetime, end: datetime | None,
 
 
 def delete_event(event_id: str) -> None:
-    """등록 취소 시 구글 캘린더의 사본도 삭제한다 (이벤트 ID만 사용)."""
+    """등록 취소·삭제 시 구글 캘린더의 사본도 삭제한다 (이벤트 ID만 사용)."""
     _service().events().delete(calendarId="primary", eventId=event_id).execute()
+
+
+def update_event(event_id: str, title: str, start: datetime,
+                 end: datetime | None, all_day: bool) -> None:
+    """일정 수정 시 구글 사본도 갱신한다 — 제목·시작·종료만."""
+    if all_day:
+        end_date = (end or start).date() + timedelta(days=1)
+        body = {"summary": title,
+                "start": {"date": start.date().isoformat()},
+                "end": {"date": end_date.isoformat()}}
+    else:
+        tz = "Asia/Seoul"
+        body = {"summary": title,
+                "start": {"dateTime": start.isoformat(), "timeZone": tz},
+                "end": {"dateTime": (end or start + timedelta(hours=1)).isoformat(),
+                        "timeZone": tz}}
+    _service().events().patch(calendarId="primary", eventId=event_id,
+                              body=body).execute()

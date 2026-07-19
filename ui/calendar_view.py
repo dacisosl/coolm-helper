@@ -182,14 +182,28 @@ class EventItemCard(QFrame):
 
     def _save(self) -> None:
         title = self.title_edit.text().strip() or self.event.title
+        new_start = self.start_edit.dateTime().toPyDateTime()
+        new_all_day = self.all_day_cb.isChecked()
         self.store.update(
             self.event.id,
             title=title,
-            start=self.start_edit.dateTime().toPyDateTime().isoformat(),
-            all_day=self.all_day_cb.isChecked(),
+            start=new_start.isoformat(),
+            all_day=new_all_day,
             priority=self.priority_combo.currentText(),
             memo=self.memo_edit.toPlainText(),
         )
+        # 구글에 올린 일정이면 사본도 갱신 (제목·일시만)
+        if self.event.google_id:
+            try:
+                from calendar_sync import google_sync
+                google_sync.update_event(self.event.google_id, title,
+                                         new_start, self.event.end_dt,
+                                         new_all_day)
+            except Exception:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self, "안내", "구글 캘린더의 사본은 갱신하지 못했습니다.\n"
+                    "구글 캘린더에서 직접 수정해 주세요.")
         # 로컬 객체도 갱신해 접힌 줄 표시를 즉시 반영
         self.event.title = title
         self.event.start = self.start_edit.dateTime().toPyDateTime().isoformat()
@@ -201,6 +215,15 @@ class EventItemCard(QFrame):
         self.on_change(reload_day=False)
 
     def _delete(self) -> None:
+        if self.event.google_id:
+            try:
+                from calendar_sync import google_sync
+                google_sync.delete_event(self.event.google_id)
+            except Exception:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self, "안내", "구글 캘린더의 사본은 삭제하지 못했습니다.\n"
+                    "구글 캘린더에서 직접 지워주세요.")
         self.store.remove(self.event.id)
         self.on_change(reload_day=True)
 

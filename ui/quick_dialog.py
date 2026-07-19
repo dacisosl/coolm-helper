@@ -105,6 +105,9 @@ class QuickDialog(QDialog):
             lambda on: self.time_combo.setEnabled(not on))
         row.addWidget(self.all_day_cb)
         self.deadline_cb = QCheckBox("마감")
+        self.deadline_cb.setToolTip(
+            "체크하면 '할일'로 표시되고, 마감 며칠 전에 시작 알림을 받아요.\n"
+            "(알림 일수는 설정 → 일반에서 바꿀 수 있어요)")
         row.addWidget(self.deadline_cb)
         row.addStretch()
         lay.addLayout(row)

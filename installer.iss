@@ -3,7 +3,7 @@
 ; 결과: Output\CoolmHelper-Setup.exe
 
 #define AppName "쿨메신저 일정 도우미"
-#define AppVersion "0.8.1"
+#define AppVersion "0.9.0"
 #define AppExe "CoolmHelper.exe"
 
 [Setup]
@@ -15,6 +15,7 @@ DefaultGroupName={#AppName}
 OutputBaseFilename=CoolmHelper-Setup
 Compression=lzma2
 SolidCompression=yes
+SetupIconFile=assets\app.ico
 ; 사용자별 데이터(config, store)는 설치 폴더가 아니라 실행 시 exe 옆에 생성됨
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes

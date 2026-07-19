@@ -73,8 +73,14 @@ class _DayColumn(QFrame):
         super().__init__()
         self.owner, self.d = owner, d
         today = d == date.today()
+        has_events = bool(owner.store.on_date(d))
+        # 주말(접힌 열)에 일정이 있으면 강조해서 놓치지 않게 한다
+        weekend_accent = slim and has_events
+        bg = (theme.PRIMARY_LIGHT if today
+              else "#fff8e6" if weekend_accent else theme.CARD)
+        border = "#f5a623" if weekend_accent else "transparent"
         self.setStyleSheet(
-            f"_DayColumn{{background:{theme.PRIMARY_LIGHT if today else theme.CARD};"
+            f"_DayColumn{{background:{bg};border:1.5px solid {border};"
             f"border-radius:10px}}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QVBoxLayout(self)

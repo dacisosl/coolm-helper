@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QGraphicsDropShadowEffect, QLabel, QPushButton,
@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ui import theme
+from ui.icons import icon, ICON_SIZE
 from ui.penguin_icon import penguin_pixmap
 from ui.widget_base import WidgetBase
 
@@ -42,21 +43,24 @@ class _IconBar(QWidget):
         lay.setContentsMargins(6, 8, 6, 8)
         lay.setSpacing(4)
 
-        buttons = [("⚡", "간편 등록 — 지금 보고 있는 쪽지 바로 등록",
-                    owner.open_quick)]
-        buttons.append(("➕", "일정 등록 (전체 목록)", owner.open_review))
-        buttons.append(("🗓", "캘린더 · 할일", owner.open_calendar))
-        if owner.config.get("proof_enabled"):        # 안내문구 보정 (추후 기능)
-            buttons.append(("💬", "안내문구 보정", owner.open_proof))
-        buttons.append(("⚙", "설정", owner.open_settings))
+        buttons = [("bolt", "바로 등록 — 지금 보고 있는 쪽지를 즉시 등록 "
+                    "(펭귄 더블클릭으로도 열려요)", owner.open_quick)]
+        buttons.append(("inbox", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
+                        owner.open_review))
+        buttons.append(("calendar", "캘린더 · 할일", owner.open_calendar))
+        if owner.config.get("proof_enabled"):
+            buttons.append(("chat", "문구 보정 (공개용 글)", owner.open_proof))
+        buttons.append(("gear", "설정", owner.open_settings))
 
-        for icon, tip, handler in buttons:
-            b = QPushButton(icon)
+        for name, tip, handler in buttons:
+            b = QPushButton()
+            b.setIcon(icon(name))
+            b.setIconSize(ICON_SIZE)
             b.setToolTip(tip)
             b.setFixedSize(40, 40)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
-                f"QPushButton{{background:transparent;border:none;font-size:19px;"
+                f"QPushButton{{background:transparent;border:none;"
                 f"border-radius:10px}}"
                 f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
             b.clicked.connect(lambda _, h=handler: (self.close(), h()))
@@ -75,12 +79,30 @@ class MiniWidget(WidgetBase):
         self.penguin = QLabel()
         self.penguin.setPixmap(penguin_pixmap(self.base_dir, 46))
         self.penguin.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.penguin.setToolTip("쿨 일정 도우미 (클릭: 메뉴 / 드래그: 이동 / 우클릭: 옵션)")
+        self.penguin.setToolTip("쿨 일정 도우미\n클릭: 메뉴 / 더블클릭: 바로 등록 / "
+                                "드래그: 이동 / 우클릭: 옵션")
         lay.addWidget(self.penguin)
+        # 데모 모드 표시 뱃지
+        self.demo_chip = QLabel("D", self)
+        self.demo_chip.setFixedSize(16, 16)
+        self.demo_chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.demo_chip.setStyleSheet(
+            "background:#f5a623;color:white;border-radius:8px;"
+            "font-size:10px;font-weight:bold")
+        self.demo_chip.setToolTip("데모 모드가 켜져 있습니다 (설정 → 데이터에서 끄기)")
+        self.demo_chip.move(0, 0)
         self.resize(self.WIDTH, 54)
         self._bar: _IconBar | None = None
         self._moved = False
+        self._click_timer = QTimer(self)
+        self._click_timer.setSingleShot(True)
+        self._click_timer.timeout.connect(self._open_bar)
         self.apply_config()
+
+    def apply_config(self) -> None:
+        super().apply_config()
+        if hasattr(self, "demo_chip"):
+            self.demo_chip.setVisible(bool(self.config.get("demo_mode")))
 
     def place_default(self) -> None:
         """오른쪽 벽 중앙에 도킹."""
@@ -120,8 +142,14 @@ class MiniWidget(WidgetBase):
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton and not self._moved:
-            self._open_bar()
+            # 더블클릭과 구분: 잠깐 기다렸다가 메뉴를 연다
+            self._click_timer.start(QApplication.doubleClickInterval())
         self._drag = None
+
+    def mouseDoubleClickEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            self._click_timer.stop()          # 단일클릭 메뉴 취소
+            self.open_quick()                 # 더블클릭 = ⚡ 바로 등록
 
     def contextMenuEvent(self, ev):
         from PyQt6.QtWidgets import QMenu

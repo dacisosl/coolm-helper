@@ -51,6 +51,13 @@ class WidgetBase(QWidget):
             app._coolm_stores = shared
         self.store: EventStore = shared["events"]
         self.fav_store: FavStore = shared["favs"]
+        # 지난 일정 자동 보관 (설정 가능, 0이면 끔) — 세션당 1회
+        if not getattr(app, "_coolm_archived", False):
+            app._coolm_archived = True
+            try:
+                self.store.archive_old(int(self.config.get("auto_archive_days", 90)))
+            except Exception:
+                pass
         self.cal_win: CalendarWindow | None = None
         self._drag: QPoint | None = None
         QTimer.singleShot(2000, self._auto_update_check)

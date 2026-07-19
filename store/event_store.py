@@ -105,6 +105,31 @@ class EventStore:
     def demo_count(self) -> int:
         return sum(1 for e in self._events if e.demo)
 
+    def archive_old(self, days: int) -> int:
+        """지난 지 N일 넘은 일정을 보관 파일(events_archive.json)로 옮긴다."""
+        if days <= 0:
+            return 0
+        cutoff = date.today().toordinal() - days
+        old, keep = [], []
+        for e in self._events:
+            last = e.end_dt.date() if e.end_dt else e.start_dt.date()
+            (old if last.toordinal() < cutoff else keep).append(e)
+        if not old:
+            return 0
+        archive_path = os.path.join(os.path.dirname(self.path),
+                                    "events_archive.json")
+        try:
+            with open(archive_path, encoding="utf-8") as f:
+                archived = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            archived = []
+        archived.extend(asdict(e) for e in old)
+        with open(archive_path, "w", encoding="utf-8") as f:
+            json.dump(archived, f, ensure_ascii=False, indent=1)
+        self._events = keep
+        self._save()
+        return len(old)
+
     def remove_demo(self) -> int:
         """데모 모드에서 등록한 테스트 일정을 모두 삭제한다."""
         n = self.demo_count()

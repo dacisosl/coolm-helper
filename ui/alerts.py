@@ -17,14 +17,15 @@ from store.event_store import EventStore
 from ui import theme
 
 
-def build_alerts(store: EventStore, today: date | None = None) -> list[str]:
-    """마감 알림(3일/1일 전) → 오늘 할일 순서로 알림 문구를 만든다."""
+def build_alerts(store: EventStore, today: date | None = None,
+                 days: tuple = (3, 1)) -> list[str]:
+    """마감 알림(N일 전, 설정 가능) → 오늘 할일 순서로 알림 문구를 만든다."""
     today = today or date.today()
     alerts: list[str] = []
     for e in store.all():
         if e.is_deadline and not e.done:
             days_left = (e.start_dt.date() - today).days
-            if days_left in (3, 1):
+            if days_left in days:
                 alerts.append(f"⏰ 마감 {days_left}일 전\n{e.title}")
     n = len(store.on_date(today))
     if n:
@@ -35,13 +36,14 @@ def build_alerts(store: EventStore, today: date | None = None) -> list[str]:
 class AlertBubble(QWidget):
     """앵커 위젯 위에 뜨는 말풍선. 클릭하면 다음 알림, 끝나면 사라진다."""
 
-    def __init__(self, alerts: list[str], anchor: QWidget):
+    def __init__(self, alerts: list[str], anchor: QWidget, on_done=None):
         super().__init__(None, Qt.WindowType.Tool
                          | Qt.WindowType.FramelessWindowHint
                          | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.alerts = alerts
         self.anchor = anchor
+        self.on_done = on_done
         self.idx = 0
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -93,18 +95,46 @@ class AlertBubble(QWidget):
         self.idx += 1
         if self.idx >= len(self.alerts):
             self.close()
+            if self.on_done:
+                self.on_done()
         else:
             self._sync()
 
 
+INTRO_STEPS = [
+    "👋 반가워요! 쿨메신저에서 쪽지를 보다가\n"
+    "⚡(바로 등록)를 누르면 그 쪽지가 일정이 돼요.\n"
+    "펭귄을 더블클릭해도 열립니다.",
+    "🗓 등록한 일정은 캘린더에서\n확인하고 수정할 수 있어요.\n"
+    "중요도가 '높음'인 날은 빨간 배지로 표시돼요.",
+    "⚙ 설정에서 즐겨찾기·알림·자동 시작 같은\n기능을 켜고 끌 수 있어요.\n"
+    "그럼, 시작해 볼까요?",
+]
+
+
 def show_startup_alerts(widget) -> None:
-    """앱 세션당 한 번만 알림 말풍선을 띄운다. widget = WidgetBase 인스턴스."""
+    """앱 세션당 한 번만 알림 말풍선을 띄운다. widget = WidgetBase 인스턴스.
+
+    첫 실행이면 알림 대신 기능 안내(인트로) 3장을 먼저 보여준다.
+    """
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance()
     if getattr(app, "_coolm_alerts_shown", False):
         return
     app._coolm_alerts_shown = True
-    alerts = build_alerts(widget.store)
+
+    if not widget.config.get("intro_done"):
+        def finish_intro():
+            from parser import pipeline
+            widget.config["intro_done"] = True
+            pipeline.save_config(widget.base_dir, widget.config)
+        bubble = AlertBubble(INTRO_STEPS, widget, on_done=finish_intro)
+        widget._alert_bubble = bubble
+        bubble.show()
+        return
+
+    days = tuple(widget.config.get("alert_days", [3, 1])) or (3, 1)
+    alerts = build_alerts(widget.store, days=days)
     if not alerts:
         return
     bubble = AlertBubble(alerts, widget)

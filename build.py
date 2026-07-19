@@ -22,6 +22,9 @@ def main() -> int:
         "--exclude-module", "tkinter",
         "main.py",
     ]
+    ico = os.path.join(BASE, "assets", "app.ico")
+    if os.path.exists(ico):
+        cmd[-1:-1] = ["--icon", ico]
     print(">", " ".join(cmd))
     if subprocess.call(cmd) != 0:
         print("빌드 실패")
@@ -36,6 +39,10 @@ def main() -> int:
     ]
     for src, dst in bundle:
         shutil.copyfile(os.path.join(BASE, src), os.path.join(dist, dst))
+    assets_src = os.path.join(BASE, "assets")
+    if os.path.isdir(assets_src):
+        shutil.copytree(assets_src, os.path.join(dist, "assets"),
+                        dirs_exist_ok=True)
 
     print(f"\n빌드 완료: {os.path.join(dist, 'CoolmHelper.exe')}")
     return 0

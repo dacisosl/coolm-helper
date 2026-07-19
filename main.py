@@ -47,6 +47,15 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)    # 캘린더 창 닫아도 위젯은 유지
 
+    # 앱 아이콘 (작업표시줄·창 제목) — 펭귄
+    from PyQt6.QtGui import QIcon
+    ico = os.path.join(BASE_DIR, "assets", "app.ico")
+    if os.path.exists(ico):
+        app.setWindowIcon(QIcon(ico))
+    else:
+        from ui.penguin_icon import penguin_pixmap
+        app.setWindowIcon(QIcon(penguin_pixmap(BASE_DIR, 64)))
+
     from parser import pipeline
     style = pipeline.load_config(BASE_DIR).get("widget_style", "mini")
     if style == "mini":
