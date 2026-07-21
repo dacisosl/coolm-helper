@@ -2,8 +2,9 @@
 """안내문구 보정 창 — 붙여넣은 글을 AI로 다듬는다 (공개용 글 전용).
 
 쪽지 자동 불러오기 없음. 입력창에 직접 붙여넣은 텍스트만 전송된다.
-디자인(2026-07-21): Gemini 홈 스타일 — 가운데 인사 문구 + 둥근 입력창.
-보정/Enter → 로딩 진행바 → 다듬은 글이 아래에서 페이드로 등장.
+디자인(2026-07-21 v2): 미니멀 — 가운데 열(최대 680px)에 인사 문구 +
+둥근 입력 카드(원형 ↑ 보내기 버튼). 보정 중엔 얇은 진행선, 완료되면
+다듬은 글 카드가 아래에서 페이드로 등장. 버튼·칩·닫기 줄 최소화.
 """
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ _TIP = ("공개용 글 전용 — 붙여넣은 내용은 AI 서버(Gemini/OpenRo
 
 
 class _PromptEdit(QTextEdit):
-    """Enter=보내기, Shift+Enter=줄바꿈 (Gemini 입력창처럼)."""
+    """Enter=보내기, Shift+Enter=줄바꿈."""
     submitted = pyqtSignal()
 
     def keyPressEvent(self, ev):
@@ -58,165 +59,179 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         super().__init__(parent)
         self.config = config
         self.setWindowTitle("안내문구 보정")
-        self.resize(760, 640)
+        self.resize(720, 620)
+        self.setMinimumSize(600, 520)
+        self.setMaximumSize(960, 900)     # 갑자기 전체 폭으로 커지는 것 방지
         self.setStyleSheet(theme.BASE_QSS + f"QDialog{{background:{theme.BG}}}")
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(28, 24, 28, 20)
+        outer.setContentsMargins(24, 0, 24, 16)
         outer.setSpacing(0)
 
-        # ── 인사 문구 (가운데) ──
+        # 창이 아무리 넓어져도 내용은 가운데 열(최대 680px)에 머문다
+        center = QHBoxLayout()
+        col_w = QWidget()
+        col_w.setMaximumWidth(680)
+        col_w.setStyleSheet("background:transparent")
+        col = QVBoxLayout(col_w)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(0)
+        center.addStretch()
+        center.addWidget(col_w, stretch=1)
+        center.addStretch()
+        outer.addLayout(center, stretch=1)
+
+        col.addSpacing(40)
+
+        # ── 인사 문구 ──
         greet = QLabel("어떤 글을 다듬어 드릴까요?")
         greet.setAlignment(Qt.AlignmentFlag.AlignCenter)
         greet.setStyleSheet(
-            f"font-size:24px;font-weight:bold;color:{theme.TEXT};"
+            f"font-size:22px;font-weight:bold;color:{theme.TEXT};"
             f"background:transparent")
-        outer.addWidget(greet)
+        col.addWidget(greet)
+        col.addSpacing(6)
         sub_row = QHBoxLayout()
         sub_row.addStretch()
-        sub = QLabel("가정통신문 같은 공개용 글을 붙여넣으면 정중하게 다듬어 드려요")
+        sub = QLabel("공개용 글을 붙여넣으면 정중하게 다듬어 드려요")
         sub.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
             f"background:transparent")
         sub_row.addWidget(sub)
         info = QLabel("?")
-        info.setFixedSize(18, 18)
+        info.setFixedSize(16, 16)
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         info.setToolTip(_TIP)
-        info.setCursor(Qt.CursorShape.WhatsThisCursor)
         info.setStyleSheet(
             f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
-            f"border-radius:9px;font-size:{theme.FONT_XS}px;font-weight:bold")
+            f"border-radius:8px;font-size:{theme.FONT_XS}px;font-weight:bold")
         sub_row.addWidget(info)
         sub_row.addStretch()
-        outer.addSpacing(6)
-        outer.addLayout(sub_row)
-        outer.addSpacing(18)
+        col.addLayout(sub_row)
+        col.addSpacing(24)
 
-        # ── 둥근 입력창 (가운데, 최대폭 제한) ──
-        pill_row = QHBoxLayout()
-        pill_row.addStretch()
+        # ── 둥근 입력 카드 ──
         pill = QFrame()
         pill.setObjectName("pill")
-        pill.setMaximumWidth(660)
         pill.setStyleSheet(
             f"#pill{{background:{theme.CARD};border:1px solid {theme.BORDER};"
-            f"border-radius:24px}}")
+            f"border-radius:26px}}")
         pill.setGraphicsEffect(theme.make_shadow(self, 1))
         pl = QVBoxLayout(pill)
-        pl.setContentsMargins(18, 14, 14, 10)
-        pl.setSpacing(6)
+        pl.setContentsMargins(20, 16, 12, 10)
+        pl.setSpacing(4)
         self.input_edit = _PromptEdit()
         self.input_edit.setPlaceholderText("다듬고 싶은 글을 붙여넣거나 써보세요")
         self.input_edit.setToolTip(_TIP)
         self.input_edit.setStyleSheet(
-            f"QTextEdit{{background:transparent;border:none;"
+            f"QTextEdit{{background:transparent;border:none;padding:0;"
             f"font-size:{theme.FONT_MD}px;line-height:150%;color:{theme.TEXT}}}")
-        self.input_edit.setMinimumHeight(58)
-        self.input_edit.setMaximumHeight(150)
+        self.input_edit.setMinimumHeight(56)
+        self.input_edit.setMaximumHeight(140)
         self.input_edit.submitted.connect(self._go)
         self.input_edit.textChanged.connect(self._sync_count)
         pl.addWidget(self.input_edit)
-        # 입력창 하단 줄: 공급자 칩 + 글자 수 + 보내기 버튼
+        # 하단 줄: 모델 이름(연한 글씨) · 글자 수 · 원형 ↑ 보내기
         bar = QHBoxLayout()
-        bar.setSpacing(8)
-        prov = ("OpenRouter" if self.config.get("proof_provider") == "openrouter"
-                else "Gemini")
-        prov_chip = QLabel(prov)
-        prov_chip.setStyleSheet(
-            f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
-            f"border-radius:{theme.RADIUS_SM}px;padding:2px 9px;"
-            f"font-size:{theme.FONT_XS}px;font-weight:bold")
-        bar.addWidget(prov_chip)
+        bar.setSpacing(10)
+        prov = ("OpenRouter"
+                if self.config.get("proof_provider") == "openrouter"
+                else "Gemini 3.5 Flash")
+        model_label = QLabel(prov)
+        model_label.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px;"
+            f"background:transparent")
+        bar.addWidget(model_label)
         bar.addStretch()
         self.in_count = QLabel("")
         self.in_count.setStyleSheet(
-            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px")
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px;"
+            f"background:transparent")
         bar.addWidget(self.in_count)
-        self.go_btn = QPushButton("✨ 다듬기")
-        self.go_btn.setStyleSheet(
-            theme.PRIMARY_BTN
-            + f"QPushButton{{font-size:{theme.FONT_MD}px;padding:8px 18px;"
-              f"border-radius:18px}}")
+        self.go_btn = QPushButton("↑")
+        self.go_btn.setFixedSize(38, 38)
+        self.go_btn.setToolTip("다듬기 — Enter로도 보낼 수 있어요 "
+                               "(Shift+Enter는 줄바꿈)")
         self.go_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.go_btn.setToolTip("Enter로도 보낼 수 있어요 (Shift+Enter는 줄바꿈)")
+        self.go_btn.setStyleSheet(
+            f"QPushButton{{background:{theme.PRIMARY};color:white;border:none;"
+            f"border-radius:19px;font-size:16px;font-weight:bold}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_DARK}}}"
+            f"QPushButton:pressed{{background:{theme.PRIMARY_PRESSED}}}"
+            f"QPushButton:disabled{{background:{theme.DISABLED_BG}}}")
         self.go_btn.clicked.connect(self._go)
         bar.addWidget(self.go_btn)
         pl.addLayout(bar)
-        pill_row.addWidget(pill, stretch=1)
-        pill_row.addStretch()
-        outer.addLayout(pill_row)
+        col.addWidget(pill)
 
-        # ── 로딩 진행바 (기본 숨김) ──
+        # ── 로딩: 얇은 진행선 + 작은 안내 (기본 숨김) ──
+        col.addSpacing(10)
         self.progress = QProgressBar()
-        self.progress.setRange(0, 0)          # 불확정(진행 중) 애니메이션
+        self.progress.setRange(0, 0)          # 불확정 진행 애니메이션
         self.progress.setTextVisible(False)
-        self.progress.setFixedHeight(4)
+        self.progress.setFixedHeight(3)
         self.progress.setStyleSheet(
             f"QProgressBar{{background:{theme.PRIMARY_LIGHT};border:none;"
-            f"border-radius:2px;margin:12px 60px 0 60px}}"
-            f"QProgressBar::chunk{{background:{theme.PRIMARY};border-radius:2px}}")
+            f"border-radius:1px}}"
+            f"QProgressBar::chunk{{background:{theme.PRIMARY};"
+            f"border-radius:1px}}")
         self.progress.setVisible(False)
-        outer.addWidget(self.progress)
-        self.loading_label = QLabel("✨ 글을 다듬고 있어요…")
+        col.addWidget(self.progress)
+        self.loading_label = QLabel("다듬고 있어요…")
         self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loading_label.setStyleSheet(
-            f"color:{theme.PRIMARY_DARK};font-size:{theme.FONT_SM}px;"
-            f"font-weight:bold;background:transparent;padding-top:6px")
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px;"
+            f"background:transparent;padding-top:6px")
         self.loading_label.setVisible(False)
-        outer.addWidget(self.loading_label)
+        col.addWidget(self.loading_label)
 
-        # ── 결과 카드 (기본 숨김, 완료 시 페이드 등장) ──
+        # ── 상태 (오류·복사 알림) ──
+        self.status = QLabel("")
+        self.status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status.setWordWrap(True)
+        self.status.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px;"
+            f"background:transparent;padding-top:6px")
+        col.addWidget(self.status)
+
+        # ── 결과 카드 (기본 숨김 → 완료 시 페이드 등장) ──
+        col.addSpacing(8)
         self.result_card = QFrame()
         self.result_card.setObjectName("rcard")
         self.result_card.setStyleSheet(
             f"#rcard{{background:{theme.CARD};border:1px solid {theme.BORDER};"
             f"border-radius:{theme.RADIUS_LG}px}}")
         rc = QVBoxLayout(self.result_card)
-        rc.setContentsMargins(16, 12, 16, 14)
-        rc.setSpacing(8)
+        rc.setContentsMargins(20, 12, 16, 14)
+        rc.setSpacing(4)
         rhead = QHBoxLayout()
-        rlab = QLabel("✨ 다듬은 글")
+        rlab = QLabel("다듬은 글")
         rlab.setStyleSheet(
-            f"font-size:{theme.FONT_MD}px;font-weight:bold;"
-            f"color:{theme.PRIMARY_DARK};background:transparent")
+            f"font-size:{theme.FONT_XS}px;font-weight:bold;"
+            f"color:{theme.SUBTLE};background:transparent")
         rhead.addWidget(rlab)
         rhead.addStretch()
-        copy_btn = QPushButton("📋 복사")
-        copy_btn.setStyleSheet(theme.TEXT_BTN + f"QPushButton{{font-size:{theme.FONT_XS}px}}")
+        copy_btn = QPushButton("복사")
+        copy_btn.setStyleSheet(
+            theme.TEXT_BTN + f"QPushButton{{font-size:{theme.FONT_XS}px}}")
         copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         copy_btn.clicked.connect(self._copy)
         rhead.addWidget(copy_btn)
         rc.addLayout(rhead)
         self.result_edit = QTextEdit()
-        self.result_edit.setReadOnly(False)   # 살짝 손볼 수 있게
         self.result_edit.setStyleSheet(
-            f"QTextEdit{{background:{theme.CARD_TINT};border:1px solid "
-            f"{theme.BORDER};border-radius:{theme.RADIUS_MD}px;padding:12px;"
-            f"font-size:{theme.FONT_MD}px;line-height:150%}}")
+            f"QTextEdit{{background:transparent;border:none;padding:0;"
+            f"font-size:{theme.FONT_MD}px;line-height:160%;color:{theme.TEXT}}}")
         rc.addWidget(self.result_edit)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea{background:transparent}")
         scroll.setWidget(self.result_card)
         self.result_card.setVisible(False)
-        outer.addSpacing(4)
-        outer.addWidget(scroll, stretch=1)
-
-        # ── 하단: 상태 + 닫기 ──
-        bottom = QHBoxLayout()
-        self.status = QLabel("")
-        self.status.setStyleSheet(
-            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px")
-        bottom.addWidget(self.status)
-        bottom.addStretch()
-        close_btn = QPushButton("닫기")
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.clicked.connect(self.accept)
-        bottom.addWidget(close_btn)
-        outer.addSpacing(8)
-        outer.addLayout(bottom)
+        col.addWidget(scroll, stretch=1)
+        col.addSpacing(8)
 
         self.input_edit.setFocus()
 
@@ -239,7 +254,6 @@ class ProofDialog(motion.FadeInMixin, QDialog):
 
     def _set_loading(self, on: bool) -> None:
         self.go_btn.setEnabled(not on)
-        self.go_btn.setText("다듬는 중…" if on else "✨ 다듬기")
         self.input_edit.setReadOnly(on)
         self.progress.setVisible(on)
         self.loading_label.setVisible(on)
@@ -247,8 +261,8 @@ class ProofDialog(motion.FadeInMixin, QDialog):
     def _on_done(self, result: str) -> None:
         self._set_loading(False)
         self.result_edit.setPlainText(result)
-        self.status.setText("완료 — 결과를 확인하고 📋 복사해 쓰세요.")
-        motion.fade_in_widget(self.result_card, ms=220)   # 아래에서 페이드 등장
+        self.status.setText("")
+        motion.fade_in_widget(self.result_card, ms=220)   # 페이드 등장
 
     def _on_fail(self, msg: str) -> None:
         self._set_loading(False)
@@ -256,4 +270,4 @@ class ProofDialog(motion.FadeInMixin, QDialog):
 
     def _copy(self) -> None:
         QApplication.clipboard().setText(self.result_edit.toPlainText())
-        self.status.setText("복사했습니다. 쿨메신저나 문서에 붙여넣으세요.")
+        self.status.setText("복사했습니다 — 쿨메신저나 문서에 붙여넣으세요.")

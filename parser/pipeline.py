@@ -46,7 +46,7 @@ DEFAULT_CONFIG = {
     "favorites_enabled": False,     # 즐겨찾기 보관함
     "proof_enabled": False,         # 안내문구 보정 (공개용 글 전용)
     "proof_provider": "gemini",
-    "proof_model": "gemini-2.0-flash",
+    "proof_model": "gemini-3.5-flash",
     "proof_api_key": "",            # 로컬에만 저장 (gitignore 대상 config.json)
     "desk_widgets": {               # 바탕화면 위젯 (v0.10.0~)
         # planner(캘린더·할일)는 달력 위젯의 단일 창구 — 기본 켬.

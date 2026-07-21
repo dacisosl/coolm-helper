@@ -14,7 +14,9 @@ from __future__ import annotations
 import json
 import urllib.request
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
+# 구글이 내려버린 옛 모델들 — config에 남아 있으면 기본 모델로 대체
+_RETIRED_MODELS = {"gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"}
 TIMEOUT = 30
 
 PROMPT = (
@@ -30,6 +32,8 @@ def _gemini(text: str, config: dict) -> str:
         raise RuntimeError("Gemini API 키가 설정되지 않았습니다. "
                            "설정 → 일반에서 입력해 주세요.")
     model = config.get("proof_model", DEFAULT_MODEL)
+    if model in _RETIRED_MODELS:          # 옛 설정 파일 호환 (404 방지)
+        model = DEFAULT_MODEL
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{model}:generateContent")
     body = json.dumps({
@@ -58,7 +62,7 @@ def _gemini(text: str, config: dict) -> str:
         raise RuntimeError("응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요.")
 
 
-OPENROUTER_MODEL = "google/gemini-2.5-flash"
+OPENROUTER_MODEL = "google/gemini-3.5-flash"
 
 
 def _openrouter(text: str, config: dict) -> str:
