@@ -151,14 +151,21 @@ class DeskWidgetBase(QWidget):
         return bar
 
     def make_edit_button(self) -> QPushButton:
-        """헤더에 놓는 🔧 버튼 — 누르면 편집 모드 켜고 끄기."""
-        b = QPushButton("🔧")
+        """헤더에 놓는 🔧(렌치) 버튼 — 누르면 편집 모드 켜고 끄기.
+
+        이모지가 아니라 내장 SVG 아이콘이라 어느 PC에서나 보인다.
+        """
+        from PyQt6.QtCore import QSize
+        from ui.icons import icon
+        b = QPushButton()
+        b.setIcon(icon("tools", 14))
+        b.setIconSize(QSize(14, 14))
         b.setToolTip("편집 모드 — 크기 조절점·투명도·글씨 크기·내용 수정")
-        b.setFixedSize(24, 22)
+        b.setFixedSize(26, 22)
         b.setCursor(Qt.CursorShape.PointingHandCursor)
         b.setStyleSheet(
-            "QPushButton{background:transparent;border:none;font-size:12px;"
-            "border-radius:6px}"
+            f"QPushButton{{background:transparent;border:1px solid "
+            f"{theme.BORDER};border-radius:6px}}"
             f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
         b.clicked.connect(self.toggle_edit_mode)
         return b
@@ -180,20 +187,29 @@ class DeskWidgetBase(QWidget):
 
     def paintEvent(self, ev):
         super().paintEvent(ev)
-        if not self.edit_mode:
-            return
-        # 4개 변 중앙 + 4개 꼭지점에 잡기 포인트(캐칭 포인트)를 그린다
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setPen(QColor("white"))
-        p.setBrush(QColor(theme.PRIMARY))
-        s = 8
         w, h = self.width(), self.height()
-        for x in (0, (w - s) // 2, w - s):
-            for y in (0, (h - s) // 2, h - s):
-                if (x, y) == ((w - s) // 2, (h - s) // 2):
-                    continue           # 중앙은 제외
-                p.drawRoundedRect(x, y, s, s, 2, 2)
+        if self.edit_mode:
+            # 4개 변 중앙 + 4개 꼭지점에 잡기 포인트(캐칭 포인트)를 그린다
+            p.setPen(QColor("white"))
+            p.setBrush(QColor(theme.PRIMARY))
+            s = 8
+            for x in (0, (w - s) // 2, w - s):
+                for y in (0, (h - s) // 2, h - s):
+                    if (x, y) == ((w - s) // 2, (h - s) // 2):
+                        continue       # 중앙은 제외
+                    p.drawRoundedRect(x, y, s, s, 2, 2)
+        else:
+            # 평소에도 오른쪽 아래에 은은한 대각선 그립 — "여기 잡으면
+            # 크기 조절" 힌트
+            grip = QColor(theme.SUBTLE)
+            grip.setAlpha(110)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(grip)
+            for i in range(3):
+                for j in range(3 - i):
+                    p.drawEllipse(w - 6 - j * 4, h - 6 - i * 4, 2, 2)
         p.end()
 
     # ── 저장 ────────────────────────────────────────────────
@@ -284,6 +300,12 @@ class DeskWidgetBase(QWidget):
     def contextMenuEvent(self, ev):
         menu = QMenu(self)
         menu.setStyleSheet(theme.BASE_QSS)
+        edit = QAction("편집 모드 — 크기 조절점·투명도·글씨", menu)
+        edit.setCheckable(True)
+        edit.setChecked(self.edit_mode)
+        edit.triggered.connect(self.toggle_edit_mode)
+        menu.addAction(edit)
+        menu.addSeparator()
         top = QAction("항상 위에 보이기", menu)
         top.setCheckable(True)
         top.setChecked(bool(self.conf.get("always_on_top")))

@@ -22,7 +22,7 @@ from ui.desk_base import DeskWidgetBase
 class PostItWidget(DeskWidgetBase):
     """노란 메모지 한 장. conf는 config["desk_widgets"]["notes"]의 한 항목."""
 
-    MIN_W, MIN_H = 180, 140
+    MIN_W, MIN_H = 140, 110       # 명함만 하게도 줄일 수 있게
     OFF_LABEL = "포스트잇 내리기 (일정은 그대로)"
 
     def __init__(self, store: EventStore, config: dict, base_dir: str,
