@@ -71,7 +71,7 @@ def _card(title: str, tip: str = "") -> tuple[QFrame, QVBoxLayout]:
 def _check(text: str, checked: bool, tip: str = "") -> tuple[QCheckBox, QWidget]:
     """짧은 라벨 체크박스 + ? 아이콘 한 줄."""
     row = QWidget()
-    row.setStyleSheet("border:none")
+    row.setStyleSheet("background:transparent;border:none")
     h = QHBoxLayout(row)
     h.setContentsMargins(0, 0, 0, 0)
     h.setSpacing(6)
@@ -178,7 +178,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         c.addWidget(row)
         # 보정 켜면 나타나는 API 키 영역 (Gemini 또는 OpenRouter)
         self.proof_area = QWidget()
-        self.proof_area.setStyleSheet("border:none")
+        self.proof_area.setStyleSheet("background:transparent;border:none")
         pa = QVBoxLayout(self.proof_area)
         pa.setContentsMargins(22, 0, 0, 0)
         pa.setSpacing(6)

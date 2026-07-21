@@ -59,6 +59,24 @@ SPACE_MD = 12
 SPACE_LG = 16
 
 
+def _check_icon_path() -> str:
+    """체크박스 ✓용 흰색 SVG를 임시 폴더에 만들어 QSS url로 쓴다.
+
+    (QSS는 data: URI를 지원하지 않아 파일이 필요. 전역 스타일시트가 걸리면
+    Qt가 기본 인디케이터를 못 그리므로 직접 정의해야 한다.)
+    """
+    import os
+    import tempfile
+    path = os.path.join(tempfile.gettempdir(), "coolm_check.svg")
+    if not os.path.exists(path):
+        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+               '<path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" '
+               'fill="white"/></svg>')
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(svg)
+    return path.replace("\\", "/")
+
+
 def make_shadow(parent, level: int = 1):
     """카드/팝오버용 표준 그림자. level 1=가벼움(팝오버·말풍선), 2=창 카드."""
     from PyQt6.QtGui import QColor
@@ -91,7 +109,21 @@ QComboBox::drop-down {{ border:none; width:22px; }}
 QComboBox QAbstractItemView {{
     background:{CARD}; color:{TEXT}; border:1px solid {BORDER};
     selection-background-color:{PRIMARY_LIGHT}; selection-color:{PRIMARY_DARK}; }}
-QCheckBox {{ background:transparent; spacing:{SPACE_SM}px; color:{TEXT}; }}
+QCheckBox, QRadioButton {{ background:transparent; spacing:{SPACE_SM}px;
+    color:{TEXT}; }}
+QCheckBox::indicator {{ width:18px; height:18px; border:1.5px solid {BORDER};
+    border-radius:5px; background:{CARD}; }}
+QCheckBox::indicator:hover {{ border-color:{PRIMARY}; }}
+QCheckBox::indicator:checked {{ background:{PRIMARY}; border-color:{PRIMARY};
+    image:url("{_check_icon_path()}"); }}
+QCheckBox::indicator:checked:hover {{ background:{PRIMARY_DARK}; }}
+QRadioButton::indicator {{ width:18px; height:18px;
+    border:1.5px solid {BORDER}; border-radius:10px; background:{CARD}; }}
+QRadioButton::indicator:hover {{ border-color:{PRIMARY}; }}
+QRadioButton::indicator:checked {{ border:2px solid {PRIMARY};
+    background:qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+        stop:0 {PRIMARY}, stop:0.55 {PRIMARY}, stop:0.65 {CARD},
+        stop:1 {CARD}); }}
 QTextBrowser {{ background:{CARD_TINT}; color:{TEXT};
     border:1px solid {BORDER}; border-radius:{RADIUS_MD}px; padding:8px; }}
 QPushButton {{ background:{CARD}; color:{PRIMARY_DARK};
