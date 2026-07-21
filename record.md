@@ -479,4 +479,27 @@
 
 ---
 
+## 2026-07-21 — v0.14.0: 전 화면 리디자인 (emil-design-eng 스킬 기준)
+
+emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4단계로 나눠
+단계별 커밋 (동작·레이아웃 불변, 겉감각만 개선).
+
+- **1단계 토큰**: theme.py에 RADIUS 3단·FONT 5단·SPACE 4배수·색 상수 20+개·
+  make_shadow(level) 1함수. ui/ 전체 하드코딩 hex 0건으로 치환(grep 게이트).
+  QToolTip 스타일 통일, 포커스 링 2px→1px(입력칸 덜컹 제거).
+- **2단계 눌림**: 모든 버튼 :pressed (배경 어둡게 + 1px 하강, 레이아웃 시프트
+  없음). QSS는 scale 불가 → 이 절충. apple "pointer-down 즉각 피드백".
+- **3단계 모션**: ui/motion.py(스프링 없이 QEasingCurve). fade_in/pop_in/
+  fade_out_close/slide_fade_in + FadeInMixin. OutCubic, opacity 1.0 보장,
+  enter<300ms·exit 더 빠르게. **빈도 기반 판단**: 펭귄 _IconBar·⚡ QuickDialog는
+  무애니메이션(하루 수십 회 — Raycast 원칙). Toast는 아래서 페이드인 +
+  마우스 올리면 타이머 정지. config animations_enabled + 설정 토글.
+- **4단계 디테일**: DIALOG_HEADER 공유, 커서 정리.
+- 교훈: PyQt는 CSS transition이 없어 모션을 QPropertyAnimation(windowOpacity/
+  pos)으로 구현. QGraphicsEffect는 위젯당 1개라 그림자 있는 창엔 opacity 효과
+  대신 windowOpacity를 쓴다. 자주 보는 UI에 모션을 넣지 않는 절제가 핵심.
+- 테스트 77개(신규 test_motion.py 7: on/off 즉시성·토스트 호버·핫패스 무모션).
+
+---
+
 ## (다음 기록은 여기에 이어서)

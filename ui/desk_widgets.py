@@ -35,8 +35,7 @@ class DayDetailDialog(motion.FadeInMixin, QDialog):
         self.setStyleSheet(theme.BASE_QSS)
         lay = QVBoxLayout(self)
         head = QLabel(f"{d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]})")
-        head.setStyleSheet(
-            f"font-size:15px;font-weight:bold;color:{theme.PRIMARY_DARK}")
+        head.setStyleSheet(theme.DIALOG_HEADER)
         lay.addWidget(head)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -47,6 +46,7 @@ class DayDetailDialog(motion.FadeInMixin, QDialog):
         scroll.setWidget(inner)
         lay.addWidget(scroll)
         close_btn = QPushButton("닫기")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
         lay.addWidget(close_btn)
         self._fill()
