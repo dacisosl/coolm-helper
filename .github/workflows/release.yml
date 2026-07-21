@@ -1,26 +1,19 @@
 # 릴리스 자동화 (클라우드 Windows 빌드) — release.py의 클라우드판.
-# 실행 방법 두 가지:
-#   ① release_notes.txt(첫 줄=제목, 나머지=안내문)를 갱신해 두고
-#      v0.10.0 형식의 태그를 push → 자동 실행
-#   ② GitHub → Actions → release → Run workflow (버전·제목·노트 입력)
-# 순서: 버전 갱신 → 테스트 → 빌드 → 설치파일 → GitHub 릴리스 → version.json push
-# version.json이 main에 올라가는 순간, 사용자 앱이 시작할 때 업데이트를 안내한다.
+#
+# 실행 방법: version.py의 APP_VERSION을 올리고 release_notes.txt(첫 줄=제목,
+# 나머지=안내문)를 수정해서 main에 push하면 자동 실행된다.
+# (GitHub → Actions → release → Run workflow 수동 실행도 가능)
+#
+# 순서: 테스트 → 빌드 → 설치파일 → GitHub 릴리스 → version.json push.
+# version.json이 main에 올라가는 순간, 사용자 앱이 시작할 때 업데이트를
+# 안내한다. 같은 버전 릴리스가 이미 있으면 릴리스 단계에서 멈춘다(중복 방지).
 name: release
 
 on:
   push:
-    tags: ["v*"]
+    branches: ["main"]
+    paths: ["release_notes.txt"]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "버전 (예: 0.10.0)"
-        required: true
-      title:
-        description: "릴리스 제목"
-        required: true
-      notes:
-        description: "변경사항 (업데이트 안내창에 보이는 문구)"
-        required: true
 
 permissions:
   contents: write
@@ -37,46 +30,33 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: 버전·제목·노트 정하기 (태그 push면 release_notes.txt 사용)
+      - name: 버전·제목·노트 읽기 (version.py + release_notes.txt)
         shell: python
-        env:
-          IN_VER: ${{ github.event.inputs.version }}
-          IN_TITLE: ${{ github.event.inputs.title }}
-          IN_NOTES: ${{ github.event.inputs.notes }}
         run: |
-          import os
-          if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
-              ver = os.environ["IN_VER"]
-              title = os.environ["IN_TITLE"]
-              notes = os.environ["IN_NOTES"]
-          else:
-              ver = os.environ["GITHUB_REF_NAME"].lstrip("v")
-              lines = open("release_notes.txt",
-                           encoding="utf-8").read().strip().splitlines()
-              title = lines[0].strip()
-              notes = "\n".join(lines[1:]).strip() or title
+          import os, re
+          ver = re.search(r'APP_VERSION = "([^"]+)"',
+                          open("version.py", encoding="utf-8").read()).group(1)
+          lines = open("release_notes.txt",
+                       encoding="utf-8").read().strip().splitlines()
+          title = lines[0].strip()
+          notes = "\n".join(lines[1:]).strip() or title
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
-              f.write(f"VER={ver.strip().lstrip('v')}\n")
+              f.write(f"VER={ver}\n")
               f.write(f"TITLE={title}\n")
               f.write("NOTES<<__EOF__\n" + notes + "\n__EOF__\n")
 
       - name: 의존성 설치
         run: pip install -r requirements.txt pyinstaller
 
-      - name: 버전 표기 갱신 (version.py, installer.iss)
+      - name: installer.iss 버전 맞추기
         shell: python
         run: |
           import os, re
-          ver = os.environ["VER"].strip().lstrip("v")
-          for path, pat, rep in (
-              ("version.py", r'APP_VERSION = "[^"]+"',
-               f'APP_VERSION = "{ver}"'),
-              ("installer.iss", r'#define AppVersion "[^"]+"',
-               f'#define AppVersion "{ver}"'),
-          ):
-              text = open(path, encoding="utf-8").read()
-              open(path, "w", encoding="utf-8", newline="").write(
-                  re.sub(pat, rep, text))
+          ver = os.environ["VER"]
+          text = open("installer.iss", encoding="utf-8").read()
+          open("installer.iss", "w", encoding="utf-8", newline="").write(
+              re.sub(r'#define AppVersion "[^"]+"',
+                     f'#define AppVersion "{ver}"', text))
 
       - name: 테스트
         run: python -m unittest discover -s tests
@@ -106,7 +86,7 @@ jobs:
         shell: python
         run: |
           import json, os
-          ver = os.environ["VER"].strip().lstrip("v")
+          ver = os.environ["VER"]
           data = {"version": ver,
                   "url": ("https://github.com/${{ github.repository }}/"
                           f"releases/download/v{ver}/CoolmHelper-Setup.exe"),
@@ -119,6 +99,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.py installer.iss version.json
+          git add installer.iss version.json
           git commit -m "release: v$env:VER (version.json 갱신 - 자동 업데이트 신호)"
           git push origin main
