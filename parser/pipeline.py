@@ -49,14 +49,14 @@ DEFAULT_CONFIG = {
     "proof_model": "gemini-2.0-flash",
     "proof_api_key": "",            # 로컬에만 저장 (gitignore 대상 config.json)
     "desk_widgets": {               # 바탕화면 위젯 (v0.10.0~)
-        # planner(캘린더·할일)는 빠른메뉴의 캘린더 아이콘을 대신하므로 기본 켬
+        # planner(캘린더·할일)는 달력 위젯의 단일 창구 — 기본 켬.
+        # show_detail: 아래 '그날 일정 목록'을 펼칠지 (끄면 순수 달력)
         "planner": {"enabled": True, "geometry": None, "opacity": 95,
-                    "always_on_top": False, "font_scale": 100},
+                    "always_on_top": False, "font_scale": 100,
+                    "show_detail": True},
         "simple":  {"enabled": False, "geometry": None, "opacity": 90,
                     "always_on_top": False, "font_scale": 100},
         "weekly":  {"enabled": False, "geometry": None, "opacity": 90,
-                    "always_on_top": False, "font_scale": 100},
-        "monthly": {"enabled": False, "geometry": None, "opacity": 90,
                     "always_on_top": False, "font_scale": 100},
         "notes": [],   # 포스트잇: {event_id, geometry, opacity, always_on_top, font_scale}
     },
@@ -69,12 +69,12 @@ DEFAULT_CONFIG = {
 }
 
 
-DESK_KINDS = ("planner", "simple", "weekly", "monthly")
+DESK_KINDS = ("planner", "simple", "weekly")
 
 
 def _desk_default() -> dict:
     return {"enabled": False, "geometry": None, "opacity": 90,
-            "always_on_top": False, "font_scale": 100}
+            "always_on_top": False, "font_scale": 100, "show_detail": True}
 
 
 def desk_conf(config: dict, kind: str):
@@ -108,9 +108,8 @@ def migrate_desk_config(config: dict) -> bool:
     # 캘린더·할일 위젯은 빠른메뉴의 캘린더 아이콘을 대신하므로 기본 켬
     config["desk_widgets"]["planner"]["enabled"] = True
     if was_on:
-        for k in ("weekly", "monthly"):
-            config["desk_widgets"][k]["enabled"] = True
-            config["desk_widgets"][k]["opacity"] = max(40, min(100, opacity))
+        config["desk_widgets"]["weekly"]["enabled"] = True
+        config["desk_widgets"]["weekly"]["opacity"] = max(40, min(100, opacity))
     config["desk_migration_notice_done"] = not was_on
     return True
 
@@ -126,6 +125,20 @@ def ensure_planner(config: dict) -> bool:
     dw["planner"] = _desk_default()
     dw["planner"]["enabled"] = True
     dw["planner"]["opacity"] = 95
+    return True
+
+
+def drop_monthly(config: dict) -> bool:
+    """v0.12 마이그레이션: 월간 달력 위젯을 캘린더·할일(planner)로 통일.
+
+    월간을 켜두었던 사용자는 planner가 대신 켜진다.
+    """
+    dw = config.get("desk_widgets")
+    if not isinstance(dw, dict) or "monthly" not in dw:
+        return False
+    mon = dw.pop("monthly") or {}
+    if mon.get("enabled"):
+        desk_conf(config, "planner")["enabled"] = True
     return True
 
 
@@ -179,6 +192,7 @@ def load_config(base_dir: str) -> dict:
             config = json.load(f)
         changed = migrate_desk_config(config)
         changed = ensure_planner(config) or changed
+        changed = drop_monthly(config) or changed
         if changed:
             save_config(base_dir, config)
         return config

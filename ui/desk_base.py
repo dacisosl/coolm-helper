@@ -392,8 +392,7 @@ def _widget_class(kind: str):
     from ui import desk_widgets
     return {"planner": desk_widgets.PlannerWidget,
             "simple": desk_widgets.SimpleTodoWidget,
-            "weekly": desk_widgets.WeeklyWidget,
-            "monthly": desk_widgets.MonthlyWidget}[kind]
+            "weekly": desk_widgets.WeeklyWidget}[kind]
 
 
 def ensure_desk_widgets(owner) -> None:

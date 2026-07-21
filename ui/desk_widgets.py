@@ -266,6 +266,7 @@ class _TodoRow(_DragField):
         if owner.edit_mode:
             # 인라인 편집: 그 자리에서 제목을 바로 타이핑
             self.title_edit = QLineEdit(event.title)
+            self.title_edit.setMinimumWidth(10)   # 좁은 열에서도 안 넘치게
             self.title_edit.setStyleSheet(
                 f"QLineEdit{{background:#fbfdff;border:1px solid "
                 f"{theme.BORDER};border-radius:5px;padding:1px 4px;"
@@ -275,6 +276,7 @@ class _TodoRow(_DragField):
         else:
             title = QLabel(event.title)
             title.setWordWrap(True)
+            title.setMinimumWidth(10)   # 최소폭 주장 않기 — 열 너비에 맞춰 줄바꿈
             title.setStyleSheet(
                 f"font-size:{fpx(10)}px;color:{theme.TEXT};"
                 f"background:transparent" + done_style)
@@ -340,6 +342,9 @@ class SimpleTodoWidget(DeskWidgetBase):
         lay.addWidget(head)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        # 가로로 넘치지 않게 — 필드가 열 너비 안에서 줄바꿈되도록 강제
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea{border:none;background:transparent}")
         inner = QWidget()
         inner.setStyleSheet("background:transparent")
@@ -450,6 +455,7 @@ class _WeekField(_DragField):
             col.addWidget(t)
         title = QLabel(event.title)
         title.setWordWrap(True)
+        title.setMinimumWidth(10)   # 최소폭 주장 않기 — 열 너비에 맞춰 줄바꿈
         title.setStyleSheet(f"color:{fg};font-size:{fpx(9)}px;"
                             f"background:transparent")
         col.addWidget(title)
@@ -529,45 +535,7 @@ class WeeklyWidget(DeskWidgetBase):
         self.week_row.addLayout(weekend, stretch=2)
 
 
-# ── ③ 월간 달력 ──────────────────────────────────────────────
-class MonthlyWidget(DeskWidgetBase):
-    """한 달 달력(개수 배지) — 날짜 클릭 시 상세 모달."""
-
-    MIN_W, MIN_H = 260, 240
-
-    def __init__(self, store, config, base_dir, conf):
-        super().__init__(store, config, base_dir, conf)
-        root, _head = _make_card(self, "📅 월간 달력", extra_qss=theme.CALENDAR_QSS)
-        self.cal = EventCalendar()
-        self.cal.clicked.connect(
-            lambda qd: open_day_dialog(self.store,
-                                       date(qd.year(), qd.month(), qd.day())))
-        root.addWidget(self.cal, stretch=1)
-        self.refresh()
-
-    def place_default(self) -> None:
-        screen = QApplication.primaryScreen().availableGeometry()
-        self.resize(360, 340)
-        self.move(screen.right() - self.width() - 40,
-                  screen.bottom() - self.height() - 60)
-
-    def resizeEvent(self, ev):
-        super().resizeEvent(ev)
-        self._apply_cal_font()
-
-    def _apply_cal_font(self) -> None:
-        _scale_calendar(self.cal, self.height(), self.font_scale(), 26)
-
-    def refresh(self) -> None:
-        self._apply_cal_font()
-        counts: dict[date, tuple[int, bool]] = {}
-        for d in self.store.dates_with_events():
-            evs = self.store.on_date(d)
-            counts[d] = (len(evs), any(e.priority == "높음" for e in evs))
-        self.cal.set_counts(counts)
-
-
-# ── ⑤ 캘린더 · 할일 (내 캘린더 창의 위젯판) ──────────────────
+# ── ③ 캘린더 · 할일 (달력 위젯 단일 창구) ────────────────────
 class PlannerWidget(DeskWidgetBase):
     """달력 + 선택한 날짜의 일정 목록이 한 위젯에.
 
@@ -588,17 +556,41 @@ class PlannerWidget(DeskWidgetBase):
         root.addWidget(self.cal, stretch=5)
         self.day_label = QLabel()
         root.addWidget(self.day_label)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea{border:none;background:transparent}")
+        self.detail_scroll = QScrollArea()
+        self.detail_scroll.setWidgetResizable(True)
+        self.detail_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.detail_scroll.setStyleSheet(
+            "QScrollArea{border:none;background:transparent}")
         inner = QWidget()
         inner.setStyleSheet("background:transparent")
         self.items_lay = QVBoxLayout(inner)
         self.items_lay.setContentsMargins(0, 0, 0, 0)
         self.items_lay.setSpacing(6)
-        scroll.setWidget(inner)
-        root.addWidget(scroll, stretch=4)
+        self.detail_scroll.setWidget(inner)
+        root.addWidget(self.detail_scroll, stretch=4)
+        # 편집 도구줄에 '아래 상세보기' 토글 — 끄면 순수 달력처럼 쓴다
+        self.detail_cb = QCheckBox("상세보기")
+        self.detail_cb.setToolTip("달력 아래에 그날 일정 목록을 펼칠지")
+        self.detail_cb.setStyleSheet(
+            f"QCheckBox{{color:{theme.SUBTLE};font-size:10px;"
+            f"background:transparent}}")
+        self.detail_cb.setChecked(bool(conf.get("show_detail", True)))
+        self.detail_cb.toggled.connect(self._set_show_detail)
+        bar_lay = self._edit_bar.layout()
+        bar_lay.insertWidget(bar_lay.count() - 2, self.detail_cb)  # 📌 앞에
+        self._apply_detail()
         self.refresh()
+
+    def _set_show_detail(self, on: bool) -> None:
+        self.conf["show_detail"] = bool(on)
+        self._save_config()
+        self._apply_detail()
+
+    def _apply_detail(self) -> None:
+        vis = bool(self.conf.get("show_detail", True))
+        self.day_label.setVisible(vis)
+        self.detail_scroll.setVisible(vis)
 
     def place_default(self) -> None:
         screen = QApplication.primaryScreen().availableGeometry()

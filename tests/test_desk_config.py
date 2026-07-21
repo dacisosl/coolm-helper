@@ -4,8 +4,9 @@ import sys, os, tempfile, shutil, unittest
 from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from parser.pipeline import (clamp_geometry, desk_conf, ensure_planner,
-                             migrate_desk_config, prune_notes, DEFAULT_CONFIG)
+from parser.pipeline import (clamp_geometry, desk_conf, drop_monthly,
+                             ensure_planner, migrate_desk_config, prune_notes,
+                             DEFAULT_CONFIG)
 from store.event_store import EventStore
 
 TODAY = date(2026, 7, 20)
@@ -16,8 +17,8 @@ class TestMigrateDeskConfig(unittest.TestCase):
         config = {"desktop_widget_enabled": True, "desktop_widget_opacity": 75}
         self.assertTrue(migrate_desk_config(config))
         self.assertTrue(config["desk_widgets"]["weekly"]["enabled"])
-        self.assertTrue(config["desk_widgets"]["monthly"]["enabled"])
         self.assertEqual(config["desk_widgets"]["weekly"]["opacity"], 75)
+        self.assertTrue(config["desk_widgets"]["planner"]["enabled"])
         self.assertFalse(config["desk_widgets"]["simple"]["enabled"])
         self.assertNotIn("desktop_widget_enabled", config)
         self.assertNotIn("desktop_widget_opacity", config)
@@ -26,7 +27,7 @@ class TestMigrateDeskConfig(unittest.TestCase):
     def test_old_widget_off_defaults(self):
         config = {"desktop_widget_enabled": False}
         self.assertTrue(migrate_desk_config(config))
-        for kind in ("simple", "weekly", "monthly"):
+        for kind in ("simple", "weekly"):
             self.assertFalse(config["desk_widgets"][kind]["enabled"])
         self.assertEqual(config["desk_widgets"]["notes"], [])
         self.assertTrue(config["desk_migration_notice_done"])    # 안내 불필요
@@ -59,6 +60,26 @@ class TestEnsurePlanner(unittest.TestCase):
         self.assertFalse(ensure_planner({}))
 
 
+class TestDropMonthly(unittest.TestCase):
+    def test_monthly_on_moves_to_planner(self):
+        config = {"desk_widgets": {
+            "planner": {"enabled": False},
+            "monthly": {"enabled": True, "geometry": [1, 2, 300, 300]}}}
+        self.assertTrue(drop_monthly(config))
+        self.assertNotIn("monthly", config["desk_widgets"])
+        self.assertTrue(config["desk_widgets"]["planner"]["enabled"])
+
+    def test_monthly_off_just_removed(self):
+        config = {"desk_widgets": {"planner": {"enabled": False},
+                                   "monthly": {"enabled": False}}}
+        self.assertTrue(drop_monthly(config))
+        self.assertFalse(config["desk_widgets"]["planner"]["enabled"])
+
+    def test_noop_when_absent(self):
+        self.assertFalse(drop_monthly({"desk_widgets": {}}))
+        self.assertFalse(drop_monthly({}))
+
+
 class TestDeskConf(unittest.TestCase):
     def test_fills_missing_keys(self):
         config = {"desk_widgets": {"weekly": {"enabled": True}}}
@@ -76,12 +97,12 @@ class TestDeskConf(unittest.TestCase):
 
     def test_returns_live_reference(self):
         config = {}
-        desk_conf(config, "monthly")["enabled"] = True
-        self.assertTrue(config["desk_widgets"]["monthly"]["enabled"])
+        desk_conf(config, "weekly")["enabled"] = True
+        self.assertTrue(config["desk_widgets"]["weekly"]["enabled"])
 
     def test_default_config_not_polluted(self):
         # load_config는 깊은 복사를 쓰므로 DEFAULT_CONFIG 원본은 항상 꺼져 있어야 한다
-        for kind in ("simple", "weekly", "monthly"):
+        for kind in ("simple", "weekly"):
             self.assertFalse(DEFAULT_CONFIG["desk_widgets"][kind]["enabled"])
 
 

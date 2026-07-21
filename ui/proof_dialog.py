@@ -44,18 +44,18 @@ class ProofDialog(QDialog):
         self.setStyleSheet(theme.BASE_QSS)
         lay = QVBoxLayout(self)
 
-        notice = QLabel(
-            "⚠ 이 기능은 가정통신문 등 <b>공개할 글</b>을 다듬는 용도입니다. "
-            "아래에 붙여넣은 내용은 구글(Gemini) 서버로 전송되니 "
-            "개인정보가 들어간 글은 넣지 마세요. 쪽지는 자동으로 불러오지 않습니다.")
-        notice.setWordWrap(True)
-        notice.setStyleSheet(
-            f"background:#fff8e1;color:#8d6e00;border-radius:8px;"
-            f"padding:8px;font-size:11px")
-        lay.addWidget(notice)
+        # 긴 주의 문단 대신 ℹ 툴팁으로 간략히 (2026-07-21 사용자 결정)
+        _tip = ("공개용 글 전용 — 붙여넣은 내용은 구글(Gemini) 서버로 "
+                "전송돼요.\n개인정보가 들어간 글은 넣지 마세요. "
+                "쪽지는 자동으로 불러오지 않아요.")
+        info = QLabel("ℹ 공개할 글(가정통신문 등) 전용")
+        info.setToolTip(_tip)
+        info.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
+        lay.addWidget(info)
 
         self.input_edit = QTextEdit()
         self.input_edit.setPlaceholderText("다듬을 글을 여기에 붙여넣으세요…")
+        self.input_edit.setToolTip(_tip)
         lay.addWidget(self.input_edit, stretch=1)
 
         mid = QHBoxLayout()

@@ -444,4 +444,21 @@
 
 ---
 
+## 2026-07-21 — v0.12.0: 달력 통일·한 줄 등록 바·자동 종일/마감
+
+- **달력 위젯 통일**: MonthlyWidget 삭제 → PlannerWidget(캘린더·할일)
+  하나로. `drop_monthly` 마이그레이션(월간 켰던 사용자는 planner로),
+  편집 도구줄에 "상세보기" 체크(conf `show_detail`) — 끄면 순수 달력.
+- **등록 UI 한 줄 바**: 제목|날짜|시간. 종일·마감 체크박스 삭제 —
+  TimeCombo 첫 항목 '종일'(선택=종일), 마감 여부는 파서 자동 감지값을
+  숨김 상태(`_is_deadline`)로 유지. EventItemCard도 종일 체크 제거,
+  00:00 = 종일 규칙.
+- ReviewDialog에 📌 포스트잇(미등록이면 등록부터) + 토스트.
+- 할 일 보드 글씨 잘림: 가로 스크롤 금지 + QLabel minimumWidth(10)로
+  열 너비 안 줄바꿈 강제. 교훈: wordWrap QLabel도 minimumSizeHint가
+  넓으면 스크롤영역을 밀어낸다.
+- 문구 보정 경고 문단 → ℹ 한 줄 + 툴팁.
+
+---
+
 ## (다음 기록은 여기에 이어서)

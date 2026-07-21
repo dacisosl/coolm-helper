@@ -138,9 +138,7 @@ class EventItemCard(QFrame):
         self.start_edit.setDateTime(event.start_dt)
         opts.addWidget(QLabel("일시"))
         opts.addWidget(self.start_edit)
-        self.all_day_cb = QCheckBox("종일")
-        self.all_day_cb.setChecked(event.all_day)
-        opts.addWidget(self.all_day_cb)
+        # 종일 여부는 시간으로 자동 판단 (00:00 = 종일) — 체크박스 없음
         opts.addWidget(QLabel("중요도"))
         self.priority_combo = QComboBox()
         self.priority_combo.addItems(PRIORITIES)
@@ -201,7 +199,7 @@ class EventItemCard(QFrame):
     def _save(self) -> None:
         title = self.title_edit.text().strip() or self.event.title
         new_start = self.start_edit.dateTime().toPyDateTime()
-        new_all_day = self.all_day_cb.isChecked()
+        new_all_day = (new_start.hour == 0 and new_start.minute == 0)
         self.store.update(
             self.event.id,
             title=title,
@@ -224,8 +222,8 @@ class EventItemCard(QFrame):
                     "구글 캘린더에서 직접 수정해 주세요.")
         # 로컬 객체도 갱신해 접힌 줄 표시를 즉시 반영
         self.event.title = title
-        self.event.start = self.start_edit.dateTime().toPyDateTime().isoformat()
-        self.event.all_day = self.all_day_cb.isChecked()
+        self.event.start = new_start.isoformat()
+        self.event.all_day = new_all_day
         self.event.priority = self.priority_combo.currentText()
         self.event.memo = self.memo_edit.toPlainText()
         self._update_labels()

@@ -84,7 +84,15 @@ class QuickDialog(QDialog):
             f"QLineEdit{{font-size:14px;font-weight:bold;background:{theme.CARD};"
             f"border:1px solid {theme.BORDER};border-radius:8px;padding:8px}}"
             f"QLineEdit:focus{{border:2px solid {theme.PRIMARY}}}")
-        lay.addWidget(self.title_edit)
+        # 한 줄 바: 제목 / 날짜 / 시간 ('종일'은 시간 콤보의 첫 항목)
+        bar = QHBoxLayout()
+        bar.addWidget(self.title_edit, stretch=1)
+        self.date_btn = DatePickerButton()
+        bar.addWidget(self.date_btn)
+        self.time_combo = TimeCombo()
+        bar.addWidget(self.time_combo)
+        lay.addLayout(bar)
+        self._is_deadline = False   # 마감 여부는 쪽지에서 자동 감지된 값 유지
 
         self.warn = QLabel()
         self.warn.setWordWrap(True)
@@ -93,24 +101,6 @@ class QuickDialog(QDialog):
             f"background:#fdecea;border-radius:6px;padding:5px")
         self.warn.setVisible(False)
         lay.addWidget(self.warn)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel("일시"))
-        self.date_btn = DatePickerButton()
-        row.addWidget(self.date_btn)
-        self.time_combo = TimeCombo()
-        row.addWidget(self.time_combo)
-        self.all_day_cb = QCheckBox("종일")
-        self.all_day_cb.toggled.connect(
-            lambda on: self.time_combo.setEnabled(not on))
-        row.addWidget(self.all_day_cb)
-        self.deadline_cb = QCheckBox("마감")
-        self.deadline_cb.setToolTip(
-            "체크하면 '할일'로 표시되고, 마감 며칠 전에 시작 알림을 받아요.\n"
-            "(알림 일수는 설정 → 일반에서 바꿀 수 있어요)")
-        row.addWidget(self.deadline_cb)
-        row.addStretch()
-        lay.addLayout(row)
 
         self.body_edit = QTextEdit()
         self.body_edit.setPlaceholderText("상세내용")
@@ -187,7 +177,7 @@ class QuickDialog(QDialog):
             self.title_edit.setText(msg.title)
             self.body_edit.setHtml(highlight_html(msg.body, roster_spans))
             self.date_btn.set_date(datetime.now().date())
-            self.all_day_cb.setChecked(True)
+            self.time_combo.set_all_day()
             self.register_btn.setEnabled(True)
             return
         self.status.setText(src)
@@ -216,10 +206,11 @@ class QuickDialog(QDialog):
         else:
             self.warn.setVisible(False)
         self.date_btn.set_date(c.start.date())
-        self.time_combo.set_time(c.start.hour, c.start.minute)
-        self.all_day_cb.setChecked(c.all_day)
-        self.time_combo.setEnabled(not c.all_day)
-        self.deadline_cb.setChecked(c.is_deadline)
+        if c.all_day:
+            self.time_combo.set_all_day()
+        else:
+            self.time_combo.set_time(c.start.hour, c.start.minute)
+        self._is_deadline = c.is_deadline
         self.body_edit.setHtml(highlight_html(c.message.body, c.body_spans))
 
     # ── 등록 ────────────────────────────────────────────────
@@ -228,7 +219,7 @@ class QuickDialog(QDialog):
         if not title:
             QMessageBox.warning(self, "확인", "제목을 입력하세요.")
             return
-        all_day = self.all_day_cb.isChecked()
+        all_day = self.time_combo.is_all_day()
         d = self.date_btn.get_date()
         h, m = (0, 0) if all_day else self.time_combo.get_time()
         start = datetime(d.year, d.month, d.day, h, m)
@@ -249,7 +240,7 @@ class QuickDialog(QDialog):
         if self.matched and 0 <= idx < len(self.candidates):
             ref = cand_ref(self.candidates[idx])
         self.store.add(title=title, start=start, end=end, all_day=all_day,
-                       is_deadline=self.deadline_cb.isChecked(),
+                       is_deadline=self._is_deadline,
                        google_id=google_id,
                        memo=self.body_edit.toPlainText().strip(),
                        source_ref=ref)

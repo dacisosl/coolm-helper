@@ -273,10 +273,9 @@ class SettingsDialog(QDialog):
 
         lay.addWidget(_section_label("바탕화면 위젯"))
         from parser.pipeline import desk_conf
-        for kind, label in (("planner", "캘린더 · 할일 — 달력+그날 일정 (한 몸)"),
+        for kind, label in (("planner", "캘린더 · 할일 — 달력 + 그날 일정"),
                             ("simple", "할 일 보드 — 지난 일 | 오늘 | 앞으로 (3열)"),
-                            ("weekly", "주간 일정 — 이번 주 한눈에"),
-                            ("monthly", "월간 달력 — 한 달 배지 달력")):
+                            ("weekly", "주간 일정 — 이번 주 한눈에")):
             cb = QCheckBox(label)
             cb.setChecked(bool(desk_conf(self.config, kind).get("enabled")))
             # 체크하는 순간 실시간 적용 — 저장 버튼을 기다리지 않는다

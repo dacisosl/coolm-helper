@@ -156,18 +156,29 @@ class DatePickerButton(QPushButton):
 
 
 class TimeCombo(QComboBox):
-    """30분 단위 드롭다운 + 직접 입력(예: 14:05)도 되는 시간 선택."""
+    """'종일' + 30분 단위 드롭다운 + 직접 입력(예: 14:05)도 되는 시간 선택.
+
+    '종일'을 고르면 시간 없는 하루짜리 일정이 된다 (별도 체크박스 없음).
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setEditable(True)
+        self.addItem("종일")
         for h in range(0, 24):
             for m in (0, 30):
                 self.addItem(f"{h:02d}:{m:02d}")
         self.setFixedWidth(92)
+        self.setToolTip("시간을 고르거나 직접 입력 — '종일'을 고르면 시간 없는 일정")
 
     def set_time(self, h: int, m: int) -> None:
         self.setCurrentText(f"{h:02d}:{m:02d}")
+
+    def set_all_day(self) -> None:
+        self.setCurrentIndex(0)
+
+    def is_all_day(self) -> bool:
+        return self.currentText().strip() in ("종일", "")
 
     def get_time(self) -> tuple[int, int]:
         try:
@@ -249,7 +260,15 @@ class ReviewDialog(QDialog):
             f"QLineEdit{{font-size:14px;font-weight:bold;background:{theme.CARD};"
             f"border:1px solid {theme.BORDER};border-radius:8px;padding:8px}}"
             f"QLineEdit:focus{{border:2px solid {theme.PRIMARY}}}")
-        lay.addWidget(self.title_edit)
+        # 한 줄 바: 제목 / 날짜 / 시간 ('종일'은 시간 콤보의 첫 항목)
+        bar = QHBoxLayout()
+        bar.addWidget(self.title_edit, stretch=1)
+        self.date_btn = DatePickerButton()
+        bar.addWidget(self.date_btn)
+        self.time_combo = TimeCombo()
+        bar.addWidget(self.time_combo)
+        lay.addLayout(bar)
+        self._is_deadline = False   # 마감 여부는 쪽지에서 자동 감지된 값 유지
 
         self.warn = QLabel()
         self.warn.setWordWrap(True)
@@ -258,24 +277,6 @@ class ReviewDialog(QDialog):
             f"background:#fdecea;border-radius:6px;padding:5px")
         self.warn.setVisible(False)
         lay.addWidget(self.warn)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel("일시"))
-        self.date_btn = DatePickerButton()
-        row.addWidget(self.date_btn)
-        self.time_combo = TimeCombo()
-        row.addWidget(self.time_combo)
-        self.all_day_cb = QCheckBox("종일")
-        self.all_day_cb.toggled.connect(
-            lambda on: self.time_combo.setEnabled(not on))
-        row.addWidget(self.all_day_cb)
-        self.deadline_cb = QCheckBox("마감(할일)")
-        self.deadline_cb.setToolTip(
-            "체크하면 '할일'로 표시되고, 마감 며칠 전에 시작 알림을 받아요.\n"
-            "(알림 일수는 설정 → 일반에서 바꿀 수 있어요)")
-        row.addWidget(self.deadline_cb)
-        row.addStretch()
-        lay.addLayout(row)
 
         self.src_info = QLabel()
         self.src_info.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
@@ -297,6 +298,11 @@ class ReviewDialog(QDialog):
                                 and self.fav_store is not None)
         self.fav_btn.clicked.connect(self._save_favorite)
         btns.addWidget(self.fav_btn)
+        pin_btn = QPushButton("📌 포스트잇")
+        pin_btn.setStyleSheet(theme.TEXT_BTN)
+        pin_btn.setToolTip("이 쪽지를 일정으로 등록하고 바탕화면에 메모지로 붙이기")
+        pin_btn.clicked.connect(self._pin_current)
+        btns.addWidget(pin_btn)
         btns.addStretch()
         if self.google_enabled:
             self.google_cb = QCheckBox("구글에도 등록")
@@ -367,10 +373,11 @@ class ReviewDialog(QDialog):
         else:
             self.warn.setVisible(False)
         self.date_btn.set_date(c.start.date())
-        self.time_combo.set_time(c.start.hour, c.start.minute)
-        self.all_day_cb.setChecked(c.all_day)
-        self.time_combo.setEnabled(not c.all_day)
-        self.deadline_cb.setChecked(c.is_deadline)
+        if c.all_day:
+            self.time_combo.set_all_day()
+        else:
+            self.time_combo.set_time(c.start.hour, c.start.minute)
+        self._is_deadline = c.is_deadline
         self.src_info.setText(
             f'근거: "{c.source_text.strip()}" · 보낸사람 {c.message.sender} '
             f'· 받은 시각 {kr_date(c.message.received)} '
@@ -402,6 +409,22 @@ class ReviewDialog(QDialog):
         self.fav_btn.setText("★ 저장됨")
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(1500, lambda: self.fav_btn.setText("☆ 즐겨찾기"))
+
+    def _pin_current(self) -> None:
+        """지금 보는 쪽지를 일정으로 등록(안 돼 있으면)하고 포스트잇으로."""
+        c = self._current
+        if c is None:
+            return
+        ref = cand_ref(c)
+        if ref not in self.store.registered_refs():
+            self._register()                       # 먼저 등록
+        ev = next((e for e in self.store.all() if e.source_ref == ref), None)
+        if ev is None:
+            return
+        from ui.desk_base import pin_note
+        if pin_note(ev.id):
+            from ui.toast import show_toast
+            show_toast(self, "바탕화면에 포스트잇으로 붙였어요")
 
     # ── 등록 / 등록 취소 ─────────────────────────────────────
     def _unregister(self, ref: str) -> None:
@@ -445,7 +468,7 @@ class ReviewDialog(QDialog):
         if not title:
             QMessageBox.warning(self, "확인", "제목을 입력하세요.")
             return
-        all_day = self.all_day_cb.isChecked()
+        all_day = self.time_combo.is_all_day()
         d = self.date_btn.get_date()
         h, m = (0, 0) if all_day else self.time_combo.get_time()
         start = datetime(d.year, d.month, d.day, h, m)
@@ -462,7 +485,7 @@ class ReviewDialog(QDialog):
                                     f"로컬에만 저장합니다.\n{e}")
 
         self.store.add(title=title, start=start, end=end, all_day=all_day,
-                       is_deadline=self.deadline_cb.isChecked(),
+                       is_deadline=self._is_deadline,
                        google_id=google_id, demo=(self.source == "demo"),
                        memo=self.body_edit.toPlainText().strip(),
                        source_ref=cand_ref(c))
