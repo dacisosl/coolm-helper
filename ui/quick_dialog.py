@@ -60,7 +60,7 @@ class QuickDialog(QDialog):
         self.google_enabled = google_enabled
         self.candidates: list[Candidate] = []
         self.matched = False
-        self.setWindowTitle("⚡ 간편 등록")
+        self.setWindowTitle("⚡ 바로 등록")
         self.resize(520, 520)
         self.setStyleSheet(theme.BASE_QSS)
 
@@ -80,10 +80,7 @@ class QuickDialog(QDialog):
 
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("일정 제목")
-        self.title_edit.setStyleSheet(
-            f"QLineEdit{{font-size:14px;font-weight:bold;background:{theme.CARD};"
-            f"border:1px solid {theme.BORDER};border-radius:8px;padding:8px}}"
-            f"QLineEdit:focus{{border:2px solid {theme.PRIMARY}}}")
+        self.title_edit.setStyleSheet(theme.TITLE_EDIT)
         # 한 줄 바: 제목 / 날짜 / 시간 ('종일'은 시간 콤보의 첫 항목)
         bar = QHBoxLayout()
         bar.addWidget(self.title_edit, stretch=1)
@@ -96,9 +93,7 @@ class QuickDialog(QDialog):
 
         self.warn = QLabel()
         self.warn.setWordWrap(True)
-        self.warn.setStyleSheet(
-            f"color:{theme.DANGER};font-size:11px;font-weight:bold;"
-            f"background:{theme.DANGER_BG};border-radius:{theme.RADIUS_SM}px;padding:5px")
+        self.warn.setStyleSheet(theme.WARN_LABEL)
         self.warn.setVisible(False)
         lay.addWidget(self.warn)
 

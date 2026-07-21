@@ -7,12 +7,12 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 from PyQt6.QtCore import Qt, QDate, QRectF, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QTextCharFormat
 from PyQt6.QtWidgets import (
-    QCalendarWidget, QCheckBox, QComboBox, QDateTimeEdit, QFrame,
+    QCalendarWidget, QComboBox, QDateTimeEdit, QFrame,
     QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QScrollArea, QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
@@ -287,8 +287,24 @@ class EventItemCard(QFrame):
                 QMessageBox.information(
                     self, "안내", "구글 캘린더의 사본은 삭제하지 못했습니다.\n"
                     "구글 캘린더에서 직접 지워주세요.")
-        self.store.remove(self.event.id)
+        # 실수 방지: 지우되 되돌리기 토스트 제공 (등록 취소와 같은 규약)
+        e, store = self.event, self.store   # 카드 파괴 후에도 쓰도록 로컬로
+        win = self.window()                 # 카드가 사라져도 창은 남는다
+        store.remove(e.id)
         self.on_change(reload_day=True)
+
+        def restore():
+            from datetime import datetime as _dt
+            store.add(
+                title=e.title, start=_dt.fromisoformat(e.start),
+                end=_dt.fromisoformat(e.end) if e.end else None,
+                all_day=e.all_day, is_deadline=e.is_deadline,
+                demo=e.demo, memo=e.memo, source_ref=e.source_ref,
+                priority=e.priority)
+
+        if win is not None and win.isVisible():
+            from ui.toast import show_toast
+            show_toast(win, "일정을 삭제했습니다", "되돌리기", restore)
 
 
 class CalendarWindow(QWidget):
@@ -311,7 +327,7 @@ class CalendarWindow(QWidget):
         card.setObjectName("calcard")
         card.setStyleSheet(
             theme.BASE_QSS + theme.CALENDAR_QSS
-            + f"#calcard{{background:{theme.BG};border-radius:16px;"
+            + f"#calcard{{background:{theme.BG};border-radius:{theme.RADIUS_LG}px;"
               f"border:1px solid {theme.BORDER}}}")
         card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
@@ -397,11 +413,24 @@ class CalendarWindow(QWidget):
         self.refresh()
         # 다른 창(일정 등록 등)에서 저장/삭제 시 실시간 반영.
         # 지연 호출: 카드 내부 저장 도중 위젯이 파괴되는 재진입을 피한다.
-        store.subscribe(lambda: QTimer.singleShot(0, self.refresh))
+        # 닫힌 동안에는 구독을 끊는다 — 설정 저장으로 창을 새로 만들 때
+        # 옛 창이 구독을 붙잡고 남는 누수 방지 (다시 열면 재구독).
+        self._store_cb = lambda: QTimer.singleShot(0, self.refresh)
+        self._subscribed = False
+
+    def closeEvent(self, ev):
+        if self._subscribed:
+            self.store.unsubscribe(self._store_cb)
+            self._subscribed = False
+        super().closeEvent(ev)
 
     # ── 등장/퇴장 애니메이션 ─────────────────────────────────
     def showEvent(self, ev):
         super().showEvent(ev)
+        if not self._subscribed:
+            self.store.subscribe(self._store_cb)
+            self._subscribed = True
+            self.refresh()           # 닫혀 있던 사이의 변경을 반영
         self._closing = False        # 다시 열 때 퇴장 가드 해제
         from ui import motion
         motion.fade_in(self, ms=160)

@@ -31,11 +31,9 @@ class Candidate:
 
 
 DEFAULT_CONFIG = {
-    "udb_select_rule": "memo_dir 안에서 가장 최근 수정된 *.udb",
+    # DB 접근 방식(원본 읽기 전용·복사 후 열기·tbl_recv 사용)은
+    # parser/db_reader.py에 하드코딩 — config로 바꾸는 값이 아님.
     "excel_file_pattern": "coolmsg_*.xls*",
-    "db_tables": {"received": "tbl_recv", "sent": "tbl_send", "members": "tbl_member"},
-    "date_format": "yyyy/MM/dd HH:mm:ss (요일)",
-    "access_mode": "copy-then-read-only",
     "students_path": "students.txt",
     "store_dir": "store",
     "recent_count": 10,          # 가장 최근 쪽지 N개 (날짜 기준 아님)

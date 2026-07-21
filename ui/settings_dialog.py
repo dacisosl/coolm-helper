@@ -218,7 +218,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                         "포스트잇은 캘린더에서 일정을 열고 📌를 누르세요.")
         from parser.pipeline import desk_conf
         for kind, label, tip in (
-                ("planner", "캘린더 · 할일",
+                ("planner", "캘린더 · 할 일",
                  "달력과 그날 일정 목록이 한 몸인 위젯"),
                 ("simple", "할 일 보드",
                  "지난 일 | 오늘 | 앞으로 — 3열 투두리스트"),
@@ -397,6 +397,12 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             QMessageBox.warning(self, "오류", str(e))
 
     def _delete_demo_events(self) -> None:
+        n = self.store.demo_count()
+        if QMessageBox.question(
+                self, "확인",
+                f"데모로 등록한 일정 {n}건을 모두 삭제할까요?") \
+                != QMessageBox.StandardButton.Yes:
+            return
         n = self.store.remove_demo()
         self.demo_del_btn.setText("데모로 등록한 일정 모두 삭제 (0건)")
         self.demo_del_btn.setEnabled(False)

@@ -13,7 +13,6 @@ PRIMARY = "#1e88e5"
 PRIMARY_DARK = "#1565c0"
 PRIMARY_PRESSED = "#0d47a1"     # 파란 버튼 눌림
 PRIMARY_LIGHT = "#e8f2fd"
-PRIMARY_TINT = "rgba(30,136,229,0.10)"   # 반투명 파랑 hover(리스트 행)
 LIGHT_PRESSED = "#d8e9fb"       # 연파랑 눌림(텍스트/아이콘 버튼)
 BG = "#f4f8fd"
 CARD = "#ffffff"
@@ -168,6 +167,17 @@ TEXT_BTN = (
 DIALOG_HEADER = (
     f"font-size:{FONT_LG}px;font-weight:bold;color:{PRIMARY_DARK};"
     f"background:transparent")
+
+# 제목 입력칸 — 등록·간편등록·일정추가 창의 한 줄 바 공용
+TITLE_EDIT = (
+    f"QLineEdit{{font-size:14px;font-weight:bold;background:{CARD};"
+    f"border:1px solid {BORDER};border-radius:{RADIUS_SM + 2}px;padding:8px}}"
+    f"QLineEdit:focus{{border:2px solid {PRIMARY};padding:7px}}")
+
+# 개인정보 경고 라벨 — 빨간 알약
+WARN_LABEL = (
+    f"color:{DANGER};font-size:{FONT_XS}px;font-weight:bold;"
+    f"background:{DANGER_BG};border-radius:{RADIUS_SM}px;padding:5px")
 
 # 달력 위젯 — 테두리 없는 플랫 스타일
 CALENDAR_QSS = f"""

@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QPoint, QTimer
+from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QLabel, QPushButton,
     QVBoxLayout, QWidget,

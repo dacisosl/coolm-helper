@@ -152,6 +152,7 @@ class AddEventDialog(motion.FadeInMixin, QDialog):
         bar.setSpacing(6)
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("일정 제목")
+        self.title_edit.setStyleSheet(theme.TITLE_EDIT)
         bar.addWidget(self.title_edit, stretch=1)
         self.date_btn = DatePickerButton()
         bar.addWidget(self.date_btn)
@@ -186,7 +187,7 @@ class AddEventDialog(motion.FadeInMixin, QDialog):
         cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         cancel.clicked.connect(self.reject)
         btns.addWidget(cancel)
-        save = QPushButton("추가")
+        save = QPushButton("일정 등록")   # 등록 창들과 같은 문구로 통일
         save.setStyleSheet(theme.PRIMARY_BTN)
         save.setCursor(Qt.CursorShape.PointingHandCursor)
         save.clicked.connect(self._save)
@@ -348,7 +349,7 @@ class _TodoRow(_DragField):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(3, 2, 6, 2)
         lay.setSpacing(3)
-        lay.addWidget(self.make_grip(fg, fpx(9)))
+        lay.addWidget(self.make_grip(fg, fpx(11)))
         # 모든 항목에 체크박스 — 끝낸 일은 체크 (투두리스트처럼)
         cb = QCheckBox()
         cb.setChecked(event.done)
@@ -545,7 +546,7 @@ class _WeekField(_DragField):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(3, 2, 6, 2)
         lay.setSpacing(3)
-        lay.addWidget(self.make_grip(fg, fpx(9)))
+        lay.addWidget(self.make_grip(fg, fpx(11)))
         col = QVBoxLayout()
         col.setSpacing(0)
         col.setContentsMargins(0, 0, 0, 0)
@@ -650,7 +651,7 @@ class PlannerWidget(DeskWidgetBase):
     def __init__(self, store, config, base_dir, conf):
         super().__init__(store, config, base_dir, conf)
         self._selected = date.today()
-        root, _head = _make_card(self, "📋 캘린더 · 할일",
+        root, _head = _make_card(self, "📋 캘린더 · 할 일",
                                  extra_qss=theme.CALENDAR_QSS)
         self.cal = EventCalendar()
         self.cal.clicked.connect(

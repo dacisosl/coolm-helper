@@ -26,7 +26,7 @@ class FloatingWidget(WidgetBase):
         card = QFrame()
         card.setObjectName("card")
         card.setStyleSheet(
-            f"#card{{background:{theme.CARD};border-radius:16px;"
+            f"#card{{background:{theme.CARD};border-radius:{theme.RADIUS_LG}px;"
             f"border:1px solid {theme.BORDER}}}"
             f"QLabel{{background:transparent;font-family:'Malgun Gothic'}}")
         card.setGraphicsEffect(theme.make_shadow(self, 2))
@@ -87,7 +87,7 @@ class FloatingWidget(WidgetBase):
         add_btn.clicked.connect(self.open_review)
         lay.addWidget(add_btn)
 
-        cal_btn = QPushButton(" 캘린더 · 할일")
+        cal_btn = QPushButton(" 캘린더 · 할 일")
         cal_btn.setIcon(icon("calendar"))
         cal_btn.setIconSize(ICON_SIZE)
         cal_btn.setStyleSheet(secondary)
@@ -118,6 +118,11 @@ class FloatingWidget(WidgetBase):
         self.resize(190, 205)
         self.apply_config()
         self.store.subscribe(self.refresh_badge)
+
+    def closeEvent(self, ev):
+        # 스타일 전환으로 버려질 때 구독을 끊어야 유령 위젯이 안 쌓인다
+        self.store.unsubscribe(self.refresh_badge)
+        super().closeEvent(ev)
 
     def refresh_badge(self) -> None:
         n = len(self.store.on_date(date.today()))

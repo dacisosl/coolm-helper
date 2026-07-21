@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import (QEasingCurve, QParallelAnimationGroup, QPoint,
-                          QPropertyAnimation, QTimer)
+                          QPropertyAnimation)
 
 _enabled = True
 

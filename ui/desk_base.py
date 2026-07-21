@@ -205,12 +205,19 @@ class DeskWidgetBase(QWidget):
         b.clicked.connect(self.toggle_edit_mode)
         return b
 
+    _edit_hint_shown = False   # 편집 모드 안내 토스트 — 세션당 1회(전 위젯 공유)
+
     def toggle_edit_mode(self) -> None:
         self.edit_mode = not self.edit_mode
         if self._edit_bar is not None:
             self._edit_bar.setVisible(self.edit_mode)
         self.update()          # 잡기 포인트 다시 그리기
         self.refresh()         # 편집 모드용 내용(인라인 입력칸 등) 반영
+        if self.edit_mode and not DeskWidgetBase._edit_hint_shown:
+            DeskWidgetBase._edit_hint_shown = True
+            from ui.toast import show_toast
+            show_toast(self, "파란 점을 끌면 크기, 제목을 누르면 바로 수정",
+                       msec=6000)
 
     def _bump_font(self, delta: int) -> None:
         self.conf["font_scale"] = max(70, min(150,

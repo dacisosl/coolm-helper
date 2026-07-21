@@ -167,12 +167,6 @@ class EventStore:
                 e.order = int(id_to_order[e.id])
         self._save()
 
-    def set_google_id(self, event_id: str, google_id: str) -> None:
-        for e in self._events:
-            if e.id == event_id:
-                e.google_id = google_id
-        self._save()
-
     # ── 조회 ────────────────────────────────────────────────
     def all(self) -> list[Event]:
         return sorted(self._events, key=lambda e: e.start)
@@ -212,8 +206,3 @@ class EventStore:
                 if e.start_dt.date().toordinal() - today.toordinal() <= 14:
                     upcoming.append(e)
         return overdue, self.on_date(today), upcoming[:10]
-
-    def todos(self) -> list[Event]:
-        """기한형([마감]) 일정 = 할일 목록. 미완료 먼저, 기한순."""
-        items = [e for e in self._events if e.is_deadline]
-        return sorted(items, key=lambda e: (e.done, e.start))
