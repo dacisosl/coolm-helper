@@ -61,15 +61,26 @@ class EventCalendar(QCalendarWidget):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         selected = qdate == self.selectedDate()
-        chip_w, chip_h = (20 if n < 10 else 26), 14
-        x = rect.center().x() - chip_w / 2
-        y = rect.bottom() - chip_h - 3
         painter.setPen(Qt.PenStyle.NoPen)
+        # 셀 크기에 맞춰 배지를 줄인다(반응형) — 가운데 날짜 숫자와 안 겹치게
+        # 오른쪽 아래 구석에 붙이고, 아주 작은 셀에서는 숫자 대신 점만 찍는다
+        if rect.height() < 30:
+            r = max(2, rect.height() // 8)
+            painter.setBrush(QColor("white") if selected else base)
+            painter.drawEllipse(rect.right() - r * 2 - 3,
+                                rect.bottom() - r * 2 - 3, r * 2, r * 2)
+            painter.restore()
+            return
+        chip_h = max(10, min(14, rect.height() // 4))
+        chip_w = chip_h + (6 if n < 10 else 12)
+        x = rect.right() - chip_w - 3
+        y = rect.bottom() - chip_h - 2
         painter.setBrush(QColor("white") if selected else base)
-        painter.drawRoundedRect(QRectF(x, y, chip_w, chip_h), 7, 7)
+        painter.drawRoundedRect(QRectF(x, y, chip_w, chip_h),
+                                chip_h / 2, chip_h / 2)
         painter.setPen(base if selected else QColor("white"))
         f = QFont(self.font())
-        f.setPointSize(7)
+        f.setPointSize(6 if chip_h < 13 else 7)
         f.setBold(True)
         painter.setFont(f)
         painter.drawText(QRectF(x, y, chip_w, chip_h),

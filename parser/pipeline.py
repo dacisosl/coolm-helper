@@ -49,10 +49,13 @@ DEFAULT_CONFIG = {
     "proof_model": "gemini-2.0-flash",
     "proof_api_key": "",            # 로컬에만 저장 (gitignore 대상 config.json)
     "desk_widgets": {               # 바탕화면 위젯 4종 (v0.10.0)
-        "simple":  {"enabled": False, "geometry": None, "opacity": 90, "always_on_top": False},
-        "weekly":  {"enabled": False, "geometry": None, "opacity": 90, "always_on_top": False},
-        "monthly": {"enabled": False, "geometry": None, "opacity": 90, "always_on_top": False},
-        "notes": [],                # 포스트잇: {event_id, geometry, opacity, always_on_top}
+        "simple":  {"enabled": False, "geometry": None, "opacity": 90,
+                    "always_on_top": False, "font_scale": 100},
+        "weekly":  {"enabled": False, "geometry": None, "opacity": 90,
+                    "always_on_top": False, "font_scale": 100},
+        "monthly": {"enabled": False, "geometry": None, "opacity": 90,
+                    "always_on_top": False, "font_scale": 100},
+        "notes": [],   # 포스트잇: {event_id, geometry, opacity, always_on_top, font_scale}
     },
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "alert_days": [3, 1],           # 마감 며칠 전에 알림할지
@@ -68,7 +71,7 @@ DESK_KINDS = ("simple", "weekly", "monthly")
 
 def _desk_default() -> dict:
     return {"enabled": False, "geometry": None, "opacity": 90,
-            "always_on_top": False}
+            "always_on_top": False, "font_scale": 100}
 
 
 def desk_conf(config: dict, kind: str):

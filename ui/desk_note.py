@@ -49,11 +49,9 @@ class PostItWidget(DeskWidgetBase):
 
         head = QHBoxLayout()
         self.when_label = QLabel()
-        self.when_label.setStyleSheet(
-            f"color:{theme.POSTIT_HEADER};font-size:10px;font-weight:bold;"
-            f"background:transparent")
         head.addWidget(self.when_label)
         head.addStretch()
+        head.addWidget(self.make_edit_button())
         close_btn = QPushButton("✕")
         close_btn.setToolTip("포스트잇 내리기 (일정은 그대로 남아요)")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -64,24 +62,33 @@ class PostItWidget(DeskWidgetBase):
         close_btn.clicked.connect(self.turn_off)
         head.addWidget(close_btn)
         root.addLayout(head)
+        root.addWidget(self.build_edit_bar())
 
         self.title_edit = QLineEdit(event.title)
-        self.title_edit.setStyleSheet(
-            f"QLineEdit{{background:transparent;border:none;padding:0;"
-            f"font-size:13px;font-weight:bold;color:{theme.TEXT}}}")
         self.title_edit.textEdited.connect(lambda _: self._save_timer.start())
         root.addWidget(self.title_edit)
 
         self.memo_edit = QTextEdit()
         self.memo_edit.setPlainText(event.memo)
         self.memo_edit.setPlaceholderText("여기에 바로 메모하세요")
-        self.memo_edit.setStyleSheet(
-            f"QTextEdit{{background:transparent;border:none;padding:0;"
-            f"font-size:12px;color:{theme.TEXT}}}")
         self.memo_edit.textChanged.connect(self._on_memo_changed)
         root.addWidget(self.memo_edit, stretch=1)
 
+        self._apply_font()
         self._update_when()
+
+    def _apply_font(self) -> None:
+        """글씨 크기 설정(%)을 제목·메모·날짜에 적용."""
+        fpx = self.font_px
+        self.when_label.setStyleSheet(
+            f"color:{theme.POSTIT_HEADER};font-size:{fpx(10)}px;"
+            f"font-weight:bold;background:transparent")
+        self.title_edit.setStyleSheet(
+            f"QLineEdit{{background:transparent;border:none;padding:0;"
+            f"font-size:{fpx(13)}px;font-weight:bold;color:{theme.TEXT}}}")
+        self.memo_edit.setStyleSheet(
+            f"QTextEdit{{background:transparent;border:none;padding:0;"
+            f"font-size:{fpx(12)}px;color:{theme.TEXT}}}")
 
     def _on_memo_changed(self) -> None:
         # setPlainText(프로그램 갱신)에도 이 시그널이 오므로 값 비교로 거른다
@@ -127,12 +134,13 @@ class PostItWidget(DeskWidgetBase):
         super().focusOutEvent(ev)
 
     def refresh(self) -> None:
-        """다른 창에서 이 일정이 바뀌거나 삭제됐을 때."""
+        """다른 창에서 이 일정이 바뀌거나 삭제됐을 때 (글씨 크기 변경 포함)."""
         cur = next((e for e in self.store.all() if e.id == self.event.id), None)
         if cur is None:                          # 일정 삭제 → 포스트잇도 내림
             self.turn_off()
             return
         self.event = cur
+        self._apply_font()
         self._update_when()
         # 사용자가 그 필드를 편집 중이면 덮어쓰지 않는다 (재진입 가드)
         if not self.title_edit.hasFocus() and self.title_edit.text() != cur.title:

@@ -13,8 +13,10 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QRect, QTimer
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QApplication, QMenu, QWidget
+from PyQt6.QtGui import QAction, QColor, QPainter
+from PyQt6.QtWidgets import (
+    QApplication, QHBoxLayout, QLabel, QMenu, QPushButton, QSlider, QWidget,
+)
 
 from parser import pipeline
 from parser.pipeline import DESK_KINDS, clamp_geometry, desk_conf, prune_notes
@@ -51,6 +53,9 @@ class DeskWidgetBase(QWidget):
         self._edges = 0
         self._start_geo: QRect | None = None
         self._start_pos = None
+        self.edit_mode = False             # 🔧 편집 모드 (잡기 포인트·도구줄)
+        self._edit_bar: QWidget | None = None
+        self._font_label: QLabel | None = None
         self.apply_window_conf(first=True)
         self._store_cb = lambda: QTimer.singleShot(0, self.refresh)
         store.subscribe(self._store_cb)
@@ -95,6 +100,101 @@ class DeskWidgetBase(QWidget):
 
     def refresh(self) -> None:
         """서브클래스에서 재정의 — 일정 변경 시 다시 그림."""
+
+    # ── 🔧 편집 모드 (잡기 포인트 표시 + 도구줄) ─────────────
+    def font_scale(self) -> int:
+        return int(self.conf.get("font_scale", 100))
+
+    def font_px(self, base: int) -> int:
+        """위젯별 글씨 크기 설정(%)을 적용한 픽셀 크기."""
+        return max(7, round(base * self.font_scale() / 100))
+
+    def build_edit_bar(self) -> QWidget:
+        """편집 모드에서만 보이는 도구줄: 투명도 슬라이더 + 글씨 크기."""
+        bar = QWidget()
+        bar.setStyleSheet("background:transparent")
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(0, 0, 0, 2)
+        lay.setSpacing(6)
+        op_label = QLabel("투명도")
+        op_label.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:10px;background:transparent")
+        lay.addWidget(op_label)
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(40, 100)
+        slider.setValue(max(40, int(self.conf.get("opacity", 90))))
+        slider.setFixedHeight(18)
+        slider.setToolTip("위젯 투명도")
+        slider.valueChanged.connect(
+            lambda v: self.setWindowOpacity(v / 100))          # 즉시 미리보기
+        slider.sliderReleased.connect(
+            lambda s=slider: self._set_opacity(s.value()))     # 놓으면 저장
+        lay.addWidget(slider, stretch=1)
+        for text, delta, tip in (("A−", -10, "글씨 작게"), ("A＋", 10, "글씨 크게")):
+            b = QPushButton(text)
+            b.setFixedSize(30, 20)
+            b.setToolTip(tip)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(
+                f"QPushButton{{background:{theme.CARD};border:1px solid "
+                f"{theme.BORDER};border-radius:5px;font-size:10px;"
+                f"color:{theme.TEXT}}}"
+                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            b.clicked.connect(lambda _, d=delta: self._bump_font(d))
+            lay.addWidget(b)
+        self._font_label = QLabel(f"{self.font_scale()}%")
+        self._font_label.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:10px;background:transparent")
+        lay.addWidget(self._font_label)
+        bar.setVisible(False)
+        self._edit_bar = bar
+        return bar
+
+    def make_edit_button(self) -> QPushButton:
+        """헤더에 놓는 🔧 버튼 — 누르면 편집 모드 켜고 끄기."""
+        b = QPushButton("🔧")
+        b.setToolTip("편집 모드 — 크기 조절점·투명도·글씨 크기·내용 수정")
+        b.setFixedSize(24, 22)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setStyleSheet(
+            "QPushButton{background:transparent;border:none;font-size:12px;"
+            "border-radius:6px}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+        b.clicked.connect(self.toggle_edit_mode)
+        return b
+
+    def toggle_edit_mode(self) -> None:
+        self.edit_mode = not self.edit_mode
+        if self._edit_bar is not None:
+            self._edit_bar.setVisible(self.edit_mode)
+        self.update()          # 잡기 포인트 다시 그리기
+        self.refresh()         # 편집 모드용 내용(인라인 입력칸 등) 반영
+
+    def _bump_font(self, delta: int) -> None:
+        self.conf["font_scale"] = max(70, min(150,
+                                              self.font_scale() + delta))
+        self._save_config()
+        if self._font_label is not None:
+            self._font_label.setText(f"{self.font_scale()}%")
+        self.refresh()
+
+    def paintEvent(self, ev):
+        super().paintEvent(ev)
+        if not self.edit_mode:
+            return
+        # 4개 변 중앙 + 4개 꼭지점에 잡기 포인트(캐칭 포인트)를 그린다
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(QColor("white"))
+        p.setBrush(QColor(theme.PRIMARY))
+        s = 8
+        w, h = self.width(), self.height()
+        for x in (0, (w - s) // 2, w - s):
+            for y in (0, (h - s) // 2, h - s):
+                if (x, y) == ((w - s) // 2, (h - s) // 2):
+                    continue           # 중앙은 제외
+                p.drawRoundedRect(x, y, s, s, 2, 2)
+        p.end()
 
     # ── 저장 ────────────────────────────────────────────────
     def _save_config(self) -> None:
@@ -313,7 +413,7 @@ def pin_note(event_id: str) -> bool:
         return True
     notes = desk_conf(owner.config, "notes")
     notes.append({"event_id": event_id, "geometry": None,
-                  "opacity": 95, "always_on_top": False})
+                  "opacity": 95, "always_on_top": False, "font_scale": 100})
     pipeline.save_config(owner.base_dir, owner.config)
     ensure_desk_widgets(owner)
     return True
