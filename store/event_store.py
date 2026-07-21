@@ -90,12 +90,13 @@ class EventStore:
     def add(self, title: str, start: datetime, end: datetime | None = None,
             all_day: bool = True, is_deadline: bool = False,
             google_id: str | None = None, demo: bool = False,
-            memo: str = "", source_ref: str = "") -> Event:
+            memo: str = "", source_ref: str = "",
+            priority: str = "보통") -> Event:
         ev = Event(title=title, start=start.isoformat(),
                    end=end.isoformat() if end else None,
                    all_day=all_day, is_deadline=is_deadline,
                    google_id=google_id, demo=demo, memo=memo,
-                   source_ref=source_ref,
+                   source_ref=source_ref, priority=priority,
                    created=datetime.now().isoformat())
         self._events.append(ev)
         self._save()

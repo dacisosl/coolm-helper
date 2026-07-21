@@ -334,6 +334,13 @@ class ReviewDialog(motion.FadeInMixin, QDialog):
         self.list.clear()
         self.rows = []
         refs = self.store.registered_refs()
+        # 옛 버전에서 등록해 상세내용이 빈 일정에 쪽지 원문을 채워 넣는다
+        empty_memo = {e.source_ref: e for e in self.store.all()
+                      if e.source_ref and not e.memo.strip()}
+        for c in candidates:
+            ev = empty_memo.pop(cand_ref(c), None)
+            if ev is not None:
+                self.store.update(ev.id, memo=c.message.body.strip())
         for c in candidates:
             row = CandRow(c)
             row.set_registered(cand_ref(c) in refs)
