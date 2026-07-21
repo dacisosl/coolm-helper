@@ -12,7 +12,7 @@ from datetime import date
 from PyQt6.QtCore import Qt, QDate, QRectF, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QTextCharFormat
 from PyQt6.QtWidgets import (
-    QCalendarWidget, QComboBox, QDateTimeEdit, QFrame,
+    QCalendarWidget, QComboBox, QFrame,
     QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QScrollArea, QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
@@ -140,19 +140,23 @@ class EventItemCard(QFrame):
         d.setSpacing(6)
 
         if full:
-            # 한 줄 바: 제목 / 일시 / 중요도 (등록 창의 한 줄 바와 같은 구성)
+            # 한 줄 바: 제목 / 날짜 / 시간 / 중요도 — 등록 창들과 같은 부품
+            from ui.review_dialog import DatePickerButton, TimeCombo
             bar = QHBoxLayout()
             bar.setSpacing(6)
             self.title_edit = QLineEdit(event.title)
             self.title_edit.setToolTip("제목")
             bar.addWidget(self.title_edit, stretch=1)
-            self.start_edit = QDateTimeEdit()
-            self.start_edit.setCalendarPopup(True)
-            self.start_edit.setDisplayFormat("yyyy-MM-dd (ddd) HH:mm")
-            self.start_edit.setDateTime(event.start_dt)
-            # 종일 여부는 시간으로 자동 판단 (00:00 = 종일) — 체크박스 없음
-            self.start_edit.setToolTip("일시 — 00:00이면 종일 일정")
-            bar.addWidget(self.start_edit)
+            self.date_btn = DatePickerButton()
+            self.date_btn.set_date(event.start_dt.date())
+            bar.addWidget(self.date_btn)
+            self.time_combo = TimeCombo()
+            if event.all_day:
+                self.time_combo.set_all_day()
+            else:
+                self.time_combo.set_time(event.start_dt.hour,
+                                         event.start_dt.minute)
+            bar.addWidget(self.time_combo)
             self.priority_combo = QComboBox()
             self.priority_combo.addItems(PRIORITIES)
             self.priority_combo.setCurrentText(event.priority)
@@ -241,8 +245,11 @@ class EventItemCard(QFrame):
             self.on_change(reload_day=False)
             return
         title = self.title_edit.text().strip() or self.event.title
-        new_start = self.start_edit.dateTime().toPyDateTime()
-        new_all_day = (new_start.hour == 0 and new_start.minute == 0)
+        from datetime import datetime as _dt
+        nd = self.date_btn.get_date()
+        new_all_day = self.time_combo.is_all_day()
+        h, m = (0, 0) if new_all_day else self.time_combo.get_time()
+        new_start = _dt(nd.year, nd.month, nd.day, h, m)
         self.store.update(
             self.event.id,
             title=title,
