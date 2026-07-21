@@ -18,6 +18,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONUTF8: "1"   # Windows 콘솔(cp1252)에서 한글 출력이 깨지지 않게
+
 jobs:
   build-release:
     runs-on: windows-latest
