@@ -1,5 +1,5 @@
 {
-  "version": "0.14.1",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.14.1/CoolmHelper-Setup.exe",
-  "notes": "자잘한 개선\r\n\r\n- 일정 등록 창의 '상세내용' 입력칸이 배경색과 같아 보이던 문제를 고쳤어요 — 이제 흰색으로 또렷하게 보입니다.\r\n- 캘린더·할일에서 일정을 펼치면 이제 메모만 보여요. 중요도는 앞의 색깔 칩(보통/높음/낮음)을 눌러 바로 바꿀 수 있어요.\r\n- 제목·일시까지 고치려면 '할 일 보드' 위젯에서 ✎(자세히 수정)를 쓰세요."
+  "version": "0.14.2",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.14.2/CoolmHelper-Setup.exe",
+  "notes": "쓰기 편한 채팅 스타일로\r\n\r\n- 안내문구 보정 창을 깔끔한 새 화면으로 바꿨어요 — 가운데 둥근 입력창에 글을 쓰고 Enter(또는 ✨ 다듬기)를 누르면 됩니다. (줄바꿈은 Shift+Enter)\r\n- 다듬는 동안 파란 진행 표시가 나타나고, 끝나면 다듬은 글이 아래에서 부드럽게 나타나요.\r\n- 결과는 바로 조금 손볼 수도 있고, 📋 복사로 가져다 쓰면 돼요.\r\n- Gemini / OpenRouter 어떤 키를 쓰는지 입력창 안에 표시돼요."
 }
