@@ -1,5 +1,5 @@
 {
-  "version": "0.9.1",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.9.1/CoolmHelper-Setup.exe",
-  "notes": "설치 폴더에 '사용설명서.html'이 함께 들어갑니다 — 실제 화면 캡처가 포함된 8장 캐러셀 설명서로, 더블클릭하면 브라우저에서 열립니다. 동료분들께 프로그램을 소개할 때 활용하세요."
+  "version": "0.10.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.10.0/CoolmHelper-Setup.exe",
+  "notes": "바탕화면 위젯이 새로워졌어요!\r\n\r\n- 할일 간단판(밀린 일·오늘·앞으로), 주간, 월간, 포스트잇 4종을 원하는 위치·크기로 띄울 수 있어요.\r\n- 펭귄 클릭 → ▦(위젯) 버튼으로 켜고 끕니다.\r\n- 캘린더에서 일정을 펼치고 📌를 누르면 포스트잇으로 바탕화면에 붙어요.\r\n- 드래그로 옮기고 모서리로 크기 조절, 위치는 자동으로 기억됩니다."
 }
