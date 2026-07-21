@@ -103,6 +103,28 @@ class FadeInMixin:
         fade_in(self, getattr(self, "_fade_ms", 150))
 
 
+def fade_in_widget(widget, ms: int = 200) -> None:
+    """레이아웃 안의 자식 위젯 등장 — opacity 0→1 (pos 이동 없음, 레이아웃 안전).
+
+    끝나면 효과를 제거해 이후 렌더가 정상으로 돌아온다.
+    그림자 있는 위젯엔 쓰지 말 것(QGraphicsEffect는 위젯당 1개).
+    """
+    from PyQt6.QtWidgets import QGraphicsOpacityEffect
+    widget.show()
+    if not _enabled:
+        return
+    eff = QGraphicsOpacityEffect(widget)
+    widget.setGraphicsEffect(eff)
+    a = QPropertyAnimation(eff, b"opacity", widget)
+    a.setDuration(ms)
+    a.setStartValue(0.0)
+    a.setEndValue(1.0)
+    a.setEasingCurve(QEasingCurve.Type.OutCubic)
+    a.finished.connect(lambda: widget.setGraphicsEffect(None))
+    widget._motion_anim = a
+    a.start()
+
+
 def slide_fade_in(child, dy: int = 8, ms: int = 200) -> None:
     """자식 위젯(토스트)용 — QGraphicsOpacityEffect + 아래서 위로.
 
