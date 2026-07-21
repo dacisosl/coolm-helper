@@ -1,5 +1,5 @@
 {
-  "version": "0.14.2",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.14.2/CoolmHelper-Setup.exe",
-  "notes": "쓰기 편한 채팅 스타일로\r\n\r\n- 안내문구 보정 창을 깔끔한 새 화면으로 바꿨어요 — 가운데 둥근 입력창에 글을 쓰고 Enter(또는 ✨ 다듬기)를 누르면 됩니다. (줄바꿈은 Shift+Enter)\r\n- 다듬는 동안 파란 진행 표시가 나타나고, 끝나면 다듬은 글이 아래에서 부드럽게 나타나요.\r\n- 결과는 바로 조금 손볼 수도 있고, 📋 복사로 가져다 쓰면 돼요.\r\n- Gemini / OpenRouter 어떤 키를 쓰는지 입력창 안에 표시돼요."
+  "version": "0.14.3",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.14.3/CoolmHelper-Setup.exe",
+  "notes": "보정이 다시 되고, 더 깔끔해졌어요\r\n\r\n- 보정이 안 되던 문제(구글이 옛 Gemini 모델을 내림)를 고쳤어요 — 이제 Gemini 3.5 Flash를 씁니다. 따로 설정 바꿀 필요 없어요.\r\n- 화면을 미니멀하게 다시 다듬었어요: 가운데 정렬, 둥근 입력 카드, 원형 ↑ 보내기 버튼. 창을 아무리 늘려도 내용은 가운데에 예쁘게 머물러요.\r\n- 다듬는 동안 입력 카드 아래 얇은 파란 진행선이 흐르고, 끝나면 다듬은 글이 부드럽게 나타납니다."
 }
