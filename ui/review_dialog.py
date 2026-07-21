@@ -38,7 +38,7 @@ def highlight_html(text: str, spans: list[PiiSpan]) -> str:
     parts, pos = [], 0
     for s in sorted(spans, key=lambda s: s.start):
         parts.append(html.escape(text[pos:s.start]))
-        parts.append(f'<span style="color:#c62828;font-weight:bold;'
+        parts.append(f'<span style="color:{theme.DANGER_FG};font-weight:bold;'
                      f'text-decoration:underline">{html.escape(s.text)}</span>')
         pos = s.end
     parts.append(html.escape(text[pos:]))
@@ -62,21 +62,22 @@ class CandRow(QFrame):
         unread = "● " if cand.message.is_unread else ""   # 안읽은 쪽지 표시
         date_label = QLabel(unread + when + ("  ⏰" if cand.is_deadline else ""))
         date_label.setStyleSheet(
-            f"color:{theme.PRIMARY_DARK};font-size:11px;font-weight:bold;"
-            f"background:transparent")
+            f"color:{theme.PRIMARY_DARK};font-size:{theme.FONT_XS}px;"
+            f"font-weight:bold;background:transparent")
         top.addWidget(date_label)
         top.addStretch()
         self.mark = QLabel("✓ 등록됨")
         self.mark.setStyleSheet(
-            "background:#2e7d32;color:white;border-radius:8px;"
-            "padding:1px 8px;font-size:10px;font-weight:bold")
+            f"background:{theme.SUCCESS_FG};color:white;"
+            f"border-radius:{theme.RADIUS_SM}px;"
+            f"padding:1px 8px;font-size:{theme.FONT_XS}px;font-weight:bold")
         self.mark.setVisible(False)
         top.addWidget(self.mark)
         lay.addLayout(top)
 
         title = QLabel(cand.suggested_title[:38])
         title.setStyleSheet(
-            f"color:{theme.TEXT};font-size:12px;background:transparent")
+            f"color:{theme.TEXT};font-size:{theme.FONT_SM}px;background:transparent")
         lay.addWidget(title)
         self._restyle()
 
@@ -91,7 +92,7 @@ class CandRow(QFrame):
 
     def _restyle(self) -> None:
         if self.registered:
-            bg = "#dff0e2" if self.selected else theme.SUCCESS_BG
+            bg = theme.SUCCESS_SEL if self.selected else theme.SUCCESS_BG
             border = theme.SUCCESS_BORDER
         elif self.selected:
             bg, border = theme.PRIMARY_LIGHT, theme.PRIMARY
@@ -99,7 +100,7 @@ class CandRow(QFrame):
             bg, border = "transparent", "transparent"
         self.setStyleSheet(
             f"CandRow{{background:{bg};border:1px solid {border};"
-            f"border-radius:8px}}")
+            f"border-radius:{theme.RADIUS_MD}px}}")
 
 
 # ── 모던 날짜·시간 피커 ─────────────────────────────────────
@@ -273,8 +274,8 @@ class ReviewDialog(QDialog):
         self.warn = QLabel()
         self.warn.setWordWrap(True)
         self.warn.setStyleSheet(
-            f"color:{theme.DANGER};font-size:11px;font-weight:bold;"
-            f"background:#fdecea;border-radius:6px;padding:5px")
+            f"color:{theme.DANGER};font-size:{theme.FONT_XS}px;font-weight:bold;"
+            f"background:{theme.DANGER_BG};border-radius:{theme.RADIUS_SM}px;padding:5px")
         self.warn.setVisible(False)
         lay.addWidget(self.warn)
 
@@ -394,9 +395,10 @@ class ReviewDialog(QDialog):
             self.register_btn.setText("등록 취소")
             self.register_btn.setStyleSheet(
                 f"QPushButton{{background:{theme.CARD};color:{theme.DANGER};"
-                f"border:1.5px solid {theme.DANGER};border-radius:8px;"
+                f"border:1.5px solid {theme.DANGER};border-radius:{theme.RADIUS_MD}px;"
                 f"padding:9px 18px;font-weight:bold}}"
-                f"QPushButton:hover{{background:#fdecea}}")
+                f"QPushButton:hover{{background:{theme.DANGER_BG}}}"
+                f"QPushButton:pressed{{background:{theme.DANGER_PRESSED}}}")
         else:
             self.register_btn.setText("일정 등록")
             self.register_btn.setStyleSheet(theme.PRIMARY_BTN)

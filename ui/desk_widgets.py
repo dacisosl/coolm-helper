@@ -236,8 +236,8 @@ class _TodoRow(_DragField):
         self.owner = owner
         fpx = owner.font_px
         self.setStyleSheet(
-            "_TodoRow{background:transparent;border-radius:6px}"
-            "_TodoRow:hover{background:rgba(30,136,229,0.10)}")
+            f"_TodoRow{{background:transparent;border-radius:{theme.RADIUS_SM}px}}"
+            f"_TodoRow:hover{{background:{theme.PRIMARY_TINT}}}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(2, 2, 2, 2)
@@ -268,7 +268,7 @@ class _TodoRow(_DragField):
             self.title_edit = QLineEdit(event.title)
             self.title_edit.setMinimumWidth(10)   # 좁은 열에서도 안 넘치게
             self.title_edit.setStyleSheet(
-                f"QLineEdit{{background:#fbfdff;border:1px solid "
+                f"QLineEdit{{background:{theme.CARD_TINT};border:1px solid "
                 f"{theme.BORDER};border-radius:5px;padding:1px 4px;"
                 f"font-size:{fpx(10)}px;color:{theme.TEXT}}}")
             self.title_edit.editingFinished.connect(self._save_title)
@@ -371,11 +371,11 @@ class SimpleTodoWidget(DeskWidgetBase):
                 item.widget().deleteLater()
         overdue, today, upcoming = self.store.sections(date.today())
         self.cols.addWidget(
-            self._column("😰 지난 일", "#c62828", overdue, False), 1)
+            self._column("😰 지난 일", theme.DANGER_FG, overdue, False), 1)
         self.cols.addWidget(
             self._column("📌 오늘 할 일", theme.PRIMARY_DARK, today, True), 1)
         self.cols.addWidget(
-            self._column("🌱 앞으로 할 일", "#66738a", upcoming, False), 1)
+            self._column("🌱 앞으로 할 일", theme.LOW_FG, upcoming, False), 1)
 
 
 # ── ② 주간 일정 ──────────────────────────────────────────────
@@ -390,18 +390,18 @@ class _DayColumn(QFrame):
         # 주말(접힌 열)에 일정이 있으면 강조해서 놓치지 않게 한다
         weekend_accent = slim and has_events
         bg = (theme.PRIMARY_LIGHT if today
-              else "#fff8e6" if weekend_accent else theme.CARD)
-        border = "#f5a623" if weekend_accent else "transparent"
+              else theme.ACCENT_BG if weekend_accent else theme.CARD)
+        border = theme.ACCENT if weekend_accent else "transparent"
         self.setStyleSheet(
             f"_DayColumn{{background:{bg};border:1.5px solid {border};"
-            f"border-radius:10px}}")
+            f"border-radius:{theme.RADIUS_MD}px}}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(8, 6, 8, 6)
         lay.setSpacing(3)
         fpx = owner.font_px
         wd = WEEKDAY_KO[d.weekday()]
-        color = ("#e57373" if d.weekday() == 6 else
+        color = (theme.SUNDAY if d.weekday() == 6 else
                  theme.PRIMARY if d.weekday() == 5 else theme.SUBTLE)
         head = QLabel(f"{d.day} ({wd})")
         head.setStyleSheet(f"color:{color};font-size:{fpx(10)}px;"

@@ -7,9 +7,8 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QPoint, QTimer
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QApplication, QFrame, QGraphicsDropShadowEffect, QLabel, QPushButton,
+    QApplication, QFrame, QLabel, QPushButton,
     QVBoxLayout, QWidget,
 )
 
@@ -33,11 +32,7 @@ class _IconBar(QWidget):
         card.setStyleSheet(
             f"#bar{{background:{theme.CARD};border-radius:14px;"
             f"border:1px solid {theme.BORDER}}}")
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(18)
-        shadow.setOffset(0, 3)
-        shadow.setColor(QColor(30, 136, 229, 70))
-        card.setGraphicsEffect(shadow)
+        card.setGraphicsEffect(theme.make_shadow(self, 1))
         outer.addWidget(card)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(6, 8, 6, 8)
@@ -87,8 +82,8 @@ class MiniWidget(WidgetBase):
         self.demo_chip.setFixedSize(16, 16)
         self.demo_chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.demo_chip.setStyleSheet(
-            "background:#f5a623;color:white;border-radius:8px;"
-            "font-size:10px;font-weight:bold")
+            f"background:{theme.ACCENT};color:white;border-radius:8px;"  # 8=16px의 반(원형)
+            f"font-size:{theme.FONT_XS}px;font-weight:bold")
         self.demo_chip.setToolTip("데모 모드가 켜져 있습니다 (설정 → 데이터에서 끄기)")
         self.demo_chip.move(0, 0)
         self.resize(self.WIDTH, 54)

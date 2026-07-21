@@ -44,7 +44,7 @@ class EventCalendar(QCalendarWidget):
         sat.setForeground(QColor(theme.PRIMARY))
         self.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, sat)
         sun = QTextCharFormat(fmt)
-        sun.setForeground(QColor("#e57373"))
+        sun.setForeground(QColor(theme.SUNDAY))
         self.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, sun)
 
     def set_counts(self, counts: dict[date, tuple[int, bool]]) -> None:
@@ -57,7 +57,7 @@ class EventCalendar(QCalendarWidget):
         if not info:
             return
         n, has_high = info
-        base = QColor("#e53935") if has_high else QColor(theme.PRIMARY)
+        base = QColor(theme.DANGER) if has_high else QColor(theme.PRIMARY)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         selected = qdate == self.selectedDate()
@@ -99,7 +99,7 @@ class EventItemCard(QFrame):
         self.setStyleSheet(
             f"EventItemCard{{background:{theme.CARD};border:none;"
             f"border-radius:12px}}"
-            f"EventItemCard:hover{{background:#fbfdff}}")
+            f"EventItemCard:hover{{background:{theme.CARD_TINT}}}")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(12, 10, 12, 10)
         lay.setSpacing(6)
@@ -157,7 +157,8 @@ class EventItemCard(QFrame):
         del_btn.setStyleSheet(
             f"QPushButton{{background:transparent;color:{theme.DANGER};"
             f"border:none;font-size:12px;padding:5px}}"
-            f"QPushButton:hover{{background:#fdecea;border-radius:6px}}")
+            f"QPushButton:hover{{background:{theme.DANGER_BG};"
+            f"border-radius:{theme.RADIUS_SM}px}}")
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         del_btn.clicked.connect(self._delete)
         btns.addWidget(del_btn)
@@ -270,11 +271,7 @@ class CalendarWindow(QWidget):
             theme.BASE_QSS + theme.CALENDAR_QSS
             + f"#calcard{{background:{theme.BG};border-radius:16px;"
               f"border:1px solid {theme.BORDER}}}")
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(24)
-        shadow.setOffset(0, 4)
-        shadow.setColor(QColor(30, 136, 229, 55))
-        card.setGraphicsEffect(shadow)
+        card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
         root = QVBoxLayout(card)
         root.setContentsMargins(14, 8, 14, 14)
@@ -292,11 +289,12 @@ class CalendarWindow(QWidget):
             b.setFixedSize(30, 26)
             b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-            hover = "#fdecea;color:#c62828" if text == "✕" else \
-                f"{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK}"
+            hover = f"{theme.DANGER_BG};color:{theme.DANGER_FG}" if text == "✕" \
+                else f"{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK}"
             b.setStyleSheet(
                 f"QPushButton{{background:transparent;color:{theme.SUBTLE};"
-                f"border:none;border-radius:6px;font-size:13px}}"
+                f"border:none;border-radius:{theme.RADIUS_SM}px;"
+                f"font-size:{theme.FONT_MD}px}}"
                 f"QPushButton:hover{{background:{hover}}}")
             b.clicked.connect(handler)
             bar.addWidget(b)

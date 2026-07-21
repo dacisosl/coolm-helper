@@ -174,7 +174,7 @@ class DeskWidgetBase(QWidget):
         off.setStyleSheet(
             f"QPushButton{{background:{theme.CARD};border:1px solid "
             f"{theme.BORDER};border-radius:5px}}"
-            f"QPushButton:hover{{background:#fdecea;border-color:{theme.DANGER}}}")
+            f"QPushButton:hover{{background:{theme.DANGER_BG};border-color:{theme.DANGER}}}")
         off.clicked.connect(self.turn_off)
         lay.addWidget(off)
         bar.setVisible(False)

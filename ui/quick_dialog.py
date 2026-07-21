@@ -98,7 +98,7 @@ class QuickDialog(QDialog):
         self.warn.setWordWrap(True)
         self.warn.setStyleSheet(
             f"color:{theme.DANGER};font-size:11px;font-weight:bold;"
-            f"background:#fdecea;border-radius:6px;padding:5px")
+            f"background:{theme.DANGER_BG};border-radius:{theme.RADIUS_SM}px;padding:5px")
         self.warn.setVisible(False)
         lay.addWidget(self.warn)
 

@@ -5,9 +5,8 @@ from __future__ import annotations
 from datetime import date
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QApplication, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
+    QApplication, QFrame, QHBoxLayout, QLabel,
     QPushButton, QVBoxLayout,
 )
 
@@ -30,11 +29,7 @@ class FloatingWidget(WidgetBase):
             f"#card{{background:{theme.CARD};border-radius:16px;"
             f"border:1px solid {theme.BORDER}}}"
             f"QLabel{{background:transparent;font-family:'Malgun Gothic'}}")
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(24)
-        shadow.setOffset(0, 4)
-        shadow.setColor(QColor(30, 136, 229, 60))
-        card.setGraphicsEffect(shadow)
+        card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
 
         lay = QVBoxLayout(card)

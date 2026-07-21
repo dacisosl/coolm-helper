@@ -8,9 +8,8 @@ from __future__ import annotations
 from datetime import date
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QFrame, QGraphicsDropShadowEffect, QLabel, QVBoxLayout, QWidget,
+    QFrame, QLabel, QVBoxLayout, QWidget,
 )
 
 from store.event_store import EventStore
@@ -53,12 +52,8 @@ class AlertBubble(QWidget):
         card.setObjectName("bubble")
         card.setStyleSheet(
             f"#bubble{{background:{theme.CARD};border:2px solid {theme.PRIMARY};"
-            f"border-radius:12px}}")
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(16)
-        shadow.setOffset(0, 3)
-        shadow.setColor(QColor(30, 136, 229, 80))
-        card.setGraphicsEffect(shadow)
+            f"border-radius:{theme.RADIUS_LG}px}}")
+        card.setGraphicsEffect(theme.make_shadow(self, 1))
         outer.addWidget(card)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 9, 12, 9)
@@ -82,7 +77,7 @@ class AlertBubble(QWidget):
         esc = html.escape(self.alerts[self.idx]).replace("\n", "<br>")
         esc = re.sub(
             r"(\d+건|\d+일 전)",
-            r'<span style="background-color:#e53935;color:#ffffff;'
+            rf'<span style="background-color:{theme.DANGER};color:white;'
             r'font-weight:bold;">&nbsp;\1&nbsp;</span>', esc)
         self.text.setTextFormat(Qt.TextFormat.RichText)
         self.text.setText(esc)

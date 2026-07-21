@@ -129,7 +129,7 @@ class ProofDialog(QDialog):
         self.result_edit.setPlaceholderText(
             "✨ 다듬기를 누르면 여기에 결과가 나타나요.")
         self.result_edit.setStyleSheet(
-            _EDITOR_QSS.replace(theme.CARD, "#f8fbff", 1))
+            _EDITOR_QSS.replace(theme.CARD, theme.CARD_TINT, 1))
         right.addWidget(self.result_edit, stretch=1)
         rw = QWidget()
         rw.setLayout(right)
