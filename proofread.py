@@ -112,7 +112,7 @@ def _openrouter(text: str, config: dict) -> str:
 _PROVIDERS = {"gemini": _gemini, "openrouter": _openrouter}
 
 
-def proofread(text: str, config: dict, tone: str = "polite") -> str:
+def proofread(text: str, config: dict, tone: str = "formal") -> str:
     """입력 텍스트를 다듬어 돌려준다. 실패 시 RuntimeError(사용자용 메시지).
 
     tone: TONES의 키 — 다듬는 말투(정중/친근/격식/간결).
@@ -124,5 +124,5 @@ def proofread(text: str, config: dict, tone: str = "polite") -> str:
     fn = _PROVIDERS.get(provider)
     if fn is None:
         raise RuntimeError(f"알 수 없는 공급자: {provider}")
-    style = TONES.get(tone, TONES["polite"])
+    style = TONES.get(tone, TONES["formal"])
     return fn(PROMPT.format(style=style, text=text), config)

@@ -3,7 +3,7 @@
 
 쪽지 자동 불러오기 없음. 입력창에 직접 붙여넣은 텍스트만 전송된다.
 디자인(2026-07-21 v3, 'Reword' 레퍼런스): 2화면 전환 구조 —
-① 입력: 그라데이션 헤드라인 + 유리 카드 입력 + 톤 선택 칩 + 검정 CTA
+① 입력: 그라데이션 헤드라인 + 유리 카드 입력 + 검정 CTA (톤은 격식·명확 고정)
 ② 결과: ← 다시 작성하기 / 원본 요약 / 제안 카드(타이핑 효과) / 🔄 다른 버전
 복사하면 토스트. 창을 늘려도 내용은 가운데 열(최대 560px)에 머문다.
 """
@@ -14,7 +14,7 @@ import threading
 from PyQt6.QtCore import Qt, QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (
-    QButtonGroup, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
+    QDialog, QFrame, QHBoxLayout, QLabel,
     QProgressBar, QPushButton, QScrollArea, QStackedWidget, QTextEdit,
     QVBoxLayout, QWidget,
 )
@@ -24,15 +24,6 @@ from ui import motion, theme
 _TIP = ("공개용 글 전용 — 붙여넣은 내용은 AI 서버(Gemini/OpenRouter)로 "
         "전송돼요.\n개인정보가 들어간 글은 넣지 마세요. "
         "쪽지는 자동으로 불러오지 않아요.")
-
-# 톤 칩: (키, 라벨, 결과 헤더 라벨) — proofread.TONES와 키 일치
-_TONE_CHIPS = (
-    ("polite",   "세련되고 정중하게 ✨", "세련되고 정중한 제안"),
-    ("friendly", "부드럽고 친근하게 😊", "부드럽고 친근한 제안"),
-    ("formal",   "격식있고 명확하게 💼", "격식있고 명확한 제안"),
-    ("short",    "짧고 간결하게 ⚡",     "짧고 간결한 제안"),
-)
-
 
 def _gradient_html(text: str, c1=(79, 70, 229), c2=(236, 72, 153)) -> str:
     """글자별 색 보간으로 그라데이션 텍스트 흉내 (인디고→핑크)."""
@@ -126,7 +117,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         lay.addWidget(head)
         lay.addSpacing(8)
         sub_row = QHBoxLayout()
-        sub = QLabel("작성하신 글을 붙여넣고 원하는 톤을 선택하세요")
+        sub = QLabel("작성하신 글을 붙여넣으면 격식 있고 명확하게 다듬어 드려요")
         sub.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
             f"background:transparent")
@@ -194,34 +185,6 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         lay.addWidget(card)
         lay.addSpacing(18)
 
-        # 톤 선택 칩 (2×2)
-        tone_lab = QLabel("원하는 분위기")
-        tone_lab.setStyleSheet(
-            f"color:{theme.TEXT};font-size:{theme.FONT_SM}px;font-weight:bold;"
-            f"background:transparent")
-        lay.addWidget(tone_lab)
-        lay.addSpacing(8)
-        grid = QGridLayout()
-        grid.setSpacing(8)
-        self._tone_group = QButtonGroup(self)
-        chip_qss = (
-            f"QPushButton{{background:{theme.CARD};color:{theme.SUBTLE};"
-            f"border:1px solid {theme.BORDER};border-radius:17px;"
-            f"padding:8px 14px;font-size:{theme.FONT_SM}px}}"
-            f"QPushButton:hover{{background:{theme.CARD_TINT}}}"
-            f"QPushButton:checked{{background:{theme.TEXT};color:white;"
-            f"border-color:{theme.TEXT};font-weight:bold}}")
-        for i, (key, label, _result_label) in enumerate(_TONE_CHIPS):
-            b = QPushButton(label)
-            b.setCheckable(True)
-            b.setProperty("tone_key", key)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setStyleSheet(chip_qss)
-            if i == 0:
-                b.setChecked(True)
-            self._tone_group.addButton(b)
-            grid.addWidget(b, i // 2, i % 2)
-        lay.addLayout(grid)
         lay.addSpacing(22)
 
         # CTA: 검정 풀폭 버튼
@@ -313,7 +276,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         rc.setContentsMargins(20, 14, 16, 16)
         rc.setSpacing(6)
         rhead = QHBoxLayout()
-        self.tone_label = QLabel("✨ 세련되고 정중한 제안")
+        self.tone_label = QLabel("✨ 다듬은 글")
         self.tone_label.setStyleSheet(
             f"color:{theme.PRIMARY_DARK};font-size:{theme.FONT_SM}px;"
             f"font-weight:bold;background:transparent")
@@ -351,10 +314,6 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         return page
 
     # ── 동작 ────────────────────────────────────────────────
-    def _tone_key(self) -> str:
-        b = self._tone_group.checkedButton()
-        return b.property("tone_key") if b else "polite"
-
     def _go(self) -> None:
         text = self.input_edit.toPlainText().strip()
         if not text:
@@ -363,7 +322,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
             return
         self._set_loading(True)
         self.status.setText("")
-        self._worker = _Worker(text, self.config, self._tone_key(), self)
+        self._worker = _Worker(text, self.config, "formal", self)
         self._worker.done.connect(self._on_done)
         self._worker.failed.connect(self._on_fail)
         self._worker.start()
@@ -379,9 +338,6 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         # 원본 요약 (3줄 정도로 컷)
         src = self.input_edit.toPlainText().strip()
         self.orig_preview.setText(src[:120] + ("…" if len(src) > 120 else ""))
-        for key, _label, result_label in _TONE_CHIPS:
-            if key == self._tone_key():
-                self.tone_label.setText(f"✨ {result_label}")
         self.stack.setCurrentIndex(1)
         motion.fade_in_widget(self.stack.currentWidget(), ms=220)
         self._type_result(result)
