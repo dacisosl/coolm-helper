@@ -3,7 +3,7 @@
 ; 결과: Output\CoolmHelper-Setup.exe
 
 #define AppName "쿨메신저 일정 도우미"
-#define AppVersion "0.14.3"
+#define AppVersion "0.15.0"
 #define AppExe "CoolmHelper.exe"
 
 [Setup]
