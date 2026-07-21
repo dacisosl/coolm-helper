@@ -51,15 +51,24 @@ def check_for_update(update_url: str) -> dict | None:
     return None
 
 
-def download_installer(url: str) -> str:
-    """설치파일을 임시 폴더에 내려받고 경로를 돌려준다."""
+def download_installer(url: str, progress=None) -> str:
+    """설치파일을 임시 폴더에 내려받고 경로를 돌려준다.
+
+    progress(받은 바이트, 전체 바이트)를 주면 덩어리마다 불러준다
+    (전체를 모르면 전체=0) — 업데이트 진행 창의 게이지용.
+    """
     fd, path = tempfile.mkstemp(suffix=".exe", prefix="CoolmHelper-Update-")
     os.close(fd)
     req = urllib.request.Request(
         url, headers={"User-Agent": f"CoolmHelper/{APP_VERSION}"})
     with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
         while chunk := r.read(1024 * 256):
             f.write(chunk)
+            done += len(chunk)
+            if progress is not None:
+                progress(done, total)
     return path
 
 

@@ -15,7 +15,9 @@ DefaultGroupName={#AppName}
 OutputBaseFilename=CoolmHelper-Setup
 Compression=lzma2
 SolidCompression=yes
-SetupIconFile=assets\app.ico
+; 설치파일 아이콘은 초록 ↓ 배지 버전 — 실행파일(app.ico)과 구분
+; (tools/make_setup_icon.py로 생성)
+SetupIconFile=assets\setup.ico
 ; 사용자별 데이터(config, store)는 설치 폴더가 아니라 실행 시 exe 옆에 생성됨
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes

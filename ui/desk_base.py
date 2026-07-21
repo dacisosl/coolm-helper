@@ -130,17 +130,22 @@ class DeskWidgetBase(QWidget):
         slider.sliderReleased.connect(
             lambda s=slider: self._set_opacity(s.value()))     # 놓으면 저장
         lay.addWidget(slider, stretch=1)
-        for text, delta, tip in (("A−", -10, "글씨 작게"), ("A＋", 10, "글씨 크게")):
-            b = QPushButton(text)
+        # 글씨 크기 — 'A−'/'A＋' 글자는 PC에 따라 안 보여서 SVG로 그린다
+        from PyQt6.QtCore import QSize as _QSize
+        from ui.icons import icon as _icon
+        for name, delta, tip in (("font_minus", -10, "글씨 작게"),
+                                 ("font_plus", 10, "글씨 크게")):
+            b = QPushButton()
+            b.setIcon(_icon(name, 14))
+            b.setIconSize(_QSize(14, 14))
             b.setFixedSize(30, 20)
             b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
                 f"QPushButton{{background:{theme.CARD};border:1px solid "
-                f"{theme.BORDER};border-radius:5px;font-size:10px;"
-                f"color:{theme.TEXT}}}"
+                f"{theme.BORDER};border-radius:5px}}"
                 f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
-            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
+                f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
             b.clicked.connect(lambda _, d=delta: self._bump_font(d))
             lay.addWidget(b)
         self._font_label = QLabel(f"{self.font_scale()}%")

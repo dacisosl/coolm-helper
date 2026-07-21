@@ -59,6 +59,16 @@ _PATHS = {
     # ★ 즐겨찾기 (노랑)
     "star": ('<path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 '
              '2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="#f5a623"/>'),
+    # A− 글씨 작게 (작은 A + −) — 글꼴에 없는 문자 대신 직접 그린다
+    "font_minus": ('<g fill="none" stroke="#78859a" stroke-width="2" '
+                   'stroke-linecap="round" stroke-linejoin="round">'
+                   '<path d="M4 19 L8.5 9 L13 19"/><path d="M5.8 15.6 H11.2"/>'
+                   '<path d="M16.5 12 H22"/></g>'),
+    # A＋ 글씨 크게 (큰 A + +)
+    "font_plus": ('<g fill="none" stroke="#78859a" stroke-width="2.2" '
+                  'stroke-linecap="round" stroke-linejoin="round">'
+                  '<path d="M2.5 20 L8 4.5 L13.5 20"/><path d="M4.7 14.7 H11.3"/>'
+                  '<path d="M16.2 11.5 H22.2"/><path d="M19.2 8.5 V14.5"/></g>'),
 }
 
 _cache: dict = {}

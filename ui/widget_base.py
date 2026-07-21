@@ -214,24 +214,9 @@ class WidgetBase(QWidget):
         self._checker.start()
 
     def _offer_update(self, info: dict) -> None:
-        notes = info.get("notes", "")
-        msg = f"새 버전 v{info.get('version')}이 나왔습니다."
-        if notes:
-            msg += f"\n\n변경사항:\n{notes}"
-        msg += "\n\n업데이트 후 재시작하시겠습니까?"
-        if QMessageBox.question(self, "업데이트", msg) != \
-                QMessageBox.StandardButton.Yes:
-            return
-        import updater
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            path = updater.download_installer(info["url"])
-        except Exception as e:
-            QApplication.restoreOverrideCursor()
-            QMessageBox.warning(self, "업데이트 실패", f"다운로드하지 못했습니다.\n{e}")
-            return
-        QApplication.restoreOverrideCursor()
-        updater.run_installer_and_quit(path)
+        # 안내·다운로드 진행·설치까지 UpdateDialog가 전담한다
+        from ui.update_dialog import UpdateDialog
+        UpdateDialog(info, self).exec()
 
     # ── 드래그 이동 (기본: 자유 이동, 미니는 재정의) ─────────
     def mousePressEvent(self, ev):

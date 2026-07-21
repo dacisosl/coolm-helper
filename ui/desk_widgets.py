@@ -354,6 +354,11 @@ class _TodoRow(_DragField):
         cb = QCheckBox()
         cb.setChecked(event.done)
         cb.setToolTip("완료 표시")
+        # 전역 18px은 좁은 열에서 너무 크다 — A−/A＋ 글씨 배율을 따라간다
+        ind = max(10, fpx(13))
+        cb.setStyleSheet(
+            f"QCheckBox::indicator{{width:{ind}px;height:{ind}px;"
+            f"border-radius:{max(3, round(ind * 0.28))}px}}")
         cb.stateChanged.connect(
             lambda st: store.set_done(event.id, bool(st)))
         lay.addWidget(cb)
