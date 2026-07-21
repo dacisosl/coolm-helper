@@ -83,6 +83,10 @@ QLineEdit, QDateTimeEdit, QComboBox {{
     selection-background-color:{PRIMARY}; selection-color:white; }}
 QLineEdit:focus, QDateTimeEdit:focus, QComboBox:focus {{
     border:1px solid {PRIMARY}; padding:7px 9px; }}
+QTextEdit {{ background:{CARD}; color:{TEXT};
+    border:1px solid {BORDER}; border-radius:{RADIUS_MD}px; padding:8px;
+    selection-background-color:{PRIMARY}; selection-color:white; }}
+QTextEdit:focus {{ border:1px solid {PRIMARY}; }}
 QComboBox::drop-down {{ border:none; width:22px; }}
 QComboBox QAbstractItemView {{
     background:{CARD}; color:{TEXT}; border:1px solid {BORDER};

@@ -106,7 +106,8 @@ class EditPopup(motion.FadeInMixin, QDialog):
         self.setFixedWidth(430)
         lay = QVBoxLayout(self)
         card = EventItemCard(event, store,
-                             lambda reload_day: QTimer.singleShot(0, self.accept))
+                             lambda reload_day: QTimer.singleShot(0, self.accept),
+                             full=True)   # ✎ 자세히 수정 — 제목·일시·중요도까지
         card.detail.setVisible(True)     # 처음부터 펼친 상태로
         lay.addWidget(card)
 

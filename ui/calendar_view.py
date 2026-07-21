@@ -89,16 +89,22 @@ class EventCalendar(QCalendarWidget):
 
 
 class EventItemCard(QFrame):
-    """투두리스트 항목 — 클릭하면 아코디언으로 상세보기가 펼쳐진다."""
+    """일정 항목 — 클릭하면 아코디언 상세보기가 펼쳐진다.
 
-    def __init__(self, event: Event, store: EventStore, on_change, parent=None):
+    기본(full=False): 상세보기는 메모만. 중요도는 접힌 줄의 칩을 눌러 바꾼다.
+    full=True: 제목·일시·중요도까지 편집(EditPopup 등 '자세히 수정'용).
+    """
+
+    def __init__(self, event: Event, store: EventStore, on_change,
+                 parent=None, full: bool = False):
         super().__init__(parent)
         self.event = event
         self.store = store
         self.on_change = on_change   # 저장/삭제 후 부모 갱신 콜백
+        self.full = full
         self.setStyleSheet(
             f"EventItemCard{{background:{theme.CARD};border:none;"
-            f"border-radius:12px}}"
+            f"border-radius:{theme.RADIUS_LG}px}}"
             f"EventItemCard:hover{{background:{theme.CARD_TINT}}}")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(12, 10, 12, 10)
@@ -107,15 +113,20 @@ class EventItemCard(QFrame):
         # ── 접힌 줄: 시간(있을 때만, 윗줄) + [중요도] 제목 ──
         self.time_line = QLabel()
         self.time_line.setStyleSheet(
-            f"color:{theme.SUBTLE};font-size:11px;background:transparent")
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px;background:transparent")
         lay.addWidget(self.time_line)
         row = QHBoxLayout()
-        self.chip = QLabel(event.priority)
-        self.chip.setStyleSheet(theme.priority_chip(event.priority))
+        if full:
+            self.chip = QLabel(event.priority)         # 중요도는 아래 콤보로 편집
+        else:
+            self.chip = QPushButton(event.priority)    # 눌러서 중요도 변경
+            self.chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.chip.setToolTip("눌러서 중요도 변경")
+            self.chip.clicked.connect(self._pick_priority)
         row.addWidget(self.chip)
         self.title_label = QLabel(event.title)
         self.title_label.setStyleSheet(
-            f"font-size:13px;font-weight:bold;color:{theme.TEXT}")
+            f"font-size:{theme.FONT_MD}px;font-weight:bold;color:{theme.TEXT}")
         self.title_label.setWordWrap(True)
         row.addWidget(self.title_label, stretch=1)
         lay.addLayout(row)
@@ -128,24 +139,24 @@ class EventItemCard(QFrame):
         d.setContentsMargins(0, 4, 0, 0)
         d.setSpacing(6)
 
-        self.title_edit = QLineEdit(event.title)
-        d.addWidget(self.title_edit)
-
-        opts = QHBoxLayout()
-        self.start_edit = QDateTimeEdit()
-        self.start_edit.setCalendarPopup(True)
-        self.start_edit.setDisplayFormat("yyyy-MM-dd (ddd) HH:mm")
-        self.start_edit.setDateTime(event.start_dt)
-        opts.addWidget(QLabel("일시"))
-        opts.addWidget(self.start_edit)
-        # 종일 여부는 시간으로 자동 판단 (00:00 = 종일) — 체크박스 없음
-        opts.addWidget(QLabel("중요도"))
-        self.priority_combo = QComboBox()
-        self.priority_combo.addItems(PRIORITIES)
-        self.priority_combo.setCurrentText(event.priority)
-        opts.addWidget(self.priority_combo)
-        opts.addStretch()
-        d.addLayout(opts)
+        if full:
+            self.title_edit = QLineEdit(event.title)
+            d.addWidget(self.title_edit)
+            opts = QHBoxLayout()
+            self.start_edit = QDateTimeEdit()
+            self.start_edit.setCalendarPopup(True)
+            self.start_edit.setDisplayFormat("yyyy-MM-dd (ddd) HH:mm")
+            self.start_edit.setDateTime(event.start_dt)
+            opts.addWidget(QLabel("일시"))
+            opts.addWidget(self.start_edit)
+            # 종일 여부는 시간으로 자동 판단 (00:00 = 종일) — 체크박스 없음
+            opts.addWidget(QLabel("중요도"))
+            self.priority_combo = QComboBox()
+            self.priority_combo.addItems(PRIORITIES)
+            self.priority_combo.setCurrentText(event.priority)
+            opts.addWidget(self.priority_combo)
+            opts.addStretch()
+            d.addLayout(opts)
 
         self.memo_edit = QTextEdit(event.memo)
         self.memo_edit.setPlaceholderText("메모 (로컬에만 저장됩니다)")
@@ -156,7 +167,7 @@ class EventItemCard(QFrame):
         del_btn = QPushButton("삭제")
         del_btn.setStyleSheet(
             f"QPushButton{{background:transparent;color:{theme.DANGER};"
-            f"border:none;font-size:12px;padding:5px}}"
+            f"border:none;font-size:{theme.FONT_SM}px;padding:5px}}"
             f"QPushButton:hover{{background:{theme.DANGER_BG};"
             f"border-radius:{theme.RADIUS_SM}px}}"
             f"QPushButton:pressed{{background:{theme.DANGER_PRESSED}}}")
@@ -182,13 +193,33 @@ class EventItemCard(QFrame):
         e = self.event
         self.title_label.setText(e.title)
         self.chip.setText(e.priority)
-        self.chip.setStyleSheet(theme.priority_chip(e.priority))
+        chip_qss = theme.priority_chip(e.priority)
+        if isinstance(self.chip, QPushButton):
+            chip_qss = f"QPushButton{{{chip_qss};border:none}}"
+        self.chip.setStyleSheet(chip_qss)
         # 시간이 있으면 '시간 ↵ 제목' 두 줄, 종일이면 제목 한 줄
         if e.all_day:
             self.time_line.hide()
         else:
             self.time_line.setText(e.start_dt.strftime("%H:%M"))
             self.time_line.show()
+
+    def _pick_priority(self) -> None:
+        """접힌 줄의 칩을 눌러 중요도(높음/보통/낮음)를 바로 바꾼다."""
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet(theme.BASE_QSS)
+        for p in PRIORITIES:
+            menu.addAction(p, lambda p=p: self._set_priority(p))
+        menu.exec(self.chip.mapToGlobal(self.chip.rect().bottomLeft()))
+
+    def _set_priority(self, priority: str) -> None:
+        if priority == self.event.priority:
+            return
+        self.store.update(self.event.id, priority=priority)
+        self.event.priority = priority
+        self._update_labels()
+        self.on_change(reload_day=False)
 
     # 접힌 줄 클릭 → 아코디언 토글 (버튼·입력칸 클릭은 제외)
     def mousePressEvent(self, ev):
@@ -199,6 +230,14 @@ class EventItemCard(QFrame):
         super().mousePressEvent(ev)
 
     def _save(self) -> None:
+        if not self.full:
+            # 기본 모드: 메모만 저장 (제목·일시는 그대로, 중요도는 칩으로 이미 반영)
+            self.store.update(self.event.id,
+                              memo=self.memo_edit.toPlainText())
+            self.event.memo = self.memo_edit.toPlainText()
+            self.detail.setVisible(False)
+            self.on_change(reload_day=False)
+            return
         title = self.title_edit.text().strip() or self.event.title
         new_start = self.start_edit.dateTime().toPyDateTime()
         new_all_day = (new_start.hour == 0 and new_start.minute == 0)
