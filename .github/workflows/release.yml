@@ -1,10 +1,15 @@
 # 릴리스 자동화 (클라우드 Windows 빌드) — release.py의 클라우드판.
-# 실행: GitHub → Actions → release → Run workflow (버전·제목·노트 입력)
+# 실행 방법 두 가지:
+#   ① release_notes.txt(첫 줄=제목, 나머지=안내문)를 갱신해 두고
+#      v0.10.0 형식의 태그를 push → 자동 실행
+#   ② GitHub → Actions → release → Run workflow (버전·제목·노트 입력)
 # 순서: 버전 갱신 → 테스트 → 빌드 → 설치파일 → GitHub 릴리스 → version.json push
 # version.json이 main에 올라가는 순간, 사용자 앱이 시작할 때 업데이트를 안내한다.
 name: release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -32,13 +37,34 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: 버전·제목·노트 정하기 (태그 push면 release_notes.txt 사용)
+        shell: python
+        env:
+          IN_VER: ${{ github.event.inputs.version }}
+          IN_TITLE: ${{ github.event.inputs.title }}
+          IN_NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          import os
+          if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+              ver = os.environ["IN_VER"]
+              title = os.environ["IN_TITLE"]
+              notes = os.environ["IN_NOTES"]
+          else:
+              ver = os.environ["GITHUB_REF_NAME"].lstrip("v")
+              lines = open("release_notes.txt",
+                           encoding="utf-8").read().strip().splitlines()
+              title = lines[0].strip()
+              notes = "\n".join(lines[1:]).strip() or title
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"VER={ver.strip().lstrip('v')}\n")
+              f.write(f"TITLE={title}\n")
+              f.write("NOTES<<__EOF__\n" + notes + "\n__EOF__\n")
+
       - name: 의존성 설치
         run: pip install -r requirements.txt pyinstaller
 
       - name: 버전 표기 갱신 (version.py, installer.iss)
         shell: python
-        env:
-          VER: ${{ github.event.inputs.version }}
         run: |
           import os, re
           ver = os.environ["VER"].strip().lstrip("v")
@@ -72,18 +98,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VER: ${{ github.event.inputs.version }}
-          TITLE: ${{ github.event.inputs.title }}
-          NOTES: ${{ github.event.inputs.notes }}
         run: |
           gh release create "v$env:VER" "Output/CoolmHelper-Setup.exe" `
             --title "v$env:VER — $env:TITLE" --notes "$env:NOTES"
 
       - name: version.json 갱신 (자동 업데이트 신호)
         shell: python
-        env:
-          VER: ${{ github.event.inputs.version }}
-          NOTES: ${{ github.event.inputs.notes }}
         run: |
           import json, os
           ver = os.environ["VER"].strip().lstrip("v")
@@ -96,8 +116,6 @@ jobs:
 
       - name: main에 커밋·푸시
         shell: pwsh
-        env:
-          VER: ${{ github.event.inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
