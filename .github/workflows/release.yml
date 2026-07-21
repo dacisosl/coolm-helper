@@ -1,0 +1,106 @@
+# 릴리스 자동화 (클라우드 Windows 빌드) — release.py의 클라우드판.
+# 실행: GitHub → Actions → release → Run workflow (버전·제목·노트 입력)
+# 순서: 버전 갱신 → 테스트 → 빌드 → 설치파일 → GitHub 릴리스 → version.json push
+# version.json이 main에 올라가는 순간, 사용자 앱이 시작할 때 업데이트를 안내한다.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "버전 (예: 0.10.0)"
+        required: true
+      title:
+        description: "릴리스 제목"
+        required: true
+      notes:
+        description: "변경사항 (업데이트 안내창에 보이는 문구)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: 버전 표기 갱신 (version.py, installer.iss)
+        shell: python
+        env:
+          VER: ${{ github.event.inputs.version }}
+        run: |
+          import os, re
+          ver = os.environ["VER"].strip().lstrip("v")
+          for path, pat, rep in (
+              ("version.py", r'APP_VERSION = "[^"]+"',
+               f'APP_VERSION = "{ver}"'),
+              ("installer.iss", r'#define AppVersion "[^"]+"',
+               f'#define AppVersion "{ver}"'),
+          ):
+              text = open(path, encoding="utf-8").read()
+              open(path, "w", encoding="utf-8", newline="").write(
+                  re.sub(pat, rep, text))
+
+      - name: 테스트
+        run: python -m unittest discover -s tests
+
+      - name: 빌드 (PyInstaller)
+        run: python build.py
+
+      - name: 한국어 설치 언어파일 준비
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/Korean.isl" `
+            -OutFile "C:\Program Files (x86)\Inno Setup 6\Languages\Korean.isl"
+
+      - name: 설치파일 만들기 (Inno Setup)
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
+
+      - name: GitHub 릴리스 올리기
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VER: ${{ github.event.inputs.version }}
+          TITLE: ${{ github.event.inputs.title }}
+          NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          gh release create "v$env:VER" "Output/CoolmHelper-Setup.exe" `
+            --title "v$env:VER — $env:TITLE" --notes "$env:NOTES"
+
+      - name: version.json 갱신 (자동 업데이트 신호)
+        shell: python
+        env:
+          VER: ${{ github.event.inputs.version }}
+          NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          import json, os
+          ver = os.environ["VER"].strip().lstrip("v")
+          data = {"version": ver,
+                  "url": ("https://github.com/${{ github.repository }}/"
+                          f"releases/download/v{ver}/CoolmHelper-Setup.exe"),
+                  "notes": os.environ["NOTES"]}
+          with open("version.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+
+      - name: main에 커밋·푸시
+        shell: pwsh
+        env:
+          VER: ${{ github.event.inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.py installer.iss version.json
+          git commit -m "release: v$env:VER (version.json 갱신 - 자동 업데이트 신호)"
+          git push origin main
