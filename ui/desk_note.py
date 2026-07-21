@@ -58,7 +58,8 @@ class PostItWidget(DeskWidgetBase):
         close_btn.setStyleSheet(
             f"QPushButton{{background:transparent;border:none;"
             f"color:{theme.POSTIT_HEADER};font-size:12px;padding:0 4px}}"
-            f"QPushButton:hover{{color:{theme.DANGER}}}")
+            f"QPushButton:hover{{color:{theme.DANGER}}}"
+            f"QPushButton:pressed{{color:{theme.DANGER_FG}}}")
         close_btn.clicked.connect(self.turn_off)
         head.addWidget(close_btn)
         root.addLayout(head)

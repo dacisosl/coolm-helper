@@ -139,7 +139,8 @@ class DeskWidgetBase(QWidget):
                 f"QPushButton{{background:{theme.CARD};border:1px solid "
                 f"{theme.BORDER};border-radius:5px;font-size:10px;"
                 f"color:{theme.TEXT}}}"
-                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
             b.clicked.connect(lambda _, d=delta: self._bump_font(d))
             lay.addWidget(b)
         self._font_label = QLabel(f"{self.font_scale()}%")
@@ -162,7 +163,8 @@ class DeskWidgetBase(QWidget):
             f"{theme.BORDER};border-radius:5px}}"
             f"QPushButton:checked{{background:{theme.PRIMARY_LIGHT};"
             f"border-color:{theme.PRIMARY}}}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
         pin.toggled.connect(self._set_always_on_top)
         lay.addWidget(pin)
         off = QPushButton()
@@ -174,7 +176,8 @@ class DeskWidgetBase(QWidget):
         off.setStyleSheet(
             f"QPushButton{{background:{theme.CARD};border:1px solid "
             f"{theme.BORDER};border-radius:5px}}"
-            f"QPushButton:hover{{background:{theme.DANGER_BG};border-color:{theme.DANGER}}}")
+            f"QPushButton:hover{{background:{theme.DANGER_BG};border-color:{theme.DANGER}}}"
+            f"QPushButton:pressed{{background:{theme.DANGER_PRESSED}}}")
         off.clicked.connect(self.turn_off)
         lay.addWidget(off)
         bar.setVisible(False)
@@ -197,7 +200,8 @@ class DeskWidgetBase(QWidget):
         b.setStyleSheet(
             f"QPushButton{{background:transparent;border:1px solid "
             f"{theme.BORDER};border-radius:6px}}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
         b.clicked.connect(self.toggle_edit_mode)
         return b
 

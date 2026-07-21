@@ -55,7 +55,8 @@ class FavoritesTab(QWidget):
             f"QPushButton{{background:transparent;color:{theme.DANGER};"
             f"border:none;font-size:12px;padding:5px}}"
             f"QPushButton:hover{{background:{theme.DANGER_BG};"
-            f"border-radius:{theme.RADIUS_SM}px}}")
+            f"border-radius:{theme.RADIUS_SM}px}}"
+            f"QPushButton:pressed{{background:{theme.DANGER_PRESSED}}}")
         del_btn.clicked.connect(self._delete)
         btns.addWidget(del_btn)
         btns.addStretch()

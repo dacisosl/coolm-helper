@@ -47,7 +47,8 @@ class FloatingWidget(WidgetBase):
         gear.setFixedSize(26, 26)
         gear.setStyleSheet(
             "QPushButton{background:transparent;border:none;border-radius:6px}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
         gear.setCursor(Qt.CursorShape.PointingHandCursor)
         gear.setToolTip("설정")
         gear.clicked.connect(self.open_settings)
@@ -65,7 +66,8 @@ class FloatingWidget(WidgetBase):
             f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
             f"border:1.5px solid {theme.PRIMARY};border-radius:8px;"
             f"padding:8px;font-weight:bold;font-size:13px;text-align:left}}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
 
         quick_btn = QPushButton(" 바로 등록")
         quick_btn.setIcon(icon("bolt"))
@@ -106,7 +108,8 @@ class FloatingWidget(WidgetBase):
         quit_btn.setStyleSheet(
             f"QPushButton{{background:transparent;color:{theme.SUBTLE};"
             f"border:none;padding:4px;font-size:11px}}"
-            f"QPushButton:hover{{color:{theme.DANGER}}}")
+            f"QPushButton:hover{{color:{theme.DANGER}}}"
+            f"QPushButton:pressed{{color:{theme.DANGER_FG}}}")
         quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         quit_btn.clicked.connect(QApplication.instance().quit)
         lay.addWidget(quit_btn)

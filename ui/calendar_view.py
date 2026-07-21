@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt, QDate, QRectF, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QTextCharFormat
 from PyQt6.QtWidgets import (
     QCalendarWidget, QCheckBox, QComboBox, QDateTimeEdit, QFrame,
-    QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QScrollArea, QSplitter, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -158,7 +158,8 @@ class EventItemCard(QFrame):
             f"QPushButton{{background:transparent;color:{theme.DANGER};"
             f"border:none;font-size:12px;padding:5px}}"
             f"QPushButton:hover{{background:{theme.DANGER_BG};"
-            f"border-radius:{theme.RADIUS_SM}px}}")
+            f"border-radius:{theme.RADIUS_SM}px}}"
+            f"QPushButton:pressed{{background:{theme.DANGER_PRESSED}}}")
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         del_btn.clicked.connect(self._delete)
         btns.addWidget(del_btn)
@@ -291,11 +292,13 @@ class CalendarWindow(QWidget):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             hover = f"{theme.DANGER_BG};color:{theme.DANGER_FG}" if text == "✕" \
                 else f"{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK}"
+            pressed = theme.DANGER_PRESSED if text == "✕" else theme.LIGHT_PRESSED
             b.setStyleSheet(
                 f"QPushButton{{background:transparent;color:{theme.SUBTLE};"
                 f"border:none;border-radius:{theme.RADIUS_SM}px;"
                 f"font-size:{theme.FONT_MD}px}}"
-                f"QPushButton:hover{{background:{hover}}}")
+                f"QPushButton:hover{{background:{hover}}}"
+                f"QPushButton:pressed{{background:{pressed}}}")
             b.clicked.connect(handler)
             bar.addWidget(b)
         root.addLayout(bar)

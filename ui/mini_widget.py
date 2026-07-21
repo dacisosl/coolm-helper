@@ -57,7 +57,8 @@ class _IconBar(QWidget):
             b.setStyleSheet(
                 f"QPushButton{{background:transparent;border:none;"
                 f"border-radius:10px}}"
-                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+                f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+                f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
             b.clicked.connect(lambda _, h=handler: (self.close(), h()))
             lay.addWidget(b)
 
