@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from ui import theme
+from ui import motion, theme
 
 _TIP = ("공개용 글 전용 — 붙여넣은 내용은 AI 서버(Gemini/OpenRouter)로 "
         "전송돼요.\n개인정보가 들어간 글은 넣지 마세요. "
@@ -46,7 +46,7 @@ class _Worker(QObject):
             self.failed.emit(str(e))
 
 
-class ProofDialog(QDialog):
+class ProofDialog(motion.FadeInMixin, QDialog):
     def __init__(self, config: dict, parent=None):
         super().__init__(parent)
         self.config = config

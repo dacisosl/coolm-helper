@@ -43,6 +43,7 @@ class AlertBubble(QWidget):
         self.alerts = alerts
         self.anchor = anchor
         self.on_done = on_done
+        self._popped = False
         self.idx = 0
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -94,6 +95,13 @@ class AlertBubble(QWidget):
         x = self.anchor.x() + self.anchor.width() - self.width()
         y = self.anchor.y() - self.height() - 2
         self.move(max(0, x), max(0, y))
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        if not self._popped:          # 첫 등장만 살짝 올라오며 페이드
+            self._popped = True
+            from ui import motion
+            motion.pop_in(self, ms=200, rise=6)
 
     def mousePressEvent(self, ev) -> None:
         self.idx += 1

@@ -61,6 +61,7 @@ DEFAULT_CONFIG = {
         "notes": [],   # 포스트잇: {event_id, geometry, opacity, always_on_top, font_scale}
     },
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
+    "animations_enabled": True,     # 화면 전환 애니메이션 (끄면 즉시 표시)
     "alert_days": [3, 1],           # 마감 며칠 전에 알림할지
     "auto_archive_days": 90,        # 지난 일정 자동 보관 (0=끔)
     "intro_done": False,            # 첫 실행 기능 안내를 봤는지

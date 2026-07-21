@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 from parser.pii_detector import PiiSpan
 from parser.pipeline import Candidate
 from store.event_store import EventStore
-from ui import theme
+from ui import motion, theme
 
 WEEK_KO = "월화수목금토일"
 
@@ -189,7 +189,7 @@ class TimeCombo(QComboBox):
             return 0, 0
 
 
-class ReviewDialog(QDialog):
+class ReviewDialog(motion.FadeInMixin, QDialog):
     COUNTS = (10, 50, 100)
 
     def __init__(self, candidates: list[Candidate], store: EventStore,

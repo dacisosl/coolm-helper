@@ -17,14 +17,14 @@ from PyQt6.QtWidgets import (
 )
 
 from store.event_store import Event, EventStore, day_sort_key
-from ui import theme
+from ui import motion, theme
 from ui.calendar_view import EventCalendar, EventItemCard, WEEKDAY_KO
 from ui.desk_base import DeskWidgetBase
 
 _PRIORITY_ORDER = {"높음": 0, "보통": 1, "낮음": 2}
 
 
-class DayDetailDialog(QDialog):
+class DayDetailDialog(motion.FadeInMixin, QDialog):
     """날짜 클릭 시 뜨는 상세 모달 — 아코디언 카드로 편집·삭제 가능."""
 
     def __init__(self, store: EventStore, d: date, parent=None):
@@ -90,11 +90,12 @@ def open_day_dialog(store: EventStore, d: date) -> None:
     dlg.exec()
 
 
-class EditPopup(QDialog):
+class EditPopup(motion.FadeInMixin, QDialog):
     """일정 1건 인라인 편집 팝오버 — EventItemCard를 펼친 채로 담는다.
 
     좁은 위젯 안에서는 일시·중요도 입력칸이 깨지므로 커서 근처에 띄운다.
     """
+    _fade_ms = 120
 
     def __init__(self, event: Event, store: EventStore):
         super().__init__()

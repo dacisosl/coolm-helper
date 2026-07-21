@@ -57,7 +57,10 @@ def main() -> None:
         app.setWindowIcon(QIcon(penguin_pixmap(BASE_DIR, 64)))
 
     from parser import pipeline
-    style = pipeline.load_config(BASE_DIR).get("widget_style", "mini")
+    config = pipeline.load_config(BASE_DIR)
+    from ui import motion
+    motion.set_enabled(bool(config.get("animations_enabled", True)))
+    style = config.get("widget_style", "mini")
     if style == "mini":
         from ui.mini_widget import MiniWidget
         w = MiniWidget(BASE_DIR)

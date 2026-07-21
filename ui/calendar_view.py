@@ -285,7 +285,7 @@ class CalendarWindow(QWidget):
         bar.addWidget(self._titlebar)
         bar.addStretch()
         for text, tip, handler in (("–", "최소화", self.showMinimized),
-                                   ("✕", "닫기", self.close)):
+                                   ("✕", "닫기", self._close_anim)):
             b = QPushButton(text)
             b.setFixedSize(30, 26)
             b.setToolTip(tip)
@@ -357,6 +357,17 @@ class CalendarWindow(QWidget):
         # 다른 창(일정 등록 등)에서 저장/삭제 시 실시간 반영.
         # 지연 호출: 카드 내부 저장 도중 위젯이 파괴되는 재진입을 피한다.
         store.subscribe(lambda: QTimer.singleShot(0, self.refresh))
+
+    # ── 등장/퇴장 애니메이션 ─────────────────────────────────
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        self._closing = False        # 다시 열 때 퇴장 가드 해제
+        from ui import motion
+        motion.fade_in(self, ms=160)
+
+    def _close_anim(self) -> None:
+        from ui import motion
+        motion.fade_out_close(self, ms=120)
 
     # ── 커스텀 타이틀바 드래그 ───────────────────────────────
     def mousePressEvent(self, ev):

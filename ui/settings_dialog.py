@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 
 from parser import pipeline
 from store.event_store import EventStore
-from ui import theme
+from ui import motion, theme
 from version import APP_VERSION
 
 _SETTINGS_QSS = f"""
@@ -85,7 +85,7 @@ def _check(text: str, checked: bool, tip: str = "") -> tuple[QCheckBox, QWidget]
     return cb, row
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(motion.FadeInMixin, QDialog):
     def __init__(self, base_dir: str, config: dict, store: EventStore,
                  parent=None):
         super().__init__(parent)
@@ -158,6 +158,10 @@ class SettingsDialog(QDialog):
         self.autostart_cb, row = _check(
             "Windows 시작 시 자동 실행", auto_on,
             "컴퓨터를 켜면 프로그램이 자동으로 시작됩니다.")
+        c.addWidget(row)
+        self.anim_cb, row = _check(
+            "화면 전환 애니메이션", bool(self.config.get("animations_enabled", True)),
+            "창·알림이 부드럽게 나타나요. 끄면 즉시 표시됩니다.")
         c.addWidget(row)
         lay.addWidget(card)
 
@@ -444,5 +448,8 @@ class SettingsDialog(QDialog):
         self.config["recent_count"] = self.count_spin.value()
         self.config["demo_mode"] = self.demo_cb.isChecked()
         self.config["auto_update_check"] = self.auto_update_cb.isChecked()
+        self.config["animations_enabled"] = self.anim_cb.isChecked()
+        from ui import motion
+        motion.set_enabled(self.anim_cb.isChecked())   # 즉시 반영
         pipeline.save_config(self.base_dir, self.config)
         self.accept()
