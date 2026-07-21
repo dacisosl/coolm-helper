@@ -61,7 +61,7 @@ class WidgetBase(QWidget):
         self.cal_win: CalendarWindow | None = None
         self._drag: QPoint | None = None
         QTimer.singleShot(2000, self._auto_update_check)
-        QTimer.singleShot(300, self.ensure_desktop_widget)
+        QTimer.singleShot(300, self.ensure_desk_widgets)
         QTimer.singleShot(2500, self._show_startup_alerts)   # 세션당 1회
         # ⚡ 간편 등록이 첫 클릭부터 빠르도록 UIA를 백그라운드에서 미리 초기화
         threading.Thread(target=self._warmup_capture, daemon=True).start()
@@ -102,7 +102,7 @@ class WidgetBase(QWidget):
             return
         self.config = pipeline.load_config(self.base_dir)
         self.apply_config()
-        self.ensure_desktop_widget()
+        self.ensure_desk_widgets()
         # 즐겨찾기 탭 등 설정이 바뀌었을 수 있으니 캘린더 창은 다음에 새로 만든다
         if self.cal_win is not None:
             self.cal_win.close()
@@ -111,24 +111,37 @@ class WidgetBase(QWidget):
         if new_style != old_style:
             self._swap_style(new_style)
 
-    def ensure_desktop_widget(self) -> None:
-        """바탕화면 캘린더 위젯을 설정에 맞춰 켜거나 끈다."""
-        app = QApplication.instance()
-        cur = getattr(app, "_coolm_desktop", None)
-        if self.config.get("desktop_widget_enabled"):
-            if cur is None:
-                from ui.desktop_calendar import DesktopCalendar
-                cur = DesktopCalendar(self.store, self.config)
-                cur.place_default()
-                cur.show()
-                app._coolm_desktop = cur
-            else:
-                cur.config = self.config
-                cur.setWindowOpacity(
-                    max(40, int(self.config.get("desktop_widget_opacity", 90))) / 100)
-        elif cur is not None:
-            cur.close()
-            app._coolm_desktop = None
+    def ensure_desk_widgets(self) -> None:
+        """바탕화면 위젯(할일·주간·월간·포스트잇)을 설정에 맞춰 켜거나 끈다."""
+        from ui.desk_base import ensure_desk_widgets
+        ensure_desk_widgets(self)
+
+    def open_widget_menu(self) -> None:
+        """바탕화면 위젯 켜기/끄기 체크 메뉴 (펭귄 아이콘 바에서)."""
+        from PyQt6.QtGui import QCursor
+        from PyQt6.QtWidgets import QMenu
+        from parser.pipeline import DESK_KINDS, desk_conf
+        from ui import theme
+        labels = {"simple": "✓ 할일 간단판 (밀린·오늘·앞으로)",
+                  "weekly": "🗓 주간 일정",
+                  "monthly": "📅 월간 달력"}
+        menu = QMenu(self)
+        menu.setStyleSheet(theme.BASE_QSS)
+        acts = {}
+        for kind in DESK_KINDS:
+            act = menu.addAction(labels[kind])
+            act.setCheckable(True)
+            act.setChecked(bool(desk_conf(self.config, kind).get("enabled")))
+            acts[act] = kind
+        menu.addSeparator()
+        hint = menu.addAction("포스트잇: 캘린더에서 일정을 열고 📌 누르기")
+        hint.setEnabled(False)
+        chosen = menu.exec(QCursor.pos())
+        kind = acts.get(chosen)
+        if kind:
+            desk_conf(self.config, kind)["enabled"] = chosen.isChecked()
+            pipeline.save_config(self.base_dir, self.config)
+            self.ensure_desk_widgets()
 
     def open_proof(self) -> None:
         """안내문구 보정 (공개용 글 전용, 붙여넣기만 지원)."""

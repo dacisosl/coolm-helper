@@ -151,6 +151,12 @@ class EventItemCard(QFrame):
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         del_btn.clicked.connect(self._delete)
         btns.addWidget(del_btn)
+        pin_btn = QPushButton("📌 포스트잇")
+        pin_btn.setToolTip("이 일정을 바탕화면에 메모지로 붙이기")
+        pin_btn.setStyleSheet(theme.TEXT_BTN)
+        pin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        pin_btn.clicked.connect(self._pin)
+        btns.addWidget(pin_btn)
         btns.addStretch()
         save_btn = QPushButton("저장")
         save_btn.setStyleSheet(theme.PRIMARY_BTN)
@@ -213,6 +219,10 @@ class EventItemCard(QFrame):
         self._update_labels()
         self.detail.setVisible(False)
         self.on_change(reload_day=False)
+
+    def _pin(self) -> None:
+        from ui.desk_base import pin_note
+        pin_note(self.event.id)
 
     def _delete(self) -> None:
         if self.event.google_id:

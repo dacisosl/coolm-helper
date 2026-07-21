@@ -182,6 +182,22 @@ class EventStore:
                 d = date.fromordinal(d.toordinal() + 1)
         return out
 
+    def sections(self, today: date) -> tuple[list[Event], list[Event], list[Event]]:
+        """할일 간단판 위젯용 3구역: (밀린 일, 오늘, 앞으로).
+
+        밀린 일 = 기한이 지난 미완료 마감형.
+        앞으로 = 오늘 이후 14일 이내 시작, 최대 10건 (완료된 마감형 제외).
+        """
+        overdue, upcoming = [], []
+        for e in self.all():
+            last = e.end_dt.date() if e.end_dt else e.start_dt.date()
+            if e.is_deadline and not e.done and last < today:
+                overdue.append(e)
+            elif e.start_dt.date() > today and not (e.is_deadline and e.done):
+                if e.start_dt.date().toordinal() - today.toordinal() <= 14:
+                    upcoming.append(e)
+        return overdue, self.on_date(today), upcoming[:10]
+
     def todos(self) -> list[Event]:
         """기한형([마감]) 일정 = 할일 목록. 미완료 먼저, 기한순."""
         items = [e for e in self._events if e.is_deadline]

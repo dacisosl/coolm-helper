@@ -282,23 +282,21 @@ class SettingsDialog(QDialog):
         self.proof_cb.setChecked(bool(self.config.get("proof_enabled", False)))
         lay.addWidget(self.proof_cb)
 
-        lay.addWidget(_section_label("바탕화면 캘린더 위젯"))
-        self.desk_cb = QCheckBox("바탕화면 반절 캘린더 표시 (주간+월간, 항상 맨 뒤)")
-        self.desk_cb.setChecked(
-            bool(self.config.get("desktop_widget_enabled", False)))
-        lay.addWidget(self.desk_cb)
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("위젯 투명도"))
-        self.desk_opacity = QSlider(Qt.Orientation.Horizontal)
-        self.desk_opacity.setRange(40, 100)
-        self.desk_opacity.setValue(
-            int(self.config.get("desktop_widget_opacity", 90)))
-        row2.addWidget(self.desk_opacity)
-        self.desk_opacity_label = QLabel(f"{self.desk_opacity.value()}%")
-        self.desk_opacity.valueChanged.connect(
-            lambda v: self.desk_opacity_label.setText(f"{v}%"))
-        row2.addWidget(self.desk_opacity_label)
-        lay.addLayout(row2)
+        lay.addWidget(_section_label("바탕화면 위젯"))
+        from parser.pipeline import desk_conf
+        self.desk_cbs = {}
+        for kind, label in (("simple", "할일 간단판 — 밀린 일·오늘·앞으로"),
+                            ("weekly", "주간 일정 — 이번 주 한눈에"),
+                            ("monthly", "월간 달력 — 한 달 배지 달력")):
+            cb = QCheckBox(label)
+            cb.setChecked(bool(desk_conf(self.config, kind).get("enabled")))
+            lay.addWidget(cb)
+            self.desk_cbs[kind] = cb
+        desk_hint = QLabel("드래그로 옮기고 모서리를 끌어 크기 조절 · "
+                           "우클릭으로 투명도/항상 위 · 포스트잇은 캘린더에서 📌")
+        desk_hint.setStyleSheet("color:#78859a;font-size:11px")
+        desk_hint.setWordWrap(True)
+        lay.addWidget(desk_hint)
         lay.addStretch()
         return w
 
@@ -367,8 +365,9 @@ class SettingsDialog(QDialog):
             reverse=True) or [3, 1]
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         self.config["proof_api_key"] = self.proof_key_edit.text().strip()
-        self.config["desktop_widget_enabled"] = self.desk_cb.isChecked()
-        self.config["desktop_widget_opacity"] = self.desk_opacity.value()
+        from parser.pipeline import desk_conf
+        for kind, cb in self.desk_cbs.items():
+            desk_conf(self.config, kind)["enabled"] = cb.isChecked()
         import autostart
         try:
             if self.autostart_cb.isChecked():

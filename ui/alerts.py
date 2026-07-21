@@ -135,6 +135,15 @@ def show_startup_alerts(widget) -> None:
 
     days = tuple(widget.config.get("alert_days", [3, 1])) or (3, 1)
     alerts = build_alerts(widget.store, days=days)
+    # 구 '반절 캘린더' 사용자에게 위젯 개편을 최초 1회만 안내
+    if not widget.config.get("desk_migration_notice_done", True):
+        alerts.insert(0,
+            "🔄 바탕화면 캘린더가 주간·월간 위젯 2개로 바뀌었어요.\n"
+            "이제 드래그로 옮기고 모서리를 끌어 크기를 조절할 수 있어요.\n"
+            "펭귄 → 위젯 메뉴에서 켜고 끕니다.")
+        from parser import pipeline
+        widget.config["desk_migration_notice_done"] = True
+        pipeline.save_config(widget.base_dir, widget.config)
     if not alerts:
         return
     bubble = AlertBubble(alerts, widget)

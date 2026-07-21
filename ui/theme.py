@@ -77,6 +77,11 @@ QCalendarWidget QAbstractItemView {{ background:{CARD}; color:{TEXT};
     selection-background-color:{PRIMARY}; selection-color:white; }}
 """
 
+# 포스트잇 위젯 (은은한 노란 메모지)
+POSTIT_BG = "#fff9e6"
+POSTIT_BORDER = "#f0e0b0"
+POSTIT_HEADER = "#8a7a45"
+
 # 중요도 색상 (글자색, 연한 배경색)
 PRIORITY_COLORS = {
     "높음": ("#c62828", "#fdecea"),

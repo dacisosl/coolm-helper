@@ -48,8 +48,12 @@ DEFAULT_CONFIG = {
     "proof_provider": "gemini",
     "proof_model": "gemini-2.0-flash",
     "proof_api_key": "",            # 로컬에만 저장 (gitignore 대상 config.json)
-    "desktop_widget_enabled": False,   # 바탕화면 반절 캘린더 위젯
-    "desktop_widget_opacity": 90,      # 40~100 (%)
+    "desk_widgets": {               # 바탕화면 위젯 4종 (v0.10.0)
+        "simple":  {"enabled": False, "geometry": None, "opacity": 90, "always_on_top": False},
+        "weekly":  {"enabled": False, "geometry": None, "opacity": 90, "always_on_top": False},
+        "monthly": {"enabled": False, "geometry": None, "opacity": 90, "always_on_top": False},
+        "notes": [],                # 포스트잇: {event_id, geometry, opacity, always_on_top}
+    },
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "alert_days": [3, 1],           # 마감 며칠 전에 알림할지
     "auto_archive_days": 90,        # 지난 일정 자동 보관 (0=끔)
@@ -57,6 +61,86 @@ DEFAULT_CONFIG = {
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
     "update_url": "https://raw.githubusercontent.com/dacisosl/coolm-helper/main/version.json"
 }
+
+
+DESK_KINDS = ("simple", "weekly", "monthly")
+
+
+def _desk_default() -> dict:
+    return {"enabled": False, "geometry": None, "opacity": 90,
+            "always_on_top": False}
+
+
+def desk_conf(config: dict, kind: str):
+    """desk_widgets에서 kind("simple"/"weekly"/"monthly"/"notes") 설정을 꺼낸다.
+
+    구버전 config라 키가 없거나 일부만 있어도 기본값을 채워서 돌려준다.
+    반환된 dict/list는 config 내부 객체라 수정 후 save_config 하면 저장된다.
+    """
+    dw = config.setdefault("desk_widgets", {})
+    if kind == "notes":
+        return dw.setdefault("notes", [])
+    cur = dw.setdefault(kind, {})
+    for k, v in _desk_default().items():
+        cur.setdefault(k, v)
+    return cur
+
+
+def migrate_desk_config(config: dict) -> bool:
+    """구 '바탕화면 반절 캘린더' 설정을 위젯 4종 체계로 옮긴다. 변경 시 True.
+
+    반절 캘린더를 켜두었던 사용자는 주간+월간 위젯이 대신 켜지고
+    투명도를 물려받는다. desk_migration_notice_done=False로 남겨
+    최초 1회 안내 말풍선을 띄운다.
+    """
+    if "desk_widgets" in config:
+        return False
+    was_on = bool(config.pop("desktop_widget_enabled", False))
+    opacity = int(config.pop("desktop_widget_opacity", 90) or 90)
+    config["desk_widgets"] = {k: _desk_default() for k in DESK_KINDS}
+    config["desk_widgets"]["notes"] = []
+    if was_on:
+        for k in ("weekly", "monthly"):
+            config["desk_widgets"][k]["enabled"] = True
+            config["desk_widgets"][k]["opacity"] = max(40, min(100, opacity))
+    config["desk_migration_notice_done"] = not was_on
+    return True
+
+
+def prune_notes(config: dict, existing_ids: set[str]) -> bool:
+    """삭제된 일정을 가리키는 포스트잇 항목을 정리한다. 변경 시 True."""
+    notes = desk_conf(config, "notes")
+    keep = [n for n in notes if n.get("event_id") in existing_ids]
+    if len(keep) == len(notes):
+        return False
+    config["desk_widgets"]["notes"] = keep
+    return True
+
+
+def clamp_geometry(geo, screen):
+    """저장된 위젯 위치·크기가 현재 화면에 맞는지 검증한다 (해상도 변경 대비).
+
+    geo/screen: [x, y, w, h]. 화면과 거의 안 겹치면 None(기본 배치로 폴백),
+    일부만 벗어났으면 화면 안으로 끌어들인 값을 반환한다.
+    """
+    if not geo or len(geo) != 4:
+        return None
+    try:
+        x, y, w, h = (int(v) for v in geo)
+        sx, sy, sw, sh = (int(v) for v in screen)
+    except (TypeError, ValueError):
+        return None
+    if w <= 0 or h <= 0 or sw <= 0 or sh <= 0:
+        return None
+    # 겹치는 영역이 가로·세로 40px 미만이면 다른 해상도의 잔재로 본다
+    ox = min(x + w, sx + sw) - max(x, sx)
+    oy = min(y + h, sy + sh) - max(y, sy)
+    if ox < 40 or oy < 40:
+        return None
+    w, h = min(w, sw), min(h, sh)
+    x = max(sx, min(x, sx + sw - w))
+    y = max(sy, min(y, sy + sh - h))
+    return [x, y, w, h]
 
 
 def save_config(base_dir: str, config: dict) -> None:
@@ -70,9 +154,12 @@ def load_config(base_dir: str) -> dict:
     path = os.path.join(base_dir, "config.json")
     try:
         with open(path, encoding="utf-8") as f:
-            return json.load(f)
+            config = json.load(f)
+        if migrate_desk_config(config):
+            save_config(base_dir, config)
+        return config
     except FileNotFoundError:
-        config = dict(DEFAULT_CONFIG)
+        config = json.loads(json.dumps(DEFAULT_CONFIG))   # 깊은 복사
         local = os.environ.get("LOCALAPPDATA", "")
         profile = os.environ.get("USERPROFILE", "")
         config["memo_dir"] = os.path.join(local, "CoolMessenger", "Memo")
