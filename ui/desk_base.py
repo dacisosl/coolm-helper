@@ -357,14 +357,17 @@ def _registry() -> dict:
     app = QApplication.instance()
     reg = getattr(app, "_coolm_desk", None)
     if reg is None:
-        reg = {"simple": None, "weekly": None, "monthly": None, "notes": {}}
+        reg = {k: None for k in DESK_KINDS}
+        reg["notes"] = {}
         app._coolm_desk = reg
+    reg.setdefault("planner", None)      # 구버전 세션 레지스트리 호환
     return reg
 
 
 def _widget_class(kind: str):
     from ui import desk_widgets
-    return {"simple": desk_widgets.SimpleTodoWidget,
+    return {"planner": desk_widgets.PlannerWidget,
+            "simple": desk_widgets.SimpleTodoWidget,
             "weekly": desk_widgets.WeeklyWidget,
             "monthly": desk_widgets.MonthlyWidget}[kind]
 

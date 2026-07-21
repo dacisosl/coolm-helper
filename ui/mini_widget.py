@@ -47,9 +47,7 @@ class _IconBar(QWidget):
                     "(펭귄 더블클릭으로도 열려요)", owner.open_quick)]
         buttons.append(("inbox", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
                         owner.open_review))
-        buttons.append(("calendar", "캘린더 · 할일", owner.open_calendar))
-        buttons.append(("widgets", "바탕화면 위젯 — 할일·주간·월간 켜기/끄기",
-                        owner.open_widget_menu))
+        # 캘린더·할일은 v0.11.0부터 바탕화면 위젯으로 이동 (관리는 설정에서)
         if owner.config.get("proof_enabled"):
             buttons.append(("chat", "문구 보정 (공개용 글)", owner.open_proof))
         buttons.append(("gear", "설정", owner.open_settings))

@@ -104,7 +104,11 @@ class EventItemCard(QFrame):
         lay.setContentsMargins(12, 10, 12, 10)
         lay.setSpacing(6)
 
-        # ── 접힌 줄: [중요도] 제목  ·  시간 ──
+        # ── 접힌 줄: 시간(있을 때만, 윗줄) + [중요도] 제목 ──
+        self.time_line = QLabel()
+        self.time_line.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:11px;background:transparent")
+        lay.addWidget(self.time_line)
         row = QHBoxLayout()
         self.chip = QLabel(event.priority)
         self.chip.setStyleSheet(theme.priority_chip(event.priority))
@@ -114,9 +118,6 @@ class EventItemCard(QFrame):
             f"font-size:13px;font-weight:bold;color:{theme.TEXT}")
         self.title_label.setWordWrap(True)
         row.addWidget(self.title_label, stretch=1)
-        self.time_label = QLabel()
-        self.time_label.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
-        row.addWidget(self.time_label)
         lay.addLayout(row)
         self._update_labels()
 
@@ -182,12 +183,12 @@ class EventItemCard(QFrame):
         self.title_label.setText(e.title)
         self.chip.setText(e.priority)
         self.chip.setStyleSheet(theme.priority_chip(e.priority))
-        t = "종일" if e.all_day else e.start_dt.strftime("%H:%M")
-        if e.end_dt and e.end_dt.date() != e.start_dt.date():
-            t += f" ~{e.end_dt:%m/%d}"
-        if e.google_id:
-            t += " · G"
-        self.time_label.setText(t)
+        # 시간이 있으면 '시간 ↵ 제목' 두 줄, 종일이면 제목 한 줄
+        if e.all_day:
+            self.time_line.hide()
+        else:
+            self.time_line.setText(e.start_dt.strftime("%H:%M"))
+            self.time_line.show()
 
     # 접힌 줄 클릭 → 아코디언 토글 (버튼·입력칸 클릭은 제외)
     def mousePressEvent(self, ev):

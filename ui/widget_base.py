@@ -116,32 +116,12 @@ class WidgetBase(QWidget):
         from ui.desk_base import ensure_desk_widgets
         ensure_desk_widgets(self)
 
-    def open_widget_menu(self) -> None:
-        """바탕화면 위젯 켜기/끄기 체크 메뉴 (펭귄 아이콘 바에서)."""
-        from PyQt6.QtGui import QCursor
-        from PyQt6.QtWidgets import QMenu
-        from parser.pipeline import DESK_KINDS, desk_conf
-        from ui import theme
-        labels = {"simple": "✓ 할일 간단판 (밀린·오늘·앞으로)",
-                  "weekly": "🗓 주간 일정",
-                  "monthly": "📅 월간 달력"}
-        menu = QMenu(self)
-        menu.setStyleSheet(theme.BASE_QSS)
-        acts = {}
-        for kind in DESK_KINDS:
-            act = menu.addAction(labels[kind])
-            act.setCheckable(True)
-            act.setChecked(bool(desk_conf(self.config, kind).get("enabled")))
-            acts[act] = kind
-        menu.addSeparator()
-        hint = menu.addAction("포스트잇: 캘린더에서 일정을 열고 📌 누르기")
-        hint.setEnabled(False)
-        chosen = menu.exec(QCursor.pos())
-        kind = acts.get(chosen)
-        if kind:
-            desk_conf(self.config, kind)["enabled"] = chosen.isChecked()
-            pipeline.save_config(self.base_dir, self.config)
-            self.ensure_desk_widgets()
+    def apply_desk_widget(self, kind: str, on: bool) -> None:
+        """설정 창 체크박스에서 실시간 반영 — 저장 버튼 없이 즉시 켜고 끈다."""
+        from parser.pipeline import desk_conf
+        desk_conf(self.config, kind)["enabled"] = bool(on)
+        pipeline.save_config(self.base_dir, self.config)
+        self.ensure_desk_widgets()
 
     def open_proof(self) -> None:
         """안내문구 보정 (공개용 글 전용, 붙여넣기만 지원)."""

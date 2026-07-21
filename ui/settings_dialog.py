@@ -256,18 +256,7 @@ class SettingsDialog(QDialog):
         row.addWidget(self.opacity_label)
         lay.addLayout(row)
 
-        lay.addWidget(_section_label("알림 — 마감 며칠 전에 알려드릴까요?"))
-        alert_row = QHBoxLayout()
-        self.alert_cbs = {}
-        current_days = set(self.config.get("alert_days", [3, 1]))
-        for d in (7, 3, 1):
-            cb = QCheckBox(f"{d}일 전")
-            cb.setChecked(d in current_days)
-            self.alert_cbs[d] = cb
-            alert_row.addWidget(cb)
-        alert_row.addStretch()
-        lay.addLayout(alert_row)
-
+        # 알림은 기본값(마감 3·1일 전 + 오늘 일정)으로 고정 — 설정 항목 없음
         lay.addWidget(_section_label("기능"))
         core = QCheckBox("일정 등록 (기본 기능)")
         core.setChecked(True)
@@ -284,21 +273,28 @@ class SettingsDialog(QDialog):
 
         lay.addWidget(_section_label("바탕화면 위젯"))
         from parser.pipeline import desk_conf
-        self.desk_cbs = {}
-        for kind, label in (("simple", "할일 간단판 — 밀린 일·오늘·앞으로"),
+        for kind, label in (("planner", "캘린더 · 할일 — 달력+그날 일정 (한 몸)"),
+                            ("simple", "할 일 보드 — 지난 일 | 오늘 | 앞으로 (3열)"),
                             ("weekly", "주간 일정 — 이번 주 한눈에"),
                             ("monthly", "월간 달력 — 한 달 배지 달력")):
             cb = QCheckBox(label)
             cb.setChecked(bool(desk_conf(self.config, kind).get("enabled")))
+            # 체크하는 순간 실시간 적용 — 저장 버튼을 기다리지 않는다
+            cb.toggled.connect(
+                lambda on, k=kind: self._apply_desk_widget(k, on))
             lay.addWidget(cb)
-            self.desk_cbs[kind] = cb
-        desk_hint = QLabel("드래그로 옮기고 모서리를 끌어 크기 조절 · "
-                           "우클릭으로 투명도/항상 위 · 포스트잇은 캘린더에서 📌")
+        desk_hint = QLabel("체크하면 바로 화면에 나타나요. 위젯의 🔧으로 "
+                           "크기·투명도·글씨를 조절하고, 포스트잇은 캘린더에서 📌")
         desk_hint.setStyleSheet("color:#78859a;font-size:11px")
         desk_hint.setWordWrap(True)
         lay.addWidget(desk_hint)
         lay.addStretch()
         return w
+
+    def _apply_desk_widget(self, kind: str, on: bool) -> None:
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "apply_desk_widget"):
+            parent.apply_desk_widget(kind, on)
 
     # ── 동작 ────────────────────────────────────────────────
     def _open_google_guide(self) -> None:
@@ -360,14 +356,10 @@ class SettingsDialog(QDialog):
                                        else "mini")
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
-        self.config["alert_days"] = sorted(
-            (d for d, cb in self.alert_cbs.items() if cb.isChecked()),
-            reverse=True) or [3, 1]
+        self.config["alert_days"] = [3, 1]   # 알림은 기본값 고정
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         self.config["proof_api_key"] = self.proof_key_edit.text().strip()
-        from parser.pipeline import desk_conf
-        for kind, cb in self.desk_cbs.items():
-            desk_conf(self.config, kind)["enabled"] = cb.isChecked()
+        # 바탕화면 위젯은 체크 즉시 반영·저장되므로 여기서는 건드리지 않는다
         import autostart
         try:
             if self.autostart_cb.isChecked():

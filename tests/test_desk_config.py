@@ -4,8 +4,8 @@ import sys, os, tempfile, shutil, unittest
 from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from parser.pipeline import (clamp_geometry, desk_conf, migrate_desk_config,
-                             prune_notes, DEFAULT_CONFIG)
+from parser.pipeline import (clamp_geometry, desk_conf, ensure_planner,
+                             migrate_desk_config, prune_notes, DEFAULT_CONFIG)
 from store.event_store import EventStore
 
 TODAY = date(2026, 7, 20)
@@ -35,6 +35,28 @@ class TestMigrateDeskConfig(unittest.TestCase):
         config = {"desk_widgets": {"weekly": {"enabled": True}}}
         self.assertFalse(migrate_desk_config(config))
         self.assertTrue(config["desk_widgets"]["weekly"]["enabled"])
+
+    def test_planner_on_by_default(self):
+        # 캘린더·할일 위젯은 빠른메뉴 아이콘을 대신하므로 항상 켜져야 한다
+        config = {"desktop_widget_enabled": False}
+        migrate_desk_config(config)
+        self.assertTrue(config["desk_widgets"]["planner"]["enabled"])
+
+
+class TestEnsurePlanner(unittest.TestCase):
+    def test_adds_enabled_planner_to_v010_config(self):
+        config = {"desk_widgets": {"simple": {"enabled": True}, "notes": []}}
+        self.assertTrue(ensure_planner(config))
+        self.assertTrue(config["desk_widgets"]["planner"]["enabled"])
+        self.assertTrue(config["desk_widgets"]["simple"]["enabled"])  # 보존
+
+    def test_noop_when_planner_present(self):
+        config = {"desk_widgets": {"planner": {"enabled": False}}}
+        self.assertFalse(ensure_planner(config))
+        self.assertFalse(config["desk_widgets"]["planner"]["enabled"])  # 존중
+
+    def test_noop_without_desk_widgets(self):
+        self.assertFalse(ensure_planner({}))
 
 
 class TestDeskConf(unittest.TestCase):
