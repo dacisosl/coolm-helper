@@ -1,5 +1,5 @@
 {
-  "version": "0.17.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.17.0/CoolmHelper-Setup.exe",
-  "notes": "업데이트 안내가 예쁘고 친절해졌어요\r\n\r\n- 업데이트 안내 창이 새 디자인이 됐어요 — 바뀐 점을 카드로 보여주고, '지금 업데이트'를 누르면 다운로드 진행률(%)이 실시간으로 보입니다. 이제 다운로드 중에 앱이 멈춘 것처럼 보이지 않아요.\r\n- 설치파일 아이콘에 초록 ↓ 배지가 붙어서 실행 아이콘(펭귄)과 한눈에 구분됩니다. (이번 설치부터 적용돼요)\r\n- 할 일 보드의 체크박스가 글씨 크기(A−/A＋)를 따라 함께 커지고 작아져요.\r\n- 위젯 편집 도구줄의 글씨 크기 버튼(A−/A＋)이 어떤 PC에서든 보이도록 아이콘으로 새로 그렸어요."
+  "version": "0.17.1",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.17.1/CoolmHelper-Setup.exe",
+  "notes": "날짜와 시간을 고르는 방법이 어디서나 같아졌어요\r\n\r\n- 일정 수정 창의 일시 입력이 등록 창과 같은 모양(📅 날짜 버튼 + 시간 선택)으로 바뀌었어요. 시간 대신 '종일'을 고르는 것도 똑같아요."
 }
