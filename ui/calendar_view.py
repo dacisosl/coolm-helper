@@ -392,8 +392,8 @@ class CalendarWindow(QWidget):
         d = date(qd.year(), qd.month(), qd.day())
         events = self.store.on_date(d)
         # 중요도(높음 먼저) → 시간순 정렬
-        order = {"높음": 0, "보통": 1, "낮음": 2}
-        events.sort(key=lambda e: (order.get(e.priority, 1), e.start))
+        from store.event_store import day_sort_key
+        events.sort(key=day_sort_key)
         self.day_label.setText(f"{d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]})")
         self.count_label.setText(
             f"일정 {len(events)}건" if events else "일정이 없습니다")

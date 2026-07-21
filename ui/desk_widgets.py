@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
-from store.event_store import Event, EventStore
+from store.event_store import Event, EventStore, day_sort_key
 from ui import theme
 from ui.calendar_view import EventCalendar, EventItemCard, WEEKDAY_KO
 from ui.desk_base import DeskWidgetBase
@@ -57,7 +57,7 @@ class DayDetailDialog(QDialog):
             if item.widget():
                 item.widget().deleteLater()
         events = self.store.on_date(self.d)
-        events.sort(key=lambda e: (_PRIORITY_ORDER.get(e.priority, 1), e.start))
+        events.sort(key=day_sort_key)
         if not events:
             empty = QLabel("일정이 없습니다.")
             empty.setStyleSheet(f"color:{theme.SUBTLE}")
@@ -67,6 +67,20 @@ class DayDetailDialog(QDialog):
                 EventItemCard(e, self.store,
                               lambda reload_day: QTimer.singleShot(0, self._fill)))
         self.items_lay.addStretch()
+
+
+def _scale_calendar(cal: EventCalendar, widget_h: int, scale_pct: int,
+                    divisor: int) -> None:
+    """달력 글씨를 위젯 크기(반응형)×사용자 배율에 맞춰 조정.
+
+    테마의 CALENDAR_QSS가 font-size를 px로 고정하고 있어 setFont로는
+    안 바뀐다 — 달력 자체 스타일시트로 덮어써야 한다.
+    """
+    px = max(9, min(16, widget_h // divisor))
+    px = max(8, round(px * scale_pct / 100))
+    cal.setStyleSheet(
+        f"QCalendarWidget QAbstractItemView{{font-size:{px}px}}"
+        f"QCalendarWidget QToolButton{{font-size:{px + 1}px}}")
 
 
 def open_day_dialog(store: EventStore, d: date) -> None:
@@ -140,25 +154,97 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
     return root, head
 
 
-# ── ① 할일 간단판 ────────────────────────────────────────────
-class _TodoRow(QFrame):
-    """간단판의 한 줄 — 체크박스 + 내용 (투두리스트 스타일).
+# ── 공용: ⠿ 드래그로 순서를 바꾸는 일정 필드 ─────────────────
+class _DragField(QFrame):
+    """맨 앞 ⠿ 그립을 잡고 위아래로 끌면 같은 칸 안에서 순서가 바뀐다.
 
+    필드들만 담긴 레이아웃(부모 위젯의 layout) 안에서 움직이고,
+    놓는 순간 EventStore.set_orders()로 순서를 저장한다.
+    """
+
+    GRIP_W = 18       # 왼쪽 그립 클릭 판정 폭(px)
+
+    def __init__(self, event: Event, store: EventStore):
+        super().__init__()
+        self.event = event
+        self.store = store
+        self._dragging = False
+
+    def make_grip(self, color: str, size_px: int) -> QLabel:
+        g = QLabel("⠿")
+        g.setStyleSheet(
+            f"color:{color};font-size:{size_px}px;background:transparent")
+        g.setToolTip("잡고 위아래로 끌면 순서가 바뀌어요")
+        g.setCursor(Qt.CursorShape.SizeVerCursor)
+        return g
+
+    def _clicked(self, ev) -> None:
+        """그립 밖을 눌렀을 때 — 서브클래스에서 재정의."""
+
+    def mousePressEvent(self, ev):
+        if ev.button() != Qt.MouseButton.LeftButton:
+            return
+        if ev.position().x() <= self.GRIP_W:
+            self._dragging = True
+        else:
+            self._clicked(ev)
+
+    def mouseMoveEvent(self, ev):
+        if not self._dragging:
+            return
+        lay = self.parentWidget().layout()
+        gy = ev.globalPosition().toPoint().y()
+        idx = lay.indexOf(self)
+        target = idx
+        for i in range(lay.count()):
+            w = lay.itemAt(i).widget()
+            if w is None or w is self:
+                continue
+            cy = w.mapToGlobal(w.rect().center()).y()
+            if i < idx and gy < cy:
+                target = min(target, i)
+            elif i > idx and gy > cy:
+                target = max(target, i)
+        if target != idx:
+            lay.removeWidget(self)
+            lay.insertWidget(target, self)
+
+    def mouseReleaseEvent(self, ev):
+        if not self._dragging:
+            return
+        self._dragging = False
+        lay = self.parentWidget().layout()
+        orders = {}
+        for i in range(lay.count()):
+            w = lay.itemAt(i).widget()
+            if isinstance(w, _DragField):
+                orders[w.event.id] = len(orders)
+        self.store.set_orders(orders)   # 저장 → 모든 위젯이 새 순서로 갱신
+
+
+# ── ① 할일 간단판 ────────────────────────────────────────────
+class _TodoRow(_DragField):
+    """할 일 보드의 필드 한 줄: ⠿ + 체크박스 + '시간 ↵ 제목' + ✎.
+
+    ⠿를 잡고 끌면 열 안에서 위아래 순서가 바뀌고,
     편집 모드에서는 제목이 입력칸으로 바뀌어 그 자리에서 바로 고친다.
     """
 
-    def __init__(self, event: Event, store: EventStore, show_date: bool,
+    def __init__(self, event: Event, store: EventStore,
                  owner: "SimpleTodoWidget"):
-        super().__init__()
-        self.event, self.store, self.owner = event, store, owner
+        super().__init__(event, store)
+        self.owner = owner
         fpx = owner.font_px
         self.setStyleSheet(
             "_TodoRow{background:transparent;border-radius:6px}"
             "_TodoRow:hover{background:rgba(30,136,229,0.10)}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(4, 2, 2, 2)
+        lay.setContentsMargins(2, 2, 2, 2)
         lay.setSpacing(4)
+        fg, _bg = theme.PRIORITY_COLORS.get(
+            event.priority, theme.PRIORITY_COLORS["보통"])
+        lay.addWidget(self.make_grip(fg, fpx(10)))
         # 모든 항목에 체크박스 — 끝낸 일은 체크 (투두리스트처럼)
         cb = QCheckBox()
         cb.setChecked(event.done)
@@ -166,21 +252,15 @@ class _TodoRow(QFrame):
         cb.stateChanged.connect(
             lambda st: store.set_done(event.id, bool(st)))
         lay.addWidget(cb)
-        fg, _bg = theme.PRIORITY_COLORS.get(
-            event.priority, theme.PRIORITY_COLORS["보통"])
-        dot = QLabel("●")
-        dot.setStyleSheet(
-            f"color:{fg};font-size:{fpx(9)}px;background:transparent")
-        lay.addWidget(dot)
         done_style = ";text-decoration:line-through" if event.done else ""
-        # '시간 ↵ 제목' 두 줄 (종일이면 제목 한 줄)
+        # '시간 ↵ 제목' 두 줄 (종일이면 제목 한 줄), 잘리지 않게 줄바꿈
         text_col = QVBoxLayout()
         text_col.setSpacing(0)
         text_col.setContentsMargins(0, 0, 0, 0)
         if not event.all_day:
             t = QLabel(event.start_dt.strftime("%H:%M"))
             t.setStyleSheet(
-                f"color:{theme.SUBTLE};font-size:{fpx(9)}px;"
+                f"color:{theme.SUBTLE};font-size:{fpx(8)}px;"
                 f"background:transparent")
             text_col.addWidget(t)
         if owner.edit_mode:
@@ -189,21 +269,21 @@ class _TodoRow(QFrame):
             self.title_edit.setStyleSheet(
                 f"QLineEdit{{background:#fbfdff;border:1px solid "
                 f"{theme.BORDER};border-radius:5px;padding:1px 4px;"
-                f"font-size:{fpx(12)}px;color:{theme.TEXT}}}")
+                f"font-size:{fpx(10)}px;color:{theme.TEXT}}}")
             self.title_edit.editingFinished.connect(self._save_title)
             text_col.addWidget(self.title_edit)
         else:
             title = QLabel(event.title)
             title.setWordWrap(True)
             title.setStyleSheet(
-                f"font-size:{fpx(12)}px;color:{theme.TEXT};"
+                f"font-size:{fpx(10)}px;color:{theme.TEXT};"
                 f"background:transparent" + done_style)
             text_col.addWidget(title)
         lay.addLayout(text_col, stretch=1)
         edit = QPushButton("✎")
         edit.setToolTip("자세히 수정 (일시·중요도·메모)")
         edit.setStyleSheet(
-            theme.TEXT_BTN + f"QPushButton{{font-size:{fpx(12)}px;padding:2px 6px}}")
+            theme.TEXT_BTN + f"QPushButton{{font-size:{fpx(11)}px;padding:2px 5px}}")
         edit.setCursor(Qt.CursorShape.PointingHandCursor)
         edit.clicked.connect(self._edit)
         lay.addWidget(edit)
@@ -216,9 +296,9 @@ class _TodoRow(QFrame):
     def _edit(self) -> None:
         EditPopup(self.event, self.store).show_near_cursor()
 
-    def mousePressEvent(self, ev):
+    def _clicked(self, ev) -> None:
         # 편집 모드에서는 입력칸이 클릭을 받으므로 여기로 안 온다
-        if ev.button() == Qt.MouseButton.LeftButton and not self.owner.edit_mode:
+        if not self.owner.edit_mode:
             self._edit()
 
 
@@ -244,7 +324,7 @@ class SimpleTodoWidget(DeskWidgetBase):
         self.resize(min(560, screen.width() // 2), 250)
         self.move(screen.right() - self.width() - 40, screen.top() + 60)
 
-    def _column(self, label: str, color: str, events, show_date: bool,
+    def _column(self, label: str, color: str, events,
                 today_col: bool) -> QFrame:
         fpx = self.font_px
         col = QFrame()
@@ -273,7 +353,7 @@ class SimpleTodoWidget(DeskWidgetBase):
                 f"background:transparent")
             rows.addWidget(empty)
         for e in events:
-            rows.addWidget(_TodoRow(e, self.store, show_date, owner=self))
+            rows.addWidget(_TodoRow(e, self.store, owner=self))
         rows.addStretch()
         scroll.setWidget(inner)
         lay.addWidget(scroll)
@@ -286,13 +366,11 @@ class SimpleTodoWidget(DeskWidgetBase):
                 item.widget().deleteLater()
         overdue, today, upcoming = self.store.sections(date.today())
         self.cols.addWidget(
-            self._column("😰 지난 일", "#c62828", overdue, True, False), 1)
+            self._column("😰 지난 일", "#c62828", overdue, False), 1)
         self.cols.addWidget(
-            self._column("📌 오늘 할 일", theme.PRIMARY_DARK, today, False,
-                         True), 1)
+            self._column("📌 오늘 할 일", theme.PRIMARY_DARK, today, True), 1)
         self.cols.addWidget(
-            self._column("🌱 앞으로 할 일", "#66738a", upcoming, True,
-                         False), 1)
+            self._column("🌱 앞으로 할 일", "#66738a", upcoming, False), 1)
 
 
 # ── ② 주간 일정 ──────────────────────────────────────────────
@@ -321,27 +399,24 @@ class _DayColumn(QFrame):
         color = ("#e57373" if d.weekday() == 6 else
                  theme.PRIMARY if d.weekday() == 5 else theme.SUBTLE)
         head = QLabel(f"{d.day} ({wd})")
-        head.setStyleSheet(f"color:{color};font-size:{fpx(11)}px;"
+        head.setStyleSheet(f"color:{color};font-size:{fpx(10)}px;"
                            f"font-weight:bold;background:transparent")
         lay.addWidget(head)
         events = owner.store.on_date(d)
-        events.sort(key=lambda e: (_PRIORITY_ORDER.get(e.priority, 1), e.start))
+        events.sort(key=day_sort_key)
         limit = 3 if slim else 6
+        # 필드들만 담는 컨테이너 — ⠿ 드래그 순서 조정의 범위
+        fields = QWidget()
+        fields.setStyleSheet("background:transparent")
+        flay = QVBoxLayout(fields)
+        flay.setContentsMargins(0, 0, 0, 0)
+        flay.setSpacing(3)
         for e in events[:limit]:
-            fg, bg = theme.PRIORITY_COLORS.get(
-                e.priority, theme.PRIORITY_COLORS["보통"])
-            # '시간 ↵ 제목' 두 줄, 종일이면 제목 한 줄
-            text = e.title[:24] if e.all_day else \
-                f"{e.start_dt:%H:%M}\n{e.title[:24]}"
-            chip = QLabel(text)
-            chip.setWordWrap(True)
-            chip.setStyleSheet(
-                f"background:{bg};color:{fg};border-radius:6px;"
-                f"padding:2px 6px;font-size:{fpx(10)}px")
-            lay.addWidget(chip)
+            flay.addWidget(_WeekField(e, owner.store, d, fpx))
+        lay.addWidget(fields)
         if len(events) > limit:
             more = QLabel(f"+{len(events) - limit}건 더")
-            more.setStyleSheet(f"color:{theme.SUBTLE};font-size:{fpx(10)}px;"
+            more.setStyleSheet(f"color:{theme.SUBTLE};font-size:{fpx(9)}px;"
                                f"background:transparent")
             lay.addWidget(more)
         lay.addStretch()
@@ -349,6 +424,39 @@ class _DayColumn(QFrame):
     def mousePressEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
             open_day_dialog(self.owner.store, self.d)
+
+
+class _WeekField(_DragField):
+    """주간 열의 일정 필드 — ⠿ + '시간 ↵ 제목', 글씨가 잘리지 않는다."""
+
+    def __init__(self, event: Event, store: EventStore, d: date, fpx):
+        super().__init__(event, store)
+        self.d = d
+        fg, bg = theme.PRIORITY_COLORS.get(
+            event.priority, theme.PRIORITY_COLORS["보통"])
+        self.setStyleSheet(f"_WeekField{{background:{bg};border-radius:6px}}")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(3, 2, 6, 2)
+        lay.setSpacing(3)
+        lay.addWidget(self.make_grip(fg, fpx(9)))
+        col = QVBoxLayout()
+        col.setSpacing(0)
+        col.setContentsMargins(0, 0, 0, 0)
+        if not event.all_day:
+            t = QLabel(event.start_dt.strftime("%H:%M"))
+            t.setStyleSheet(f"color:{fg};font-size:{fpx(8)}px;"
+                            f"font-weight:bold;background:transparent")
+            col.addWidget(t)
+        title = QLabel(event.title)
+        title.setWordWrap(True)
+        title.setStyleSheet(f"color:{fg};font-size:{fpx(9)}px;"
+                            f"background:transparent")
+        col.addWidget(title)
+        lay.addLayout(col, stretch=1)
+
+    def _clicked(self, ev) -> None:
+        open_day_dialog(self.store, self.d)
 
 
 class WeeklyWidget(DeskWidgetBase):
@@ -448,13 +556,7 @@ class MonthlyWidget(DeskWidgetBase):
         self._apply_cal_font()
 
     def _apply_cal_font(self) -> None:
-        """위젯 크기에 비례한 달력 글씨 (반응형) × 사용자 글씨 배율."""
-        pt = max(7, min(13, self.height() // 32))
-        pt = max(6, round(pt * self.font_scale() / 100))
-        f = self.cal.font()
-        if f.pointSize() != pt:
-            f.setPointSize(pt)
-            self.cal.setFont(f)
+        _scale_calendar(self.cal, self.height(), self.font_scale(), 26)
 
     def refresh(self) -> None:
         self._apply_cal_font()
@@ -508,12 +610,7 @@ class PlannerWidget(DeskWidgetBase):
         self._apply_cal_font()
 
     def _apply_cal_font(self) -> None:
-        pt = max(7, min(13, self.height() // 48))
-        pt = max(6, round(pt * self.font_scale() / 100))
-        f = self.cal.font()
-        if f.pointSize() != pt:
-            f.setPointSize(pt)
-            self.cal.setFont(f)
+        _scale_calendar(self.cal, self.height(), self.font_scale(), 44)
 
     def _pick(self, d: date) -> None:
         self._selected = d
@@ -540,7 +637,7 @@ class PlannerWidget(DeskWidgetBase):
             if item.widget():
                 item.widget().deleteLater()
         events = self.store.on_date(d)
-        events.sort(key=lambda e: (_PRIORITY_ORDER.get(e.priority, 1), e.start))
+        events.sort(key=day_sort_key)
         if not events:
             empty = QLabel("일정이 없습니다.")
             empty.setStyleSheet(

@@ -29,7 +29,7 @@ def build_alerts(store: EventStore, today: date | None = None,
                 alerts.append(f"⏰ 마감 {days_left}일 전\n{e.title}")
     n = len(store.on_date(today))
     if n:
-        alerts.append(f"📋 오늘 일정이 {n}건 있습니다")
+        alerts.append(f"📋 오늘 일정 {n}건")
     return alerts
 
 
@@ -76,7 +76,16 @@ class AlertBubble(QWidget):
         self._sync()
 
     def _sync(self) -> None:
-        self.text.setText(self.alerts[self.idx])
+        # 'N건'·'N일 전' 같은 숫자는 빨간 배경+흰 글씨로 강조해 눈에 띄게
+        import html
+        import re
+        esc = html.escape(self.alerts[self.idx]).replace("\n", "<br>")
+        esc = re.sub(
+            r"(\d+건|\d+일 전)",
+            r'<span style="background-color:#e53935;color:#ffffff;'
+            r'font-weight:bold;">&nbsp;\1&nbsp;</span>', esc)
+        self.text.setTextFormat(Qt.TextFormat.RichText)
+        self.text.setText(esc)
         remain = len(self.alerts) - self.idx - 1
         self.hint.setText(f"클릭하면 {'다음 알림' if remain else '닫기'} "
                           f"({self.idx + 1}/{len(self.alerts)})")

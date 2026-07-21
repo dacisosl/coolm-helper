@@ -13,6 +13,12 @@ from datetime import date, datetime
 
 
 PRIORITIES = ("높음", "보통", "낮음")
+_PRIORITY_RANK = {"높음": 0, "보통": 1, "낮음": 2}
+
+
+def day_sort_key(e: "Event"):
+    """하루 안 일정 표시 순서: ⠿로 정한 순서 → 중요도 → 시간."""
+    return (e.order, _PRIORITY_RANK.get(e.priority, 1), e.start)
 
 
 @dataclass
@@ -26,6 +32,7 @@ class Event:
     priority: str = "보통"          # 중요도: 높음 | 보통 | 낮음
     memo: str = ""                  # 상세 메모 (로컬 전용)
     demo: bool = False              # 데모 모드에서 등록된 테스트 일정
+    order: int = 0                  # 위젯에서 ⠿로 정한 표시 순서 (작을수록 위)
     source_ref: str = ""            # 원본 쪽지 참조 "쪽지key|시작일시" — 등록 표시 유지용
     google_id: str | None = None    # 구글에도 등록한 경우의 이벤트 ID
     created: str = ""
@@ -150,6 +157,13 @@ class EventStore:
                 for k, v in fields.items():
                     if hasattr(e, k):
                         setattr(e, k, v)
+        self._save()
+
+    def set_orders(self, id_to_order: dict[str, int]) -> None:
+        """⠿ 드래그로 바꾼 표시 순서를 한 번에 저장 (저장·알림 1회)."""
+        for e in self._events:
+            if e.id in id_to_order:
+                e.order = int(id_to_order[e.id])
         self._save()
 
     def set_google_id(self, event_id: str, google_id: str) -> None:

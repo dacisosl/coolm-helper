@@ -146,6 +146,37 @@ class DeskWidgetBase(QWidget):
         self._font_label.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:10px;background:transparent")
         lay.addWidget(self._font_label)
+        # 📌 항상 위 고정 (토글) + ✕ 위젯 끄기
+        from PyQt6.QtCore import QSize
+        from ui.icons import icon
+        pin = QPushButton()
+        pin.setIcon(icon("pin", 13))
+        pin.setIconSize(QSize(13, 13))
+        pin.setCheckable(True)
+        pin.setChecked(bool(self.conf.get("always_on_top")))
+        pin.setToolTip("항상 위에 고정 — 다른 창들보다 위에 보이기")
+        pin.setFixedSize(26, 20)
+        pin.setCursor(Qt.CursorShape.PointingHandCursor)
+        pin.setStyleSheet(
+            f"QPushButton{{background:{theme.CARD};border:1px solid "
+            f"{theme.BORDER};border-radius:5px}}"
+            f"QPushButton:checked{{background:{theme.PRIMARY_LIGHT};"
+            f"border-color:{theme.PRIMARY}}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}")
+        pin.toggled.connect(self._set_always_on_top)
+        lay.addWidget(pin)
+        off = QPushButton()
+        off.setIcon(icon("close", 12))
+        off.setIconSize(QSize(12, 12))
+        off.setToolTip(self.OFF_LABEL)
+        off.setFixedSize(26, 20)
+        off.setCursor(Qt.CursorShape.PointingHandCursor)
+        off.setStyleSheet(
+            f"QPushButton{{background:{theme.CARD};border:1px solid "
+            f"{theme.BORDER};border-radius:5px}}"
+            f"QPushButton:hover{{background:#fdecea;border-color:{theme.DANGER}}}")
+        off.clicked.connect(self.turn_off)
+        lay.addWidget(off)
         bar.setVisible(False)
         self._edit_bar = bar
         return bar
@@ -311,14 +342,7 @@ class DeskWidgetBase(QWidget):
         top.setChecked(bool(self.conf.get("always_on_top")))
         top.toggled.connect(self._set_always_on_top)
         menu.addAction(top)
-        sub = menu.addMenu("투명도")
-        cur_op = int(self.conf.get("opacity", 90))
-        for v in _OPACITIES:
-            a = QAction(f"{v}%", sub)
-            a.setCheckable(True)
-            a.setChecked(v == cur_op)
-            a.triggered.connect(lambda _, v=v: self._set_opacity(v))
-            sub.addAction(a)
+        # 투명도는 편집 모드의 슬라이더로 일원화 (메뉴 중복 제거)
         menu.addSeparator()
         off = QAction(self.OFF_LABEL, menu)
         off.triggered.connect(self.turn_off)

@@ -94,9 +94,7 @@ class MiniWidget(WidgetBase):
         self.resize(self.WIDTH, 54)
         self._bar: _IconBar | None = None
         self._moved = False
-        self._click_timer = QTimer(self)
-        self._click_timer.setSingleShot(True)
-        self._click_timer.timeout.connect(self._open_bar)
+        self._last_bar_open = 0.0
         self.apply_config()
 
     def apply_config(self) -> None:
@@ -110,6 +108,16 @@ class MiniWidget(WidgetBase):
         self.move(screen.right() - self.WIDTH, screen.center().y() - 27)
 
     def _open_bar(self) -> None:
+        # 빠르게 두 번 열리면(=더블클릭이 팝업에 먹힌 경우) ⚡로 보낸다
+        import time
+        now = time.monotonic()
+        if now - self._last_bar_open < \
+                QApplication.doubleClickInterval() / 1000:
+            if self._bar is not None and self._bar.isVisible():
+                self._bar.close()
+            self.open_quick()
+            return
+        self._last_bar_open = now
         # 메뉴를 여는 순간 ⚡용 데이터를 미리 데워둔다 (클릭 시 즉시 채움)
         import threading
         from parser import pipeline
@@ -142,13 +150,13 @@ class MiniWidget(WidgetBase):
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton and not self._moved:
-            # 더블클릭과 구분: 잠깐 기다렸다가 메뉴를 연다
-            self._click_timer.start(QApplication.doubleClickInterval())
+            self._open_bar()                  # 딜레이 없이 즉시 메뉴
         self._drag = None
 
     def mouseDoubleClickEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
-            self._click_timer.stop()          # 단일클릭 메뉴 취소
+            if self._bar is not None and self._bar.isVisible():
+                self._bar.close()
             self.open_quick()                 # 더블클릭 = ⚡ 바로 등록
 
     def contextMenuEvent(self, ev):

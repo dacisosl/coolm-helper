@@ -37,7 +37,7 @@ class TestBuildAlerts(unittest.TestCase):
         self.store.add("오늘 일정", datetime(2026, 7, 20, 14), all_day=False)
         self.store.add("오늘 종일", datetime(2026, 7, 20))
         alerts = build_alerts(self.store, TODAY)
-        self.assertTrue(any("오늘 일정이 2건" in a for a in alerts))
+        self.assertTrue(any("오늘 일정 2건" in a for a in alerts))
 
     def test_order_deadline_first(self):
         self.store.add("오늘 일정", datetime(2026, 7, 20))
