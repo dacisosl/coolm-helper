@@ -19,9 +19,17 @@ DEFAULT_MODEL = "gemini-3.5-flash"
 _RETIRED_MODELS = {"gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"}
 TIMEOUT = 30
 
+# 톤(분위기) 선택지 — UI 칩과 1:1 대응
+TONES = {
+    "polite":   "정중하고 세련된 문장으로",
+    "friendly": "부드럽고 친근한 말투로",
+    "formal":   "격식 있고 명확한 문장으로",
+    "short":    "핵심만 남겨 짧고 간결하게",
+}
+
 PROMPT = (
     "다음은 학교에서 학부모·학생에게 공개적으로 안내하는 글입니다. "
-    "맞춤법과 띄어쓰기를 바로잡고, 문장을 정중하고 자연스럽게 다듬어 주세요. "
+    "맞춤법과 띄어쓰기를 바로잡고, {style} 다듬어 주세요. "
     "내용·날짜·숫자는 바꾸지 말고, 다듬어진 글만 출력하세요.\n\n"
     "--- 원문 ---\n{text}")
 
@@ -37,7 +45,7 @@ def _gemini(text: str, config: dict) -> str:
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{model}:generateContent")
     body = json.dumps({
-        "contents": [{"parts": [{"text": PROMPT.format(text=text)}]}],
+        "contents": [{"parts": [{"text": text}]}],   # text = 완성된 프롬프트
     }).encode("utf-8")
     req = urllib.request.Request(
         url, data=body, method="POST",
@@ -74,7 +82,7 @@ def _openrouter(text: str, config: dict) -> str:
     model = config.get("proof_model_openrouter", OPENROUTER_MODEL)
     body = json.dumps({
         "model": model,
-        "messages": [{"role": "user", "content": PROMPT.format(text=text)}],
+        "messages": [{"role": "user", "content": text}],   # text = 완성된 프롬프트
     }).encode("utf-8")
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions", data=body,
@@ -104,8 +112,11 @@ def _openrouter(text: str, config: dict) -> str:
 _PROVIDERS = {"gemini": _gemini, "openrouter": _openrouter}
 
 
-def proofread(text: str, config: dict) -> str:
-    """입력 텍스트를 다듬어 돌려준다. 실패 시 RuntimeError(사용자용 메시지)."""
+def proofread(text: str, config: dict, tone: str = "polite") -> str:
+    """입력 텍스트를 다듬어 돌려준다. 실패 시 RuntimeError(사용자용 메시지).
+
+    tone: TONES의 키 — 다듬는 말투(정중/친근/격식/간결).
+    """
     text = text.strip()
     if not text:
         raise RuntimeError("보정할 글을 입력해 주세요.")
@@ -113,4 +124,5 @@ def proofread(text: str, config: dict) -> str:
     fn = _PROVIDERS.get(provider)
     if fn is None:
         raise RuntimeError(f"알 수 없는 공급자: {provider}")
-    return fn(text, config)
+    style = TONES.get(tone, TONES["polite"])
+    return fn(PROMPT.format(style=style, text=text), config)
