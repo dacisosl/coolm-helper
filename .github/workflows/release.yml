@@ -31,7 +31,9 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          # 사용자 PC의 기존 설치(로컬 3.13 빌드)와 부품이 섞여도 안전하도록
+          # 같은 버전 유지
+          python-version: "3.13"
 
       - name: 버전·제목·노트 읽기 (version.py + release_notes.txt)
         shell: python

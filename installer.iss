@@ -20,6 +20,14 @@ SetupIconFile=assets\app.ico
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 
+[InstallDelete]
+; 업데이트 설치 전에 옛 프로그램 부품을 깨끗이 지운다 — 파이썬 버전이
+; 다른 빌드가 겹쳐 "python3xx.dll conflicts" 오류가 나는 것을 방지.
+; 사용자 데이터(store, config.json, students.txt)는 건드리지 않는다.
+Type: filesandordirs; Name: "{app}\_internal"
+Type: files; Name: "{app}\python*.dll"
+Type: files; Name: "{app}\*.pyd"
+
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 
