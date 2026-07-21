@@ -354,4 +354,23 @@
 
 ---
 
+## 2026-07-21 — 릴리스 자동화 클라우드 이전 (GitHub Actions)
+
+- 배경: 사용자가 "내 컴퓨터에서 자동으로 되게 해달라" — 로컬 release.py
+  대신 **GitHub Actions(windows-latest)** 가 빌드·설치파일·릴리스·
+  version.json 갱신까지 수행하도록 이전 (.github/workflows/release.yml).
+- 실행 방법: version.py의 APP_VERSION 올리고 **release_notes.txt**(첫 줄=
+  제목, 나머지=안내문) 수정해 main에 push → 자동 릴리스. 사용자 앱은
+  다음 실행 때 업데이트 안내를 받는다.
+- 시행착오: ①이 환경(원격 세션)은 workflow_dispatch 403·태그 push 403
+  → **release_notes.txt paths 트리거**로 우회 ②Korean.isl 다운로드 404
+  → 러너의 Inno Setup 6에 이미 내장돼 있었음(다중 폴백 로직은 유지)
+  ③Windows 러너 콘솔은 cp1252라 한글 print가 UnicodeEncodeError →
+  워크플로 전역 `PYTHONUTF8=1`.
+- v0.10.0을 이 경로로 첫 릴리스 완료 (Setup 32MB, version.json 갱신 확인).
+- 함께 추가: 업데이트.bat — 소스로 쓰는 PC에서 더블클릭 한 번으로
+  pull→일정 백업→재빌드→복원.
+
+---
+
 ## (다음 기록은 여기에 이어서)
