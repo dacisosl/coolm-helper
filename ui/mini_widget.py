@@ -139,6 +139,8 @@ class MiniWidget(WidgetBase):
         g = scr.availableGeometry()
         y = min(max(g.top(), self.y()), g.bottom() - self.height())
         self.move(g.right() - self.WIDTH, y)
+        if getattr(self, "_in_tray", False):
+            return               # 사용자가 트레이로 보낸 상태는 존중
         if not self.isVisible():
             self.show()
         self.raise_()
@@ -198,10 +200,14 @@ class MiniWidget(WidgetBase):
     def contextMenuEvent(self, ev):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
+        act_tray = menu.addAction("트레이로 보내기 (펭귄 숨기기)")
         act_detail = menu.addAction("상세 위젯으로 전환")
+        menu.addSeparator()
         act_quit = menu.addAction("종료")
         chosen = menu.exec(ev.globalPos())
-        if chosen == act_detail:
+        if chosen == act_tray:
+            self.send_to_tray()
+        elif chosen == act_detail:
             from parser import pipeline
             self.config["widget_style"] = "detail"
             pipeline.save_config(self.base_dir, self.config)

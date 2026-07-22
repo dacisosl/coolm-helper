@@ -94,6 +94,8 @@ class WidgetBase(QWidget):
             return
         if not scr.availableGeometry().intersects(self.frameGeometry()):
             self.place_default()
+        if getattr(self, "_in_tray", False):
+            return               # 사용자가 트레이로 보낸 상태는 존중
         if not self.isVisible():
             self.show()
         self.raise_()
@@ -235,6 +237,27 @@ class WidgetBase(QWidget):
         self.cal_win.show()
         self.cal_win.raise_()
         self.cal_win.activateWindow()
+
+    def showEvent(self, ev):
+        self._in_tray = False        # 어떤 경로로든 보이면 트레이 상태 해제
+        super().showEvent(ev)
+
+    def send_to_tray(self) -> None:
+        """펭귄(위젯)을 숨기고 트레이로 보낸다 — 트레이 클릭으로 복귀."""
+        self._in_tray = True
+        self.hide()
+        app = QApplication.instance()
+        tray = getattr(app, "_coolm_tray", None)
+        if tray is not None and not getattr(app, "_coolm_tray_tip_shown", False):
+            app._coolm_tray_tip_shown = True     # 안내 풍선은 세션당 1회
+            try:
+                tray.showMessage(
+                    "COOL-비서",
+                    "펭귄을 트레이로 보냈어요.\n"
+                    "이 아이콘을 클릭하면 다시 나타납니다. 🐧",
+                    tray.icon(), 4000)
+            except Exception:
+                pass
 
     def on_events_changed(self) -> None:
         """일정 변경 후 후처리 — 서브클래스에서 뱃지 갱신 등에 사용."""

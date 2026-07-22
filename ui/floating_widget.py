@@ -138,9 +138,12 @@ class FloatingWidget(WidgetBase):
     def contextMenuEvent(self, ev):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
+        act_tray = menu.addAction("트레이로 보내기 (숨기기)")
         act_mini = menu.addAction("미니 위젯으로 전환")
         chosen = menu.exec(ev.globalPos())
-        if chosen == act_mini:
+        if chosen == act_tray:
+            self.send_to_tray()
+        elif chosen == act_mini:
             from parser import pipeline
             self.config["widget_style"] = "mini"
             pipeline.save_config(self.base_dir, self.config)
