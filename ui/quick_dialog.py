@@ -36,8 +36,12 @@ class _LoadWorker(QObject):
         threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self) -> None:
+        import os
         title, body, origin = "", self.text, "클립보드"
         if self.mode == "screen":
+            if os.environ.get("COOLM_NO_CAPTURE"):   # CI/테스트 가드
+                self.loaded.emit(None)
+                return
             try:
                 import capture
                 got = capture.read_current_message()

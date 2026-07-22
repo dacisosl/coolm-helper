@@ -55,18 +55,26 @@ CREDENTIALS_PATH = os.path.join(_data_dir(), "credentials.json")
 
 
 def libs_available() -> bool:
-    """구글 라이브러리가 이 빌드에 들어 있는가."""
+    """구글 라이브러리가 이 빌드에 들어 있고 정상 동작하는가.
+
+    BaseException까지 잡는 이유: 손상된 설치에서는 ImportError가 아니라
+    네이티브(rust) 패닉이 올라올 수 있다 — 그 경우도 '사용 불가'로 처리.
+    """
     try:
         import googleapiclient  # noqa: F401
         import google_auth_oauthlib  # noqa: F401
         return True
-    except ImportError:
+    except BaseException:
         return False
 
 
 def is_available(base_dir: str | None = None) -> bool:
-    """구글 연동을 켤 수 있는 상태인가 (라이브러리 + 열쇠 파일)."""
-    return credentials_path() is not None and libs_available()
+    """구글 연동을 켤 수 있는 상태인가.
+
+    v1.4부터 공용 클라이언트(app_client.py)가 내장돼 열쇠 파일 없이도
+    라이브러리만 있으면 항상 가능하다.
+    """
+    return libs_available()
 
 
 def install_credentials(src_path: str) -> None:
@@ -103,9 +111,12 @@ def _service():
             creds.refresh(Request())
         else:
             cred = credentials_path()
-            if not cred:
-                raise RuntimeError("구글 열쇠 파일(credentials.json)이 없습니다.")
-            flow = InstalledAppFlow.from_client_secrets_file(cred, SCOPES)
+            if cred:                       # 개인 열쇠 파일이 있으면 우선
+                flow = InstalledAppFlow.from_client_secrets_file(cred, SCOPES)
+            else:                          # 기본: 내장 공용 클라이언트
+                from calendar_sync.app_client import CLIENT_CONFIG
+                flow = InstalledAppFlow.from_client_config(
+                    CLIENT_CONFIG, SCOPES)
             creds = flow.run_local_server(port=0)
         with open(tok, "w", encoding="utf-8") as f:
             f.write(creds.to_json())

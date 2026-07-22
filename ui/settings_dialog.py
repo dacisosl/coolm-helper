@@ -345,8 +345,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             self.google_status.setText(
                 "누르면 구글 로그인 창이 열리고, 로그인하면 바로 연동됩니다."
                 if ready else
-                "누르면 준비를 도와드려요 — 최초 1회 열쇠 파일만 만들면\n"
-                "그다음부터는 구글 로그인 한 번으로 끝나요.")
+                "앱을 최신 버전으로 업데이트하면 쓸 수 있어요.")
 
     def _google_chip_clicked(self) -> None:
         from parser import pipeline as _pl
@@ -362,11 +361,11 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             _pl.save_config(self.base_dir, self.config)
             self._refresh_google_chip()
             return
-        if not ready:                                     # 열쇠 파일 없음
-            if self._google_setup_wizard():               # 마법사로 준비
-                ready, token = self._google_state()
-                if ready and not token:
-                    self._google_chip_clicked()           # 바로 로그인으로
+        if not ready:      # 구글 부품이 없는 옛 빌드 (v1.4 미만)
+            QMessageBox.information(
+                self, "업데이트가 필요해요",
+                "이 버전에는 구글 연동 부품이 없습니다.\n"
+                "앱을 최신 버전으로 업데이트한 뒤 다시 눌러주세요.")
             return
         if token:                                         # 이미 로그인됨 → 켜기만
             self._google_on = True
@@ -383,90 +382,6 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         self._login_worker.done.connect(self._google_login_done)
         self._login_worker.failed.connect(self._google_login_failed)
         self._login_worker.start()
-
-    def _google_setup_wizard(self) -> bool:
-        """열쇠 파일 준비 마법사 — MD 문서 대신 앱 안에서 단계별로.
-
-        True = 열쇠 파일을 성공적으로 가져옴 (이어서 바로 로그인 시도).
-        """
-        from PyQt6.QtWidgets import QDialog, QFileDialog, QVBoxLayout
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle("구글 연동 준비 (최초 1회)")
-        dlg.setStyleSheet(theme.BASE_QSS + f"QDialog{{background:{theme.BG}}}")
-        dlg.setFixedWidth(480)
-        lay = QVBoxLayout(dlg)
-        lay.setContentsMargins(24, 20, 24, 20)
-        lay.setSpacing(10)
-
-        head = QLabel("구글 연동 준비")
-        head.setStyleSheet(theme.DIALOG_HEADER)
-        lay.addWidget(head)
-        intro = QLabel(
-            "구글 정책 때문에 '열쇠 파일'을 한 번만 만들어야 해요 (약 5분).\n"
-            "아래 두 단계만 따라 하면, 그다음부터는 로그인 한 번으로 끝!")
-        intro.setWordWrap(True)
-        intro.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
-        lay.addWidget(intro)
-
-        def step_card(num: str, text: str, btn_label: str, on_click):
-            card = QFrame()
-            card.setStyleSheet(
-                f"QFrame{{background:{theme.CARD};border:none;"
-                f"border-radius:{theme.RADIUS_LG}px}}")
-            cl = QVBoxLayout(card)
-            cl.setContentsMargins(16, 12, 16, 12)
-            cl.setSpacing(8)
-            t = QLabel(f"{num}  {text}")
-            t.setWordWrap(True)
-            t.setStyleSheet(f"font-size:{theme.FONT_MD}px;color:{theme.TEXT};"
-                            f"border:none")
-            cl.addWidget(t)
-            b = QPushButton(btn_label)
-            b.setStyleSheet(theme.PRIMARY_BTN)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.clicked.connect(on_click)
-            cl.addWidget(b, alignment=Qt.AlignmentFlag.AlignLeft)
-            lay.addWidget(card)
-            return b
-
-        def open_console():
-            import webbrowser
-            # Calendar API 켜기 + 인증정보 만들기 페이지를 순서대로 연다
-            webbrowser.open("https://console.cloud.google.com/apis/library/"
-                            "calendar-json.googleapis.com")
-            webbrowser.open("https://console.cloud.google.com/apis/credentials")
-
-        step_card("①", "구글 페이지에서 열쇠 만들기 — 열리는 두 탭에서\n"
-                  "   Calendar API [사용]을 누르고, '사용자 인증 정보 만들기' →\n"
-                  "   'OAuth 클라이언트 ID' → '데스크톱 앱' → JSON 다운로드",
-                  "구글 열쇠 만들기 페이지 열기", open_console)
-
-        def pick_file():
-            from calendar_sync import google_sync
-            downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-            path, _ = QFileDialog.getOpenFileName(
-                dlg, "받은 열쇠 파일(JSON) 고르기",
-                downloads if os.path.isdir(downloads) else "",
-                "JSON 파일 (*.json)")
-            if not path:
-                return
-            try:
-                google_sync.install_credentials(path)
-            except ValueError as e:
-                QMessageBox.warning(dlg, "다른 파일이에요", str(e))
-                return
-            dlg.accept()
-
-        step_card("②", "다운로드된 열쇠 파일(JSON)을 여기로 가져오기 —\n"
-                  "   고르기만 하면 제자리에 자동으로 복사됩니다",
-                  "받은 열쇠 파일 가져오기", pick_file)
-
-        close = QPushButton("나중에 할게요")
-        close.setStyleSheet(theme.TEXT_BTN)
-        close.clicked.connect(dlg.reject)
-        lay.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
-        return dlg.exec() == QDialog.DialogCode.Accepted
 
     def _google_login_done(self) -> None:
         from parser import pipeline as _pl

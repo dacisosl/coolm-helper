@@ -24,6 +24,7 @@ env:
 jobs:
   build-release:
     runs-on: windows-latest
+    timeout-minutes: 30   # 테스트가 멈춰도 6시간 러너 낭비 방지
     steps:
       - uses: actions/checkout@v4
         with:

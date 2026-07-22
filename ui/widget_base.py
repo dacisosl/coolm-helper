@@ -67,6 +67,9 @@ class WidgetBase(QWidget):
         threading.Thread(target=self._warmup_capture, daemon=True).start()
 
     def _warmup_capture(self) -> None:
+        import os
+        if os.environ.get("COOLM_NO_CAPTURE"):
+            return          # CI/테스트 — Windows 러너에서 UIA가 멈출 수 있음
         try:
             import capture
             capture.warmup()

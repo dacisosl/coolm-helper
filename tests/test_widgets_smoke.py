@@ -14,6 +14,8 @@ import unittest
 from datetime import datetime, date
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Windows CI에서 pywinauto/UIA 캡처가 멈출 수 있어 테스트에선 차단
+os.environ["COOLM_NO_CAPTURE"] = "1"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication
