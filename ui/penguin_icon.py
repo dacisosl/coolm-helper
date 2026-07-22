@@ -37,22 +37,31 @@ PENGUIN_SVG = f"""
 </svg>
 """
 
-# 옆으로 누워 자는 쿨쿠리 + Zz (레퍼런스 '잠자기' 포즈)
+# 벌러덩 누워 자는 쿨쿠리 (잠만보 무드) — 배 내밀고, 눈 ︶︶, 볼 발그레 + Zz
 SLEEP_SVG = f"""
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100">
-  <ellipse cx="58" cy="70" rx="46" ry="26" fill="{_BODY}"/>
-  <ellipse cx="66" cy="74" rx="30" ry="17" fill="#ffffff"/>
-  <circle cx="26" cy="62" r="20" fill="{_BODY}"/>
-  <path d="M14 58 Q20 64 26 58" stroke="#ffffff" stroke-width="3"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 100">
+  <ellipse cx="74" cy="70" rx="42" ry="23" fill="{_BODY}"/>
+  <ellipse cx="82" cy="64" rx="27" ry="15" fill="#ffffff"/>
+  <circle cx="30" cy="60" r="21" fill="{_BODY}"/>
+  <circle cx="22" cy="53" r="8" fill="#ffffff"/>
+  <circle cx="38" cy="51" r="8" fill="#ffffff"/>
+  <path d="M18 53 Q22 57 26 53" stroke="{_BODY}" stroke-width="2.6"
         fill="none" stroke-linecap="round"/>
-  <path d="M28 62 Q34 68 40 62" stroke="#ffffff" stroke-width="3"
+  <path d="M34 51 Q38 55 42 51" stroke="{_BODY}" stroke-width="2.6"
         fill="none" stroke-linecap="round"/>
-  <ellipse cx="22" cy="70" rx="7" ry="4" fill="{_ORANGE}"/>
-  <ellipse cx="104" cy="82" rx="8" ry="4" fill="{_ORANGE}"/>
-  <ellipse cx="96" cy="88" rx="8" ry="4" fill="{_ORANGE}"/>
-  <path d="M58 22 h16 l-16 14 h16" stroke="#6aa9e9" stroke-width="5"
+  <ellipse cx="16" cy="63" rx="4.2" ry="2.8" fill="#f2a9b4" opacity="0.85"/>
+  <ellipse cx="43" cy="60" rx="4.2" ry="2.8" fill="#f2a9b4" opacity="0.85"/>
+  <ellipse cx="30" cy="65" rx="5.5" ry="4" fill="{_ORANGE}"/>
+  <ellipse cx="30" cy="66" rx="2.6" ry="2" fill="#c97d0e"/>
+  <ellipse cx="66" cy="57" rx="13" ry="5.5" fill="{_BODY}"
+           transform="rotate(18 66 57)"/>
+  <ellipse cx="105" cy="50" rx="9" ry="5" fill="{_ORANGE}"
+           transform="rotate(-40 105 50)"/>
+  <ellipse cx="113" cy="62" rx="9" ry="5" fill="{_ORANGE}"
+           transform="rotate(-20 113 62)"/>
+  <path d="M50 18 h14 l-14 12 h14" stroke="#6aa9e9" stroke-width="5"
         fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M86 8 h11 l-11 10 h11" stroke="#9cc3ef" stroke-width="4"
+  <path d="M76 6 h10 l-10 9 h10" stroke="#9cc3ef" stroke-width="4"
         fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 """
