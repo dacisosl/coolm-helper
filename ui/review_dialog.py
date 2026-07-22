@@ -157,23 +157,41 @@ class DatePickerButton(QPushButton):
 
 
 class TimeCombo(QComboBox):
-    """'종일' + 30분 단위 드롭다운 + 직접 입력(예: 14:05)도 되는 시간 선택.
+    """'종일' + 30분 단위 드롭다운 — 타이핑 없이 고르기만 하는 시간 선택.
 
-    '종일'을 고르면 시간 없는 하루짜리 일정이 된다 (별도 체크박스 없음).
+    기본값은 '지금'을 30분 단위로 올린 시각 (2026-07-22 사용자 결정 —
+    종일 기본 대신). 목록을 열면 현재 선택 근처가 바로 보여 피로가 적고,
+    '종일'은 맨 위라 한 번에 고를 수 있다. 쪽지에서 감지된 14:05 같은
+    시각은 set_time()이 목록에 끼워 넣어 그대로 보여준다.
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setEditable(True)
+        self.setEditable(False)          # 직접 입력 대신 '선택'만
         self.addItem("종일")
         for h in range(0, 24):
             for m in (0, 30):
                 self.addItem(f"{h:02d}:{m:02d}")
         self.setFixedWidth(92)
-        self.setToolTip("시간을 고르거나 직접 입력 — '종일'을 고르면 시간 없는 일정")
+        self.setMaxVisibleItems(12)
+        self.setToolTip("시간 고르기 — 맨 위 '종일'을 고르면 시간 없는 일정")
+        self.set_now()
+
+    def set_now(self) -> None:
+        """지금 시각을 다음 30분 단위로 올려 기본 선택."""
+        from datetime import datetime, timedelta
+        now = datetime.now() + timedelta(minutes=29)
+        self.set_time(now.hour, 30 if now.minute >= 30 else 0)
 
     def set_time(self, h: int, m: int) -> None:
-        self.setCurrentText(f"{h:02d}:{m:02d}")
+        text = f"{h:02d}:{m:02d}"
+        idx = self.findText(text)
+        if idx < 0:                      # 30분 단위가 아닌 시각은 끼워 넣기
+            idx = 1
+            while idx < self.count() and self.itemText(idx) < text:
+                idx += 1
+            self.insertItem(idx, text)
+        self.setCurrentIndex(idx)
 
     def set_all_day(self) -> None:
         self.setCurrentIndex(0)

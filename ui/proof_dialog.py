@@ -96,23 +96,16 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         lay.setSpacing(0)
         lay.addSpacing(28)
 
-        head = QLabel(
-            f'어떤 안내 글이든<br>'
-            f'<span style="color:{theme.PRIMARY_DARK}">세련되게</span> 바꿔드려요.')
-        head.setTextFormat(Qt.TextFormat.RichText)
-        head.setStyleSheet(
-            f"font-size:{theme.FONT_HERO}px;font-weight:bold;color:{theme.TEXT};"
-            f"background:transparent;line-height:130%")
-        lay.addWidget(head)
-        lay.addSpacing(8)
+        # 메인 문구 하나로 간결하게 (2026-07-22 사용자 결정)
         sub_row = QHBoxLayout()
-        sub = QLabel("작성하신 글을 붙여넣으면 격식 있고 명확하게 다듬어 드려요")
+        sub = QLabel("작성하신 글을 붙여넣으면\n격식 있고 명확하게 다듬어 드려요")
+        sub.setWordWrap(True)
         sub.setStyleSheet(
-            f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
-            f"background:transparent")
+            f"font-size:{theme.FONT_XXL}px;font-weight:bold;"
+            f"color:{theme.TEXT};background:transparent")
         sub_row.addWidget(sub)
         from ui.help_dot import HelpDot
-        sub_row.addWidget(HelpDot(_TIP))
+        sub_row.addWidget(HelpDot(_TIP), alignment=Qt.AlignmentFlag.AlignTop)
         sub_row.addStretch()
         lay.addLayout(sub_row)
         lay.addSpacing(20)
@@ -298,12 +291,90 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         return page
 
     # ── 동작 ────────────────────────────────────────────────
+    def _ask_api_key(self) -> bool:
+        """API 키가 없을 때 그 자리에서 받는 모달. True=저장됨."""
+        from PyQt6.QtWidgets import (
+            QDialog, QHBoxLayout as _H, QLineEdit, QRadioButton,
+            QVBoxLayout as _V)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("AI 열쇠(API 키) 넣기")
+        dlg.setStyleSheet(theme.BASE_QSS + f"QDialog{{background:{theme.BG}}}")
+        dlg.setFixedWidth(420)
+        lay = _V(dlg)
+        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setSpacing(10)
+        head = QLabel("무료 AI 키가 필요해요 (최초 1회)")
+        head.setStyleSheet(theme.DIALOG_HEADER)
+        lay.addWidget(head)
+        info = QLabel("글다듬기는 AI 서비스 키로 동작해요.\n"
+                      "아래 버튼으로 무료 키를 발급받아 붙여넣어 주세요.")
+        info.setWordWrap(True)
+        info.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
+        lay.addWidget(info)
+
+        prow = _H()
+        r_gem = QRadioButton("Gemini 키")
+        r_or = QRadioButton("OpenRouter 키")
+        (r_or if self.config.get("proof_provider") == "openrouter"
+         else r_gem).setChecked(True)
+        prow.addWidget(r_gem)
+        prow.addWidget(r_or)
+        prow.addStretch()
+        lay.addLayout(prow)
+
+        key_edit = QLineEdit()
+        key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        key_edit.setPlaceholderText("AIza… 또는 sk-or-… 키 붙여넣기")
+        lay.addWidget(key_edit)
+
+        link = QPushButton("무료 키 발급 페이지 열기")
+        link.setStyleSheet(theme.TEXT_BTN)
+        link.clicked.connect(lambda: __import__("webbrowser").open(
+            "https://openrouter.ai/keys" if r_or.isChecked()
+            else "https://aistudio.google.com/apikey"))
+        lay.addWidget(link, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        btns = _H()
+        btns.addStretch()
+        cancel = QPushButton("나중에")
+        cancel.setStyleSheet(theme.TEXT_BTN)
+        cancel.clicked.connect(dlg.reject)
+        btns.addWidget(cancel)
+        ok = QPushButton("저장")
+        ok.setStyleSheet(theme.PRIMARY_BTN)
+        ok.clicked.connect(dlg.accept)
+        btns.addWidget(ok)
+        lay.addLayout(btns)
+        key_edit.setFocus()
+
+        while True:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return False
+            key = key_edit.text().strip()
+            if key:
+                break
+            info.setText("키가 비어 있어요 — 발급받은 키를 붙여넣어 주세요.")
+        self.config["proof_provider"] = ("openrouter" if r_or.isChecked()
+                                         else "gemini")
+        self.config["proof_api_key"] = key
+        parent = self.parent()
+        base_dir = getattr(parent, "base_dir", None)
+        if base_dir:                       # 설정 파일에도 저장 (재시작 유지)
+            from parser import pipeline
+            pipeline.save_config(base_dir, self.config)
+        return True
+
     def _go(self) -> None:
         text = self.input_edit.toPlainText().strip()
         if not text:
             self.stack.setCurrentIndex(0)
             self.status.setText("다듬을 글을 먼저 입력해 주세요.")
             return
+        if not str(self.config.get("proof_api_key", "")).strip():
+            if not self._ask_api_key():    # 그 자리에서 키 입력 (2026-07-22)
+                self.status.setText("AI 키를 넣으면 바로 쓸 수 있어요.")
+                return
         self._set_loading(True)
         self.status.setText("")
         self._worker = _Worker(text, self.config, "formal", self)
