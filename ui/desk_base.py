@@ -283,14 +283,14 @@ class DeskWidgetBase(QWidget):
         return b
 
     def make_tray_button(self) -> QPushButton:
-        """헤더의 – 버튼 — 펭귄과 모든 위젯을 트레이로 보낸다."""
+        """헤더의 – 버튼 — 이 위젯 하나만 트레이로 최소화한다."""
         from PyQt6.QtCore import QSize
         from ui.icons import icon
         b = QPushButton()
         b.setIcon(icon("minimize", 14))
         b.setIconSize(QSize(14, 14))
-        b.setToolTip("트레이로 보내기 — 작업표시줄 트레이 아이콘을 "
-                     "클릭하면 다시 나타나요")
+        b.setToolTip("이 위젯 최소화 — 트레이 아이콘을 클릭하면 "
+                     "전부 다시 나타나요")
         b.setFixedSize(26, 22)
         b.setCursor(Qt.CursorShape.PointingHandCursor)
         b.setStyleSheet(
@@ -298,17 +298,15 @@ class DeskWidgetBase(QWidget):
             f"{theme.BORDER};border-radius:{theme.RADIUS_SM}px}}"
             f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
             f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
-        b.clicked.connect(self._send_app_to_tray)
+        b.clicked.connect(self._minimize_to_tray)
         return b
 
-    def _send_app_to_tray(self) -> None:
-        """펭귄 위젯의 send_to_tray를 부른다 (펭귄+위젯 전부 숨김)."""
-        w = getattr(QApplication.instance(), "_coolm_widget", None)
-        if w is not None and hasattr(w, "send_to_tray"):
-            w.send_to_tray()
-        else:                    # 비상용 — 최소한 이 위젯이라도 숨긴다
-            self._in_tray = True
-            self.hide()
+    def _minimize_to_tray(self) -> None:
+        """이 위젯만 숨긴다 — 복귀는 트레이 클릭이 전부 함께 되돌린다."""
+        self._in_tray = True
+        self.hide()
+        from ui.widget_base import show_tray_tip
+        show_tray_tip(QApplication.instance())
 
     def make_edit_button(self) -> QPushButton:
         """헤더에 놓는 🔧(렌치) 버튼 — 누르면 편집 모드 켜고 끄기.

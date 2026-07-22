@@ -29,6 +29,22 @@ def _desk_widgets_flat(app) -> list:
     return out
 
 
+def show_tray_tip(app) -> None:
+    """트레이로 처음 보낼 때 한 번만 안내 풍선 — 어디서 보내든 공유."""
+    tray = getattr(app, "_coolm_tray", None)
+    if tray is None or getattr(app, "_coolm_tray_tip_shown", False):
+        return
+    app._coolm_tray_tip_shown = True
+    try:
+        tray.showMessage(
+            "COOL-비서",
+            "트레이로 보냈어요.\n"
+            "이 아이콘을 클릭하면 전부 다시 나타납니다. 🐧",
+            tray.icon(), 4000)
+    except Exception:
+        pass
+
+
 class _UpdateChecker(QObject):
     found = pyqtSignal(dict)
 
@@ -256,29 +272,10 @@ class WidgetBase(QWidget):
         super().showEvent(ev)
 
     def send_to_tray(self) -> None:
-        """펭귄과 바탕화면 위젯 전부를 트레이로 보낸다 — 클릭으로 복귀."""
+        """펭귄만 트레이로 보낸다 (위젯은 각자 – 버튼으로). 복귀는 트레이 클릭."""
         self._in_tray = True
         self.hide()
-        app = QApplication.instance()
-        # 열려 있는 바탕화면 위젯(할일·주간·플래너·포스트잇)도 같이 숨김
-        for w in _desk_widgets_flat(app):
-            try:
-                if w.isVisible():
-                    w._in_tray = True
-                    w.hide()
-            except RuntimeError:
-                pass
-        tray = getattr(app, "_coolm_tray", None)
-        if tray is not None and not getattr(app, "_coolm_tray_tip_shown", False):
-            app._coolm_tray_tip_shown = True     # 안내 풍선은 세션당 1회
-            try:
-                tray.showMessage(
-                    "COOL-비서",
-                    "펭귄을 트레이로 보냈어요.\n"
-                    "이 아이콘을 클릭하면 다시 나타납니다. 🐧",
-                    tray.icon(), 4000)
-            except Exception:
-                pass
+        show_tray_tip(QApplication.instance())
 
     def on_events_changed(self) -> None:
         """일정 변경 후 후처리 — 서브클래스에서 뱃지 갱신 등에 사용."""

@@ -97,13 +97,18 @@ def main() -> None:
             return getattr(app, "_coolm_widget", None)
 
         def bring_back():
+            # 트레이 클릭 = 최소화했던 것 전부 복귀 (펭귄 + 위젯들)
             cur = _widget()
-            if cur is None:
-                return
-            cur.place_default()             # 화면 밖이어도 확실히 복귀
-            cur.show()
-            cur.raise_()
-            # 트레이로 같이 들어갔던 바탕화면 위젯들도 복귀
+            if cur is not None:
+                # 펭귄이 숨어 있거나 화면 밖일 때만 제자리로 (안 그러면
+                # 위젯만 최소화한 경우 펭귄이 괜히 튀지 않게 그대로 둔다)
+                scr = app.primaryScreen()
+                off = scr is not None and not \
+                    scr.availableGeometry().intersects(cur.frameGeometry())
+                if getattr(cur, "_in_tray", False) or not cur.isVisible() or off:
+                    cur.place_default()
+                    cur.show()
+                    cur.raise_()
             from ui.widget_base import _desk_widgets_flat
             for dw in _desk_widgets_flat(app):
                 try:
