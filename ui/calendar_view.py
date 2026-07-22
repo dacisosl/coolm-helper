@@ -132,12 +132,22 @@ class EventItemCard(QFrame):
         lay.addLayout(row)
         self._update_labels()
 
-        # ── 상세보기 (아코디언, 기본 접힘) ──
-        self.detail = QWidget()
+        # ── 상세보기 (아코디언, 기본 접힘) — 흰 패널 = 수정 중 표시 ──
+        self.detail = QFrame()
+        self.detail.setObjectName("editzone")
+        self.detail.setStyleSheet(
+            f"#editzone{{background:{theme.CARD};border:1.5px solid "
+            f"{theme.BORDER};border-radius:{theme.RADIUS_SM + 2}px}}")
         self.detail.setVisible(False)
         d = QVBoxLayout(self.detail)
-        d.setContentsMargins(0, 4, 0, 0)
+        d.setContentsMargins(8, 8, 8, 8)
         d.setSpacing(6)
+
+        if not full:
+            # 기본 모드에서도 제목은 그 자리에서 고칠 수 있게
+            self.title_edit = QLineEdit(event.title)
+            self.title_edit.setToolTip("제목")
+            d.addWidget(self.title_edit)
 
         if full:
             # 한 줄 바: 제목 / 날짜 / 시간 / 중요도 — 등록 창들과 같은 부품
@@ -237,10 +247,21 @@ class EventItemCard(QFrame):
 
     def _save(self) -> None:
         if not self.full:
-            # 기본 모드: 메모만 저장 (제목·일시는 그대로, 중요도는 칩으로 이미 반영)
-            self.store.update(self.event.id,
+            # 기본 모드: 제목·상세내용 저장 (일시는 그대로, 중요도는 칩으로)
+            title = self.title_edit.text().strip() or self.event.title
+            self.store.update(self.event.id, title=title,
                               memo=self.memo_edit.toPlainText())
+            if self.event.google_id and title != self.event.title:
+                try:
+                    from calendar_sync import google_sync
+                    google_sync.update_event(
+                        self.event.google_id, title, self.event.start_dt,
+                        self.event.end_dt, self.event.all_day)
+                except Exception:
+                    pass   # 구글 사본 갱신 실패는 로컬 저장을 막지 않는다
+            self.event.title = title
             self.event.memo = self.memo_edit.toPlainText()
+            self._update_labels()
             self.detail.setVisible(False)
             self.on_change(reload_day=False)
             return

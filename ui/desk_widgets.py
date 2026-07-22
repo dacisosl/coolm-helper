@@ -553,7 +553,7 @@ class _DayColumn(QFrame):
         flay.setContentsMargins(0, 0, 0, 0)
         flay.setSpacing(3)
         for e in events[:limit]:
-            flay.addWidget(_WeekField(e, owner.store, d, fpx))
+            flay.addWidget(_WeekField(e, owner.store, d, fpx, owner))
         lay.addWidget(fields)
         if len(events) > limit:
             more = QLabel(f"+{len(events) - limit}건 더")
@@ -568,11 +568,16 @@ class _DayColumn(QFrame):
 
 
 class _WeekField(_DragField):
-    """주간 열의 일정 필드 — ⠿ + '시간 ↵ 제목', 글씨가 잘리지 않는다."""
+    """주간 열의 일정 필드 — ⠿ + '시간 ↵ 제목', 글씨가 잘리지 않는다.
 
-    def __init__(self, event: Event, store: EventStore, d: date, fpx):
+    편집 모드에서는 할 일 보드처럼 제목이 입력칸으로 바뀌어 그 자리 수정.
+    """
+
+    def __init__(self, event: Event, store: EventStore, d: date, fpx,
+                 owner: "WeeklyWidget" = None):
         super().__init__(event, store)
         self.d = d
+        self.owner = owner
         fg, bg = theme.PRIORITY_COLORS.get(
             event.priority, theme.PRIORITY_COLORS["보통"])
         self.setStyleSheet(f"_WeekField{{background:{bg};border-radius:6px}}")
@@ -589,13 +594,28 @@ class _WeekField(_DragField):
             t.setStyleSheet(f"color:{fg};font-size:{fpx(8)}px;"
                             f"font-weight:bold;background:transparent")
             col.addWidget(t)
-        title = QLabel(event.title)
-        title.setWordWrap(True)
-        title.setMinimumWidth(10)   # 최소폭 주장 않기 — 열 너비에 맞춰 줄바꿈
-        title.setStyleSheet(f"color:{fg};font-size:{fpx(9)}px;"
-                            f"background:transparent")
-        col.addWidget(title)
+        if owner is not None and owner.edit_mode:
+            self.title_edit = QLineEdit(event.title)
+            self.title_edit.setMinimumWidth(10)   # 좁은 열에서도 안 넘치게
+            self.title_edit.setStyleSheet(
+                f"QLineEdit{{background:{theme.CARD_TINT};border:1px solid "
+                f"{theme.BORDER};border-radius:5px;padding:1px 4px;"
+                f"font-size:{fpx(9)}px;color:{theme.TEXT}}}")
+            self.title_edit.editingFinished.connect(self._save_title)
+            col.addWidget(self.title_edit)
+        else:
+            title = QLabel(event.title)
+            title.setWordWrap(True)
+            title.setMinimumWidth(10)   # 최소폭 주장 않기 — 열 너비 줄바꿈
+            title.setStyleSheet(f"color:{fg};font-size:{fpx(9)}px;"
+                                f"background:transparent")
+            col.addWidget(title)
         lay.addLayout(col, stretch=1)
+
+    def _save_title(self) -> None:
+        new = self.title_edit.text().strip()
+        if new and new != self.event.title:
+            self.store.update(self.event.id, title=new)
 
     def _clicked(self, ev) -> None:
         open_day_dialog(self.store, self.d)

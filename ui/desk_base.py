@@ -123,13 +123,13 @@ class DeskWidgetBase(QWidget):
         slider = QSlider(Qt.Orientation.Horizontal)
         slider.setRange(40, 100)
         slider.setValue(max(40, int(self.conf.get("opacity", 90))))
-        slider.setFixedHeight(18)
+        slider.setFixedSize(110, 18)   # 위젯 폭을 다 차지하지 않게 고정 폭
         slider.setToolTip("위젯 투명도")
         slider.valueChanged.connect(
             lambda v: self.setWindowOpacity(v / 100))          # 즉시 미리보기
         slider.sliderReleased.connect(
             lambda s=slider: self._set_opacity(s.value()))     # 놓으면 저장
-        lay.addWidget(slider, stretch=1)
+        lay.addWidget(slider)
         # 글씨 크기 — 'A−'/'A＋' 글자는 PC에 따라 안 보여서 SVG로 그린다
         from PyQt6.QtCore import QSize as _QSize
         from ui.icons import icon as _icon
@@ -152,6 +152,7 @@ class DeskWidgetBase(QWidget):
         self._font_label.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:10px;background:transparent")
         lay.addWidget(self._font_label)
+        lay.addStretch()               # 📌·✕는 오른쪽 끝으로
         # 📌 항상 위 고정 (토글) + ✕ 위젯 끄기
         from PyQt6.QtCore import QSize
         from ui.icons import icon
