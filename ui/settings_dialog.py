@@ -37,16 +37,10 @@ QFrame[scard="true"] {{
 """
 
 
-def _help_dot(tip: str) -> QLabel:
-    """제목 옆 ? 아이콘 — 마우스를 올리면 상세 설명."""
-    d = QLabel("?")
-    d.setFixedSize(16, 16)
-    d.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    d.setToolTip(tip)
-    d.setStyleSheet(
-        f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
-        f"border-radius:8px;font-size:11px;font-weight:bold")
-    return d
+def _help_dot(tip: str):
+    """제목 옆 ? 아이콘 — 누르면 설명 말풍선 (호버 툴팁 겸용)."""
+    from ui.help_dot import HelpDot
+    return HelpDot(tip)
 
 
 def _card(title: str, tip: str = "") -> tuple[QFrame, QVBoxLayout]:

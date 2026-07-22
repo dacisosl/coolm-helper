@@ -281,17 +281,45 @@ class _DragField(QFrame):
         g.setStyleSheet(
             f"color:{color};font-size:{size_px}px;background:transparent")
         g.setToolTip("잡고 위아래로 끌면 순서가 바뀌어요")
-        g.setCursor(Qt.CursorShape.SizeVerCursor)
+        g.setCursor(Qt.CursorShape.OpenHandCursor)   # 손바닥 = 잡을 수 있음
         return g
 
     def _clicked(self, ev) -> None:
         """그립 밖을 눌렀을 때 — 서브클래스에서 재정의."""
+
+    # ── 들어올리기 모션: 잡는 순간 그림자가 퍼지며 살짝 떠오른다 ──
+    def _lift(self) -> None:
+        from PyQt6.QtGui import QColor
+        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+        eff = QGraphicsDropShadowEffect(self)
+        eff.setColor(QColor(21, 101, 192, 90))   # PRIMARY_DARK 반투명
+        eff.setOffset(0, 5)                      # 아래 그림자 = 위로 뜬 느낌
+        eff.setBlurRadius(0)
+        self.setGraphicsEffect(eff)
+        self.raise_()                            # 형제 필드들 위로
+        self.setCursor(Qt.CursorShape.ClosedHandCursor)   # 쥔 손
+        if motion.is_enabled():
+            from PyQt6.QtCore import QEasingCurve, QPropertyAnimation
+            a = QPropertyAnimation(eff, b"blurRadius", self)
+            a.setDuration(140)
+            a.setStartValue(0.0)
+            a.setEndValue(16.0)
+            a.setEasingCurve(QEasingCurve.Type.OutCubic)
+            a.start()
+            self._lift_anim = a                  # GC 방지
+        else:
+            eff.setBlurRadius(16)
+
+    def _drop(self) -> None:
+        self.setGraphicsEffect(None)             # 놓으면 원래 자리로 가라앉음
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def mousePressEvent(self, ev):
         if ev.button() != Qt.MouseButton.LeftButton:
             return
         if ev.position().x() <= self.GRIP_W:
             self._dragging = True
+            self._lift()
         else:
             self._clicked(ev)
 
@@ -319,6 +347,7 @@ class _DragField(QFrame):
         if not self._dragging:
             return
         self._dragging = False
+        self._drop()
         lay = self.parentWidget().layout()
         orders = {}
         for i in range(lay.count()):

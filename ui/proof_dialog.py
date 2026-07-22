@@ -122,14 +122,8 @@ class ProofDialog(motion.FadeInMixin, QDialog):
             f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
             f"background:transparent")
         sub_row.addWidget(sub)
-        info = QLabel("?")
-        info.setFixedSize(16, 16)
-        info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info.setToolTip(_TIP)
-        info.setStyleSheet(
-            f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
-            f"border-radius:8px;font-size:{theme.FONT_XS}px;font-weight:bold")
-        sub_row.addWidget(info)
+        from ui.help_dot import HelpDot
+        sub_row.addWidget(HelpDot(_TIP))
         sub_row.addStretch()
         lay.addLayout(sub_row)
         lay.addSpacing(20)
