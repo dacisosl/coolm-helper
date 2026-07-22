@@ -9,8 +9,9 @@
 from __future__ import annotations
 
 import os
+import threading
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QMessageBox, QPushButton, QRadioButton, QSpinBox,
@@ -41,6 +42,23 @@ def _help_dot(tip: str):
     """제목 옆 ? 아이콘 — 누르면 설명 말풍선 (호버 툴팁 겸용)."""
     from ui.help_dot import HelpDot
     return HelpDot(tip)
+
+
+class _GoogleLoginWorker(QObject):
+    """구글 OAuth 로그인을 백그라운드에서 — 브라우저 로그인 동안 창이 안 굳게."""
+    done = pyqtSignal()
+    failed = pyqtSignal(str)
+
+    def start(self) -> None:
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self) -> None:
+        try:
+            from calendar_sync import google_sync
+            google_sync.ensure_login()
+            self.done.emit()
+        except Exception as e:
+            self.failed.emit(str(e))
 
 
 def _card(title: str, tip: str = "") -> tuple[QFrame, QVBoxLayout]:
@@ -243,51 +261,127 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                         else "https://openrouter.ai/settings/keys")
 
     # ── 구글 연동 ───────────────────────────────────────────
-    def _google_page(self) -> QWidget:
-        w, lay = self._page()
-        card, c = _card("저장 모드",
-                        "어느 모드든 구글로 나가는 정보는 사용자가 확인한\n"
-                        "일정 제목과 일시뿐입니다. 쪽지 원문은 나가지 않습니다.")
-        self.local_radio = QRadioButton("로컬 모드 (기본)")
-        self.local_radio.setToolTip("일정이 이 PC에만 저장됩니다.")
-        self.google_radio = QRadioButton("구글 연동 모드")
-        self.google_radio.setToolTip(
-            "등록 시 구글 캘린더에도 올릴 수 있습니다.\n"
-            "휴대폰에서 일정을 보고 싶은 분께 추천.")
-        if self.config.get("google_sync_enabled"):
-            self.google_radio.setChecked(True)
-        else:
-            self.local_radio.setChecked(True)
-        c.addWidget(self.local_radio)
-        c.addWidget(self.google_radio)
-
+    def _google_state(self) -> tuple[bool, bool]:
+        """(연동 준비됨 = 열쇠 파일·라이브러리, 구글 계정 로그인됨)"""
         try:
             from calendar_sync import google_sync
-            ready = google_sync.is_available()
-            token = os.path.exists(google_sync.TOKEN_PATH)
+            return (google_sync.is_available(),
+                    os.path.exists(google_sync.TOKEN_PATH))
         except Exception:
-            ready, token = False, False
-        status = ("✅ 연동 준비 완료" if ready else
-                  "구글 연동은 최초 1회 설정이 필요합니다")
-        if token:
-            status += " · 구글 계정 연결됨"
-        info = QLabel(status)
-        info.setWordWrap(True)
-        info.setStyleSheet(f"color:{theme.SUBTLE};font-size:12px;border:none")
-        c.addWidget(info)
+            return False, False
+
+    def _google_page(self) -> QWidget:
+        w, lay = self._page()
+        card, c = _card("구글 캘린더 연동",
+                        "연동하면 일정 등록 때 '구글에도 등록'을 고를 수 있어\n"
+                        "휴대폰에서도 일정이 보입니다. 구글로 나가는 정보는\n"
+                        "확인한 일정 제목과 일시뿐 — 쪽지 원문은 나가지 않아요.")
+        self._google_on = bool(self.config.get("google_sync_enabled"))
+
+        # 칩 버튼 하나로 연동/해제 — 누르면 구글 로그인 창이 바로 뜬다
+        self.google_chip = QPushButton()
+        self.google_chip.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.google_chip.clicked.connect(self._google_chip_clicked)
+        c.addWidget(self.google_chip, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        self.google_status = QLabel()
+        self.google_status.setWordWrap(True)
+        self.google_status.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:12px;border:none")
+        c.addWidget(self.google_status)
+
         row = QHBoxLayout()
         guide_btn = QPushButton("설정 안내 열기")
+        guide_btn.setToolTip("최초 1회 준비(열쇠 파일 만들기) 단계별 안내")
         guide_btn.clicked.connect(self._open_google_guide)
         row.addWidget(guide_btn)
-        if token:
-            unlink = QPushButton("연결 해제")
-            unlink.clicked.connect(self._unlink_google)
-            row.addWidget(unlink)
         row.addStretch()
         c.addLayout(row)
         lay.addWidget(card)
         lay.addStretch()
+        self._refresh_google_chip()
         return w
+
+    def _refresh_google_chip(self) -> None:
+        ready, token = self._google_state()
+        chip = self.google_chip
+        chip.setEnabled(True)
+        if self._google_on and token:
+            chip.setText("✓  구글 캘린더 연동됨")
+            chip.setStyleSheet(
+                f"QPushButton{{background:{theme.SUCCESS_BG};"
+                f"color:{theme.SUCCESS_FG};border:1.5px solid "
+                f"{theme.SUCCESS_BORDER};border-radius:16px;"
+                f"padding:7px 16px;font-weight:bold}}"
+                f"QPushButton:hover{{border-color:{theme.SUCCESS_FG}}}")
+            self.google_status.setText("칩을 누르면 연동이 해제됩니다.")
+        else:
+            chip.setText("🔗  구글 캘린더 연동하기")
+            chip.setStyleSheet(
+                f"QPushButton{{background:{theme.PRIMARY_LIGHT};"
+                f"color:{theme.PRIMARY_DARK};border:1.5px solid "
+                f"{theme.PRIMARY};border-radius:16px;"
+                f"padding:7px 16px;font-weight:bold}}"
+                f"QPushButton:hover{{background:{theme.PRIMARY};color:white}}"
+                f"QPushButton:pressed{{background:{theme.PRIMARY_DARK};"
+                f"color:white}}")
+            self.google_status.setText(
+                "누르면 구글 로그인 창이 열리고, 로그인하면 바로 연동됩니다."
+                if ready else
+                "최초 1회 준비가 필요해요 — 아래 '설정 안내 열기'를 따라\n"
+                "열쇠 파일(credentials.json)을 먼저 만들어 주세요.")
+
+    def _google_chip_clicked(self) -> None:
+        from parser import pipeline as _pl
+        ready, token = self._google_state()
+        if self._google_on and token:                     # 연동 해제
+            if QMessageBox.question(self, "확인",
+                                    "구글 캘린더 연동을 해제할까요?") \
+                    != QMessageBox.StandardButton.Yes:
+                return
+            self._unlink_google(quiet=True)
+            self._google_on = False
+            self.config["google_sync_enabled"] = False
+            _pl.save_config(self.base_dir, self.config)
+            self._refresh_google_chip()
+            return
+        if not ready:                                     # 열쇠 파일 없음
+            QMessageBox.information(
+                self, "준비가 필요해요",
+                "구글 연동은 최초 1회 준비(열쇠 파일 만들기)가 필요합니다.\n"
+                "지금 여는 안내 문서를 따라 준비한 뒤 다시 눌러주세요.")
+            self._open_google_guide()
+            return
+        if token:                                         # 이미 로그인됨 → 켜기만
+            self._google_on = True
+            self.config["google_sync_enabled"] = True
+            _pl.save_config(self.base_dir, self.config)
+            self._refresh_google_chip()
+            return
+        # 로그인 필요 → 브라우저 열고 백그라운드 대기
+        self.google_chip.setEnabled(False)
+        self.google_chip.setText("브라우저에서 구글 로그인 중…")
+        self.google_status.setText(
+            "브라우저 창에서 로그인해 주세요. 로그인하면 자동으로 이어집니다.")
+        self._login_worker = _GoogleLoginWorker(self)
+        self._login_worker.done.connect(self._google_login_done)
+        self._login_worker.failed.connect(self._google_login_failed)
+        self._login_worker.start()
+
+    def _google_login_done(self) -> None:
+        from parser import pipeline as _pl
+        self._google_on = True
+        self.config["google_sync_enabled"] = True
+        _pl.save_config(self.base_dir, self.config)
+        self._refresh_google_chip()
+        from ui.toast import show_toast
+        show_toast(self, "구글 캘린더와 연동됐어요")
+
+    def _google_login_failed(self, err: str) -> None:
+        self._refresh_google_chip()
+        QMessageBox.warning(
+            self, "연동 실패",
+            f"구글 로그인이 완료되지 않았습니다.\n{err}")
 
     # ── 데이터 ──────────────────────────────────────────────
     def _data_page(self) -> QWidget:
@@ -381,12 +475,14 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                 return
         QMessageBox.information(self, "안내", "설정 안내 파일을 찾지 못했습니다.")
 
-    def _unlink_google(self) -> None:
+    def _unlink_google(self, quiet: bool = False) -> None:
         try:
             from calendar_sync import google_sync
             if os.path.exists(google_sync.TOKEN_PATH):
                 os.remove(google_sync.TOKEN_PATH)
-            QMessageBox.information(self, "완료", "구글 계정 연결을 해제했습니다.")
+            if not quiet:
+                QMessageBox.information(self, "완료",
+                                        "구글 계정 연결을 해제했습니다.")
         except Exception as e:
             QMessageBox.warning(self, "오류", str(e))
 
@@ -444,7 +540,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             pass                # Windows 밖(테스트 환경 등)
         except OSError as e:
             QMessageBox.warning(self, "자동 시작", f"설정하지 못했습니다.\n{e}")
-        self.config["google_sync_enabled"] = self.google_radio.isChecked()
+        self.config["google_sync_enabled"] = self._google_on
         self.config["recent_count"] = self.count_spin.value()
         self.config["demo_mode"] = self.demo_cb.isChecked()
         self.config["auto_update_check"] = self.auto_update_cb.isChecked()

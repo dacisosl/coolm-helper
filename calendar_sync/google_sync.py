@@ -55,6 +55,14 @@ def _service():
     return build("calendar", "v3", credentials=creds)
 
 
+def ensure_login() -> None:
+    """OAuth 로그인만 미리 수행해 토큰을 만든다 (설정 창 연동 칩용).
+
+    이벤트는 만들지 않는다 — 로그인 성공 여부만 확인.
+    """
+    _service()
+
+
 def register_event(title: str, start: datetime, end: datetime | None,
                    all_day: bool) -> str:
     """마스킹·확인된 제목과 일시만으로 구글 캘린더 이벤트를 만든다.
