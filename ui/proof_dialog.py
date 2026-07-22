@@ -259,10 +259,21 @@ class ProofDialog(motion.FadeInMixin, QDialog):
             f"font-weight:bold;background:transparent")
         rhead.addWidget(self.tone_label)
         rhead.addStretch()
-        copy_btn = QPushButton("복사")
+        # 복사 = 이 화면의 주인공 버튼 — 아이콘 + 채운 네이비로 강조
+        from PyQt6.QtCore import QSize
+        from ui.icons import icon
+        copy_btn = QPushButton(" 복사하기")
+        copy_btn.setIcon(icon("copy", 15))
+        copy_btn.setIconSize(QSize(15, 15))
         copy_btn.setStyleSheet(
-            theme.TEXT_BTN + f"QPushButton{{font-size:{theme.FONT_XS}px}}")
+            f"QPushButton{{background:{theme.PRIMARY};color:white;border:none;"
+            f"border-radius:{theme.RADIUS_MD}px;padding:7px 16px;"
+            f"font-size:{theme.FONT_SM}px;font-weight:bold}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_DARK}}}"
+            f"QPushButton:pressed{{background:{theme.PRIMARY_PRESSED};"
+            f"padding:8px 16px 6px 16px}}")
         copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        copy_btn.setToolTip("다듬은 글을 클립보드로 복사")
         copy_btn.clicked.connect(self._copy)
         rhead.addWidget(copy_btn)
         rc.addLayout(rhead)

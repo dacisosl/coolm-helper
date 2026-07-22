@@ -59,6 +59,10 @@ _PATHS = {
     # ★ 즐겨찾기 (노랑)
     "star": ('<path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 '
              '2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="#f5a623"/>'),
+    # 📄 복사 (흰색, content_copy 모양 — 파란 버튼 위용)
+    "copy": ('<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0'
+             '-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2'
+             '-2-2zm0 16H8V7h11v14z" fill="#ffffff"/>'),
     # A− 글씨 작게 (작은 A + −) — 글꼴에 없는 문자 대신 직접 그린다
     "font_minus": ('<g fill="none" stroke="#78859a" stroke-width="2" '
                    'stroke-linecap="round" stroke-linejoin="round">'
