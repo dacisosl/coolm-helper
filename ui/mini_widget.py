@@ -131,6 +131,18 @@ class MiniWidget(WidgetBase):
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(screen.right() - self.WIDTH, screen.center().y() - 27)
 
+    def _ensure_on_screen(self) -> None:
+        """해상도가 바뀌면 새 화면의 오른쪽 벽에 다시 도킹 (실종 방지)."""
+        scr = QApplication.primaryScreen()
+        if scr is None:
+            return
+        g = scr.availableGeometry()
+        y = min(max(g.top(), self.y()), g.bottom() - self.height())
+        self.move(g.right() - self.WIDTH, y)
+        if not self.isVisible():
+            self.show()
+        self.raise_()
+
     def _open_bar(self) -> None:
         # 빠르게 두 번 열리면(=더블클릭이 팝업에 먹힌 경우) ⚡로 보낸다
         import time

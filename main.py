@@ -89,6 +89,39 @@ def main() -> None:
     w.place_default()
     w.show()
     app._coolm_widget = w                   # 스타일 전환 시 참조 유지
+
+    # 작업표시줄 트레이 아이콘 — 펭귄이 안 보일 때 여기서 꺼낸다
+    from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
+    if QSystemTrayIcon.isSystemTrayAvailable():
+        def _widget():
+            return getattr(app, "_coolm_widget", None)
+
+        def bring_back():
+            cur = _widget()
+            if cur is None:
+                return
+            cur.place_default()             # 화면 밖이어도 확실히 복귀
+            cur.show()
+            cur.raise_()
+
+        tray = QSystemTrayIcon(app.windowIcon(), app)
+        tray.setToolTip("COOL-비서 — 펭귄 꺼내기")
+        menu = QMenu()
+        menu.addAction("🐧 펭귄 다시 보이기", bring_back)
+        menu.addAction("🗓 캘린더 열기",
+                       lambda: _widget() and _widget().open_calendar())
+        menu.addAction("⚙ 설정",
+                       lambda: _widget() and _widget().open_settings())
+        menu.addSeparator()
+        menu.addAction("종료", app.quit)
+        tray.setContextMenu(menu)
+        tray.activated.connect(
+            lambda r: bring_back()
+            if r == QSystemTrayIcon.ActivationReason.Trigger else None)
+        tray.show()
+        app._coolm_tray = tray              # GC 방지
+        app._coolm_tray_menu = menu
+
     sys.exit(app.exec())
 
 

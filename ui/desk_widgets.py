@@ -437,6 +437,7 @@ class _TodoRow(_DragField):
 
 
 class SimpleTodoWidget(DeskWidgetBase):
+    BASE_H = 250   # 기본 배치 높이 — 글씨 자동 배율 기준
     """할 일 보드 — 주간 일정표 같은 3열 레이아웃.
 
     왼쪽 = 지난(밀린) 일, 가운데 = 오늘 할 일, 오른쪽 = 앞으로 할 일.
@@ -529,6 +530,7 @@ class SimpleTodoWidget(DeskWidgetBase):
 
 # ── ①-b 오늘 할 일 (단일 목록 투두) ──────────────────────────
 class TodayTodoWidget(DeskWidgetBase):
+    BASE_H = 300
     """오늘 일정만 한 줄씩 — 체크하며 지우는 투두리스트 (v1.5.0).
 
     할 일 보드의 '오늘' 열 하나만 떼어낸 가장 단순한 위젯.
@@ -703,6 +705,7 @@ class _WeekField(_DragField):
 
 
 class WeeklyWidget(DeskWidgetBase):
+    BASE_H = 240
     """이번 주(월~금 + 접힌 토·일) 보기."""
 
     MIN_W, MIN_H = 360, 170
@@ -775,6 +778,7 @@ class WeeklyWidget(DeskWidgetBase):
 
 # ── ③ 캘린더 · 할일 (달력 위젯 단일 창구) ────────────────────
 class PlannerWidget(DeskWidgetBase):
+    BASE_H = 520
     """달력 + 선택한 날짜의 일정 목록이 한 위젯에.
 
     날짜를 클릭하면 아래 목록이 바뀌고, 일정을 클릭하면 그 자리에서

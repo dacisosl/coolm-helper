@@ -65,6 +65,38 @@ class WidgetBase(QWidget):
         QTimer.singleShot(2500, self._show_startup_alerts)   # 세션당 1회
         # ⚡ 간편 등록이 첫 클릭부터 빠르도록 UIA를 백그라운드에서 미리 초기화
         threading.Thread(target=self._warmup_capture, daemon=True).start()
+        # 해상도·모니터 변경(프로젝터 연결 등) 시 화면 밖으로 사라지지 않게
+        self._watch_screen()
+
+    # ── 해상도 변경 감시 ─────────────────────────────────────
+    def _watch_screen(self) -> None:
+        app = QApplication.instance()
+        app.primaryScreenChanged.connect(self._on_screen_event)
+        scr = app.primaryScreen()
+        if scr is not None:
+            scr.availableGeometryChanged.connect(self._on_screen_event)
+
+    def _on_screen_event(self, *_args) -> None:
+        # 해상도 전환 직후는 좌표가 요동치므로 잠깐 기다렸다 확인
+        QTimer.singleShot(500, self._ensure_on_screen)
+        scr = QApplication.primaryScreen()
+        if scr is not None:               # 새 주 모니터도 계속 감시
+            try:
+                scr.availableGeometryChanged.connect(
+                    self._on_screen_event, Qt.ConnectionType.UniqueConnection)
+            except TypeError:
+                pass                      # 이미 연결됨
+
+    def _ensure_on_screen(self) -> None:
+        """화면 밖으로 밀려났으면 기본 위치로 되돌린다 (펭귄 실종 방지)."""
+        scr = QApplication.primaryScreen()
+        if scr is None:
+            return
+        if not scr.availableGeometry().intersects(self.frameGeometry()):
+            self.place_default()
+        if not self.isVisible():
+            self.show()
+        self.raise_()
 
     def _warmup_capture(self) -> None:
         import os

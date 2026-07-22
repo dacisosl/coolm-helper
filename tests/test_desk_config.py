@@ -189,3 +189,16 @@ class TestSections(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAutoFontFactor(unittest.TestCase):
+    """크기 연동 글씨 자동 배율 — 계단식 스냅 (v1.5.4)."""
+
+    def test_snap_steps(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from ui.desk_base import auto_font_factor
+        self.assertEqual(auto_font_factor(175, 250), 0.85)   # 0.7배 → 최소단계
+        self.assertEqual(auto_font_factor(250, 250), 1.0)
+        self.assertEqual(auto_font_factor(305, 250), 1.15)   # 1.22배 → 1.15
+        self.assertEqual(auto_font_factor(500, 250), 1.3)    # 2배 → 최대단계
+        self.assertEqual(auto_font_factor(300, 0), 1.0)      # 방어
