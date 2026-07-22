@@ -9,7 +9,7 @@ from datetime import date
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QFrame, QLabel, QVBoxLayout, QWidget,
+    QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
 )
 
 from store.event_store import EventStore
