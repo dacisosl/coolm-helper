@@ -17,6 +17,34 @@ from ui.calendar_view import CalendarWindow
 from ui.review_dialog import ReviewDialog
 
 
+def _desk_widgets_flat(app) -> list:
+    """데스크 레지스트리의 모든 위젯 (notes는 {id: 위젯} dict라 평탄화)."""
+    reg = getattr(app, "_coolm_desk", None) or {}
+    out = []
+    for k, v in reg.items():
+        if k == "notes":
+            out.extend(w for w in dict(v).values() if w is not None)
+        elif v is not None:
+            out.append(v)
+    return out
+
+
+def show_tray_tip(app) -> None:
+    """트레이로 처음 보낼 때 한 번만 안내 풍선 — 어디서 보내든 공유."""
+    tray = getattr(app, "_coolm_tray", None)
+    if tray is None or getattr(app, "_coolm_tray_tip_shown", False):
+        return
+    app._coolm_tray_tip_shown = True
+    try:
+        tray.showMessage(
+            "COOL-비서",
+            "트레이로 보냈어요.\n"
+            "이 아이콘을 클릭하면 전부 다시 나타납니다. 🐧",
+            tray.icon(), 4000)
+    except Exception:
+        pass
+
+
 class _UpdateChecker(QObject):
     found = pyqtSignal(dict)
 
@@ -60,6 +88,7 @@ class WidgetBase(QWidget):
                 pass
         self.cal_win: CalendarWindow | None = None
         self._drag: QPoint | None = None
+        app._coolm_widget = self     # 트레이·위젯 – 버튼이 참조 (스왑 시 갱신)
         QTimer.singleShot(2000, self._auto_update_check)
         QTimer.singleShot(300, self.ensure_desk_widgets)
         QTimer.singleShot(2500, self._show_startup_alerts)   # 세션당 1회
@@ -243,21 +272,10 @@ class WidgetBase(QWidget):
         super().showEvent(ev)
 
     def send_to_tray(self) -> None:
-        """펭귄(위젯)을 숨기고 트레이로 보낸다 — 트레이 클릭으로 복귀."""
+        """펭귄만 트레이로 보낸다 (위젯은 각자 – 버튼으로). 복귀는 트레이 클릭."""
         self._in_tray = True
         self.hide()
-        app = QApplication.instance()
-        tray = getattr(app, "_coolm_tray", None)
-        if tray is not None and not getattr(app, "_coolm_tray_tip_shown", False):
-            app._coolm_tray_tip_shown = True     # 안내 풍선은 세션당 1회
-            try:
-                tray.showMessage(
-                    "COOL-비서",
-                    "펭귄을 트레이로 보냈어요.\n"
-                    "이 아이콘을 클릭하면 다시 나타납니다. 🐧",
-                    tray.icon(), 4000)
-            except Exception:
-                pass
+        show_tray_tip(QApplication.instance())
 
     def on_events_changed(self) -> None:
         """일정 변경 후 후처리 — 서브클래스에서 뱃지 갱신 등에 사용."""

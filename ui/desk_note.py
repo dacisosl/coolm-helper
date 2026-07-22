@@ -52,6 +52,7 @@ class PostItWidget(DeskWidgetBase):
         self.when_label = QLabel()
         head.addWidget(self.when_label)
         head.addStretch()
+        head.addWidget(self.make_tray_button())   # – 트레이로 보내기 (v1.6)
         head.addWidget(self.make_edit_button())
         close_btn = QPushButton("✕")
         close_btn.setToolTip("포스트잇 내리기 (일정은 그대로 남아요)")

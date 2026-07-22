@@ -240,6 +240,7 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
         f"background:transparent")
     head.addWidget(title)
     head.addStretch()
+    head.addWidget(widget.make_tray_button())   # – 트레이로 보내기 (v1.6)
     head.addWidget(widget.make_edit_button())
     root.addLayout(head)
     root.addWidget(widget.build_edit_bar())
