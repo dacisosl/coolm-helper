@@ -1,5 +1,5 @@
 {
-  "version": "1.5.2",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.5.2/CoolmHelper-Setup.exe",
-  "notes": "휠로 달력 넘어가던 것도 껐어요\r\n\r\n- 위젯 우하단의 점점(⋱)이 보이기만 하고 잡히지 않던 문제를 고쳤어요. 이제 점점을 잡고 끌면 바로 크기가 조절됩니다.\r\n- 캘린더·할 일 위젯에서 마우스 휠에 달력 월이 휙휙 넘어가던 것을 껐어요. 월 이동은 ◀ ▶ 버튼으로만 됩니다.\r\n- 설정 → 일반에 '메뉴 크기'가 생겼어요 — 펭귄 메뉴 아이콘을 '크게'로 바꿀 수 있습니다."
+  "version": "1.5.3",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.5.3/CoolmHelper-Setup.exe",
+  "notes": "헤더가 더 깔끔해졌어요\r\n\r\n- 캘린더·할 일 위젯 헤더(공구 버튼 옆)에 상세보기(☰) 버튼이 생겼어요. 편집 모드에 들어가지 않아도 아래 일정 목록을 바로 접었다 폈다 할 수 있습니다.\r\n- 위젯 헤더의 📌 고정 버튼은 뺐어요 — 항상 위 고정은 위젯 우클릭 메뉴에서 하면 됩니다."
 }
