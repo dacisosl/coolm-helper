@@ -46,6 +46,10 @@ from PyQt6.QtWidgets import QApplication
 def main() -> None:
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)    # 캘린더 창 닫아도 위젯은 유지
+    # 시스템 팝업(QMessageBox·QMenu)만 앱 팔레트로 — 스코프 스타일이라
+    # 반투명 위젯 배경은 건드리지 않는다 (theme.SYSTEM_QSS 주석 참고).
+    from ui import theme
+    app.setStyleSheet(theme.SYSTEM_QSS)
 
     # 앱 아이콘 (작업표시줄·창 제목) — 펭귄
     from PyQt6.QtGui import QIcon

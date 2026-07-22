@@ -227,7 +227,7 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
     card.setObjectName("deskcard")
     card.setStyleSheet(
         theme.BASE_QSS + extra_qss
-        + f"#deskcard{{background:{theme.BG};border-radius:14px;"
+        + f"#deskcard{{background:{theme.CARD};border-radius:{theme.RADIUS_XL}px;"
           f"border:1px solid {theme.BORDER}}}")
     outer.addWidget(card)
     root = QVBoxLayout(card)
@@ -373,7 +373,7 @@ class _TodoRow(_DragField):
         fpx = owner.font_px
         fg, bg = theme.PRIORITY_COLORS.get(
             event.priority, theme.PRIORITY_COLORS["보통"])
-        self.setStyleSheet(f"_TodoRow{{background:{bg};border-radius:6px}}")
+        self.setStyleSheet(f"_TodoRow{{background:{bg};border-radius:{theme.RADIUS_SM}px}}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(3, 2, 6, 2)
@@ -538,12 +538,11 @@ class _DayColumn(QFrame):
         has_events = bool(owner.store.on_date(d))
         # 주말(접힌 열)에 일정이 있으면 강조해서 놓치지 않게 한다
         weekend_accent = slim and has_events
-        # '오늘'은 시그니처 쿨쿠리 오렌지
+        # '오늘'은 시그니처 오렌지, 주말+일정은 연네이비(보라 폐기)
         bg = (theme.SIGNATURE_BG if today
-              else theme.ACCENT_BG if weekend_accent else theme.CARD)
-        border = theme.ACCENT if weekend_accent else "transparent"
+              else theme.PRIMARY_LIGHT if weekend_accent else theme.CARD)
         self.setStyleSheet(
-            f"_DayColumn{{background:{bg};border:1.5px solid {border};"
+            f"_DayColumn{{background:{bg};border:none;"
             f"border-radius:{theme.RADIUS_MD}px}}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QVBoxLayout(self)
@@ -595,7 +594,7 @@ class _WeekField(_DragField):
         self.owner = owner
         fg, bg = theme.PRIORITY_COLORS.get(
             event.priority, theme.PRIORITY_COLORS["보통"])
-        self.setStyleSheet(f"_WeekField{{background:{bg};border-radius:6px}}")
+        self.setStyleSheet(f"_WeekField{{background:{bg};border-radius:{theme.RADIUS_SM}px}}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(3, 2, 6, 2)

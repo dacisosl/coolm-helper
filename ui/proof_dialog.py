@@ -2,8 +2,8 @@
 """안내문구 보정 창 — 붙여넣은 글을 AI로 다듬는다 (공개용 글 전용).
 
 쪽지 자동 불러오기 없음. 입력창에 직접 붙여넣은 텍스트만 전송된다.
-디자인(2026-07-21 v3, 'Reword' 레퍼런스): 2화면 전환 구조 —
-① 입력: 그라데이션 헤드라인 + 유리 카드 입력 + 검정 CTA (톤은 격식·명확 고정)
+디자인(2026-07-22 v1.3, 프리미엄 신뢰 무드): 2화면 전환 구조 —
+① 입력: 단색 네이비 헤드라인 + 무테 입력 카드 + 네이비 CTA (톤은 격식·명확 고정)
 ② 결과: ← 다시 작성하기 / 원본 요약 / 제안 카드(타이핑 효과) / 🔄 다른 버전
 복사하면 토스트. 창을 늘려도 내용은 가운데 열(최대 560px)에 머문다.
 """
@@ -24,18 +24,6 @@ from ui import motion, theme
 _TIP = ("공개용 글 전용 — 붙여넣은 내용은 AI 서버(Gemini/OpenRouter)로 "
         "전송돼요.\n개인정보가 들어간 글은 넣지 마세요. "
         "쪽지는 자동으로 불러오지 않아요.")
-
-def _gradient_html(text: str, c1=(79, 70, 229), c2=(236, 72, 153)) -> str:
-    """글자별 색 보간으로 그라데이션 텍스트 흉내 (인디고→핑크)."""
-    n = max(len(text) - 1, 1)
-    out = []
-    for i, ch in enumerate(text):
-        r = int(c1[0] + (c2[0] - c1[0]) * i / n)
-        g = int(c1[1] + (c2[1] - c1[1]) * i / n)
-        b = int(c1[2] + (c2[2] - c1[2]) * i / n)
-        out.append(f'<span style="color:#{r:02x}{g:02x}{b:02x}">{ch}</span>')
-    return "".join(out)
-
 
 class _PromptEdit(QTextEdit):
     """Enter=보내기, Shift+Enter=줄바꿈."""
@@ -109,10 +97,11 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         lay.addSpacing(28)
 
         head = QLabel(
-            f'어떤 안내 글이든<br>{_gradient_html("세련되게")} 바꿔드려요.')
+            f'어떤 안내 글이든<br>'
+            f'<span style="color:{theme.PRIMARY_DARK}">세련되게</span> 바꿔드려요.')
         head.setTextFormat(Qt.TextFormat.RichText)
         head.setStyleSheet(
-            f"font-size:26px;font-weight:bold;color:{theme.TEXT};"
+            f"font-size:{theme.FONT_HERO}px;font-weight:bold;color:{theme.TEXT};"
             f"background:transparent;line-height:130%")
         lay.addWidget(head)
         lay.addSpacing(8)
@@ -132,8 +121,8 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         card = QFrame()
         card.setObjectName("incard")
         card.setStyleSheet(
-            f"#incard{{background:{theme.CARD};border:1px solid {theme.BORDER};"
-            f"border-radius:24px}}")
+            f"#incard{{background:{theme.CARD};border:none;"
+            f"border-radius:{theme.RADIUS_XL}px}}")
         card.setGraphicsEffect(theme.make_shadow(self, 1))
         cl = QVBoxLayout(card)
         cl.setContentsMargins(20, 14, 14, 10)
@@ -181,17 +170,18 @@ class ProofDialog(motion.FadeInMixin, QDialog):
 
         lay.addSpacing(22)
 
-        # CTA: 검정 풀폭 버튼
-        self.go_btn = QPushButton("글 다듬기  ✨")
+        # CTA: 네이비 풀폭 버튼 (앱 주요 버튼과 통일)
+        self.go_btn = QPushButton("글 다듬기")
         self.go_btn.setFixedHeight(52)
         self.go_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.go_btn.setToolTip("Enter로도 보낼 수 있어요 (Shift+Enter는 줄바꿈)")
         self.go_btn.setStyleSheet(
-            f"QPushButton{{background:{theme.TEXT};color:white;border:none;"
-            f"border-radius:16px;font-size:{theme.FONT_LG}px;font-weight:bold}}"
-            f"QPushButton:hover{{background:#000000}}"
-            f"QPushButton:pressed{{background:#000000;padding-top:2px}}"
-            f"QPushButton:disabled{{background:{theme.SUBTLE}}}")
+            f"QPushButton{{background:{theme.PRIMARY};color:white;border:none;"
+            f"border-radius:{theme.RADIUS_LG}px;font-size:{theme.FONT_LG}px;"
+            f"font-weight:bold}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_DARK}}}"
+            f"QPushButton:pressed{{background:{theme.PRIMARY_PRESSED};padding-top:2px}}"
+            f"QPushButton:disabled{{background:{theme.DISABLED_BG}}}")
         self.go_btn.clicked.connect(self._go)
         lay.addWidget(self.go_btn)
 
@@ -240,7 +230,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         # 원본 요약 카드
         orig = QFrame()
         orig.setStyleSheet(
-            f"QFrame{{background:{theme.BG};border:1px solid {theme.BORDER};"
+            f"QFrame{{background:{theme.CARD_TINT};border:none;"
             f"border-radius:{theme.RADIUS_LG}px}}")
         ol = QVBoxLayout(orig)
         ol.setContentsMargins(16, 10, 16, 12)
@@ -263,8 +253,8 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         self.result_card = QFrame()
         self.result_card.setObjectName("rcard")
         self.result_card.setStyleSheet(
-            f"#rcard{{background:{theme.CARD};border:1px solid {theme.BORDER};"
-            f"border-radius:24px}}")
+            f"#rcard{{background:{theme.CARD};border:none;"
+            f"border-radius:{theme.RADIUS_XL}px}}")
         self.result_card.setGraphicsEffect(theme.make_shadow(self, 1))
         rc = QVBoxLayout(self.result_card)
         rc.setContentsMargins(20, 14, 16, 16)

@@ -133,8 +133,8 @@ class EventItemCard(QFrame):
         self.detail = QFrame()
         self.detail.setObjectName("editzone")
         self.detail.setStyleSheet(
-            f"#editzone{{background:{theme.CARD};border:1.5px solid "
-            f"{theme.BORDER};border-radius:{theme.RADIUS_SM + 2}px}}")
+            f"#editzone{{background:{theme.CARD_TINT};border:1px solid "
+            f"{theme.BORDER};border-radius:{theme.RADIUS_MD}px}}")
         self.detail.setVisible(False)
         d = QVBoxLayout(self.detail)
         d.setContentsMargins(8, 8, 8, 8)
@@ -370,8 +370,8 @@ class CalendarWindow(QWidget):
         card.setObjectName("calcard")
         card.setStyleSheet(
             theme.BASE_QSS + theme.CALENDAR_QSS
-            + f"#calcard{{background:{theme.BG};border-radius:{theme.RADIUS_LG}px;"
-              f"border:1px solid {theme.BORDER}}}")
+            + f"#calcard{{background:{theme.BG};"
+              f"border-radius:{theme.RADIUS_XL}px;border:none}}")
         card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
         root = QVBoxLayout(card)
@@ -413,7 +413,8 @@ class CalendarWindow(QWidget):
         # 왼쪽: 달력 카드
         cal_card = QFrame()
         cal_card.setStyleSheet(
-            f"QFrame{{background:{theme.CARD};border-radius:14px}}")
+            f"QFrame{{background:{theme.CARD};"
+            f"border-radius:{theme.RADIUS_LG}px}}")
         cl = QVBoxLayout(cal_card)
         cl.setContentsMargins(10, 10, 10, 10)
         self.cal = EventCalendar()

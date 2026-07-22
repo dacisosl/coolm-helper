@@ -25,16 +25,17 @@ from version import APP_VERSION
 
 _SETTINGS_QSS = f"""
 QListWidget#side {{
-    background:{theme.BG}; border:none; border-radius:12px;
-    padding:6px; font-size:13px; outline:0; }}
+    background:{theme.BG}; border:none; border-radius:{theme.RADIUS_LG}px;
+    padding:6px; font-size:{theme.FONT_MD}px; outline:0; }}
 QListWidget#side::item {{
-    padding:10px 12px; border-radius:9px; margin:2px 0; color:{theme.TEXT}; }}
+    padding:10px 12px; border-radius:{theme.RADIUS_MD}px; margin:2px 0;
+    color:{theme.TEXT}; }}
 QListWidget#side::item:hover {{ background:{theme.PRIMARY_LIGHT}; }}
 QListWidget#side::item:selected {{
     background:{theme.PRIMARY}; color:white; font-weight:bold; }}
 QFrame[scard="true"] {{
-    background:{theme.CARD}; border:1px solid {theme.BORDER};
-    border-radius:12px; }}
+    background:{theme.CARD}; border:1px solid {theme.BORDER_SUBTLE};
+    border-radius:{theme.RADIUS_LG}px; }}
 """
 
 
@@ -166,7 +167,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
                 f"QPushButton{{background:{theme.CARD_TINT};color:{theme.SUBTLE};"
-                f"border:1px solid {theme.BORDER};border-radius:15px;"
+                f"border:1px solid {theme.BORDER};border-radius:{theme.RADIUS_LG}px;"
                 f"padding:6px 16px;font-weight:bold}}"
                 f"QPushButton:hover{{border-color:{theme.PRIMARY}}}"
                 f"QPushButton:checked{{background:{theme.PRIMARY};color:white;"
@@ -338,7 +339,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             chip.setStyleSheet(
                 f"QPushButton{{background:{theme.SUCCESS_BG};"
                 f"color:{theme.SUCCESS_FG};border:1.5px solid "
-                f"{theme.SUCCESS_BORDER};border-radius:16px;"
+                f"{theme.SUCCESS_BORDER};border-radius:{theme.RADIUS_LG}px;"
                 f"padding:7px 16px;font-weight:bold}}"
                 f"QPushButton:hover{{border-color:{theme.SUCCESS_FG}}}")
             self.google_status.setText("칩을 누르면 연동이 해제됩니다.")
@@ -347,7 +348,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             chip.setStyleSheet(
                 f"QPushButton{{background:{theme.PRIMARY_LIGHT};"
                 f"color:{theme.PRIMARY_DARK};border:1.5px solid "
-                f"{theme.PRIMARY};border-radius:16px;"
+                f"{theme.PRIMARY};border-radius:{theme.RADIUS_LG}px;"
                 f"padding:7px 16px;font-weight:bold}}"
                 f"QPushButton:hover{{background:{theme.PRIMARY};color:white}}"
                 f"QPushButton:pressed{{background:{theme.PRIMARY_DARK};"

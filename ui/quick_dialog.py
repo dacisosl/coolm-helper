@@ -81,7 +81,8 @@ class QuickDialog(QDialog):
         self.status.setWordWrap(True)
         self.status.setStyleSheet(
             f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
-            f"border-radius:8px;padding:7px;font-size:11px")
+            f"border-radius:{theme.RADIUS_MD}px;padding:8px;"
+            f"font-size:{theme.FONT_XS}px")
         srow.addWidget(self.status, stretch=1)
         lay.addLayout(srow)
 

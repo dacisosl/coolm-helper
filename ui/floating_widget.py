@@ -26,8 +26,8 @@ class FloatingWidget(WidgetBase):
         card = QFrame()
         card.setObjectName("card")
         card.setStyleSheet(
-            f"#card{{background:{theme.CARD};border-radius:{theme.RADIUS_LG}px;"
-            f"border:1px solid {theme.BORDER}}}"
+            f"#card{{background:{theme.CARD};border-radius:{theme.RADIUS_XL}px;"
+            f"border:none}}"
             f"QLabel{{background:transparent;font-family:'Malgun Gothic'}}")
         card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
@@ -46,7 +46,8 @@ class FloatingWidget(WidgetBase):
         gear.setIcon(icon("gear", 18))
         gear.setFixedSize(26, 26)
         gear.setStyleSheet(
-            "QPushButton{background:transparent;border:none;border-radius:6px}"
+            f"QPushButton{{background:transparent;border:none;"
+            f"border-radius:{theme.RADIUS_SM}px}}"
             f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
             f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
         gear.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -57,15 +58,18 @@ class FloatingWidget(WidgetBase):
 
         self.today_label = QLabel()
         self.today_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # '오늘 일정'은 오늘 강조 — 시그니처 오렌지 알약
         self.today_label.setStyleSheet(
-            f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
-            f"border-radius:9px;padding:5px;font-size:12px;font-weight:bold")
+            f"background:{theme.SIGNATURE_BG};color:{theme.SIGNATURE_DARK};"
+            f"border-radius:{theme.RADIUS_MD}px;padding:7px;"
+            f"font-size:{theme.FONT_SM}px;font-weight:bold")
         lay.addWidget(self.today_label)
 
         secondary = (
-            f"QPushButton{{background:{theme.CARD};color:{theme.PRIMARY_DARK};"
-            f"border:1.5px solid {theme.PRIMARY};border-radius:8px;"
-            f"padding:8px;font-weight:bold;font-size:13px;text-align:left}}"
+            f"QPushButton{{background:{theme.CARD_TINT};color:{theme.PRIMARY_DARK};"
+            f"border:none;border-radius:{theme.RADIUS_MD}px;"
+            f"padding:10px;font-weight:bold;font-size:{theme.FONT_MD}px;"
+            f"text-align:left}}"
             f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
             f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
 
