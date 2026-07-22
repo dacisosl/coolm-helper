@@ -20,6 +20,13 @@ def main() -> int:
         "--noconfirm", "--clean", "--windowed",
         "--name", "CoolmHelper",
         "--exclude-module", "tkinter",
+        # 구글 연동 — 함수 안에서 import되므로 명시 포함 + 정적 discovery JSON
+        "--hidden-import", "googleapiclient",
+        "--hidden-import", "googleapiclient.discovery",
+        "--hidden-import", "google_auth_oauthlib.flow",
+        "--hidden-import", "google.auth.transport.requests",
+        # discovery JSON 뭉치(수십 MB)는 동봉하지 않는다 —
+        # google_sync가 static_discovery=False로 접속 시 받아온다.
         "main.py",
     ]
     ico = os.path.join(BASE, "assets", "app.ico")

@@ -152,27 +152,10 @@ class DeskWidgetBase(QWidget):
         self._font_label.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:10px;background:transparent")
         lay.addWidget(self._font_label)
-        lay.addStretch()               # 📌·✕는 오른쪽 끝으로
-        # 📌 항상 위 고정 (토글) + ✕ 위젯 끄기
+        lay.addStretch()               # ✕는 오른쪽 끝으로
+        # ✕ 위젯 끄기 (📌 고정은 v1.4부터 헤더의 make_pin_button으로 이동)
         from PyQt6.QtCore import QSize
         from ui.icons import icon
-        pin = QPushButton()
-        pin.setIcon(icon("pin", 13))
-        pin.setIconSize(QSize(13, 13))
-        pin.setCheckable(True)
-        pin.setChecked(bool(self.conf.get("always_on_top")))
-        pin.setToolTip("항상 위에 고정 — 다른 창들보다 위에 보이기")
-        pin.setFixedSize(26, 20)
-        pin.setCursor(Qt.CursorShape.PointingHandCursor)
-        pin.setStyleSheet(
-            f"QPushButton{{background:{theme.CARD};border:1px solid "
-            f"{theme.BORDER};border-radius:5px}}"
-            f"QPushButton:checked{{background:{theme.PRIMARY_LIGHT};"
-            f"border-color:{theme.PRIMARY}}}"
-            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
-            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
-        pin.toggled.connect(self._set_always_on_top)
-        lay.addWidget(pin)
         off = QPushButton()
         off.setIcon(icon("close", 12))
         off.setIconSize(QSize(12, 12))
@@ -189,6 +172,28 @@ class DeskWidgetBase(QWidget):
         bar.setVisible(False)
         self._edit_bar = bar
         return bar
+
+    def make_pin_button(self) -> QPushButton:
+        """헤더에 놓는 📌 고정 토글 — 편집 모드에 안 들어가도 바로 누른다."""
+        from PyQt6.QtCore import QSize
+        from ui.icons import icon
+        pin = QPushButton()
+        pin.setIcon(icon("pin", 13))
+        pin.setIconSize(QSize(13, 13))
+        pin.setCheckable(True)
+        pin.setChecked(bool(self.conf.get("always_on_top")))
+        pin.setToolTip("항상 위에 고정 — 다른 창들보다 위에 보이기")
+        pin.setFixedSize(26, 22)
+        pin.setCursor(Qt.CursorShape.PointingHandCursor)
+        pin.setStyleSheet(
+            f"QPushButton{{background:transparent;border:1px solid "
+            f"{theme.BORDER};border-radius:{theme.RADIUS_SM}px}}"
+            f"QPushButton:checked{{background:{theme.PRIMARY_LIGHT};"
+            f"border-color:{theme.PRIMARY}}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
+        pin.toggled.connect(self._set_always_on_top)
+        return pin
 
     def make_edit_button(self) -> QPushButton:
         """헤더에 놓는 🔧(렌치) 버튼 — 누르면 편집 모드 켜고 끄기.

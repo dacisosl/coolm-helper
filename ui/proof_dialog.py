@@ -134,7 +134,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         cl.addWidget(tag)
         self.input_edit = _PromptEdit()
         self.input_edit.setPlaceholderText(
-            "여기에 다듬고 싶은 안내 글을 입력하세요…")
+            "안내할 내용을 간략하게 적어주세요.")
         self.input_edit.setToolTip(_TIP)
         self.input_edit.setStyleSheet(
             f"QTextEdit{{background:transparent;border:none;padding:0;"

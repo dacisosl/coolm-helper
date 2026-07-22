@@ -240,6 +240,7 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
         f"background:transparent")
     head.addWidget(title)
     head.addStretch()
+    head.addWidget(widget.make_pin_button())   # 📌 바로 고정 (v1.4)
     head.addWidget(widget.make_edit_button())
     root.addLayout(head)
     root.addWidget(widget.build_edit_bar())

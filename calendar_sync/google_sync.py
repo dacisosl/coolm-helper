@@ -18,20 +18,74 @@ from datetime import datetime, timedelta
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 _DIR = os.path.dirname(os.path.abspath(__file__))
-CREDENTIALS_PATH = os.path.join(_DIR, "credentials.json")
-TOKEN_PATH = os.path.join(_DIR, "token.json")
 
 
-def is_available(base_dir: str | None = None) -> bool:
-    """구글 연동을 켤 수 있는 상태인가 (라이브러리 + 클라이언트 파일)."""
-    if not os.path.exists(CREDENTIALS_PATH):
-        return False
+def _data_dir() -> str:
+    """열쇠·토큰을 두는 폴더 — exe(또는 프로젝트) 옆 calendar_sync.
+
+    frozen exe에서는 __file__이 _internal 안을 가리켜 업데이트 때 지워진다.
+    exe 옆 폴더는 [InstallDelete] 대상이 아니라 로그인이 유지된다.
+    """
+    import sys
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(_DIR)
+    d = os.path.join(base, "calendar_sync")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def credentials_path() -> str | None:
+    """열쇠 파일을 여러 위치에서 찾는다 — 데이터 폴더 → 소스 폴더."""
+    for p in (os.path.join(_data_dir(), "credentials.json"),
+              os.path.join(_DIR, "credentials.json")):
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def token_path() -> str:
+    return os.path.join(_data_dir(), "token.json")
+
+
+# 이전 버전 호환용 별칭 (settings 등에서 TOKEN_PATH를 직접 참조)
+TOKEN_PATH = token_path()
+CREDENTIALS_PATH = os.path.join(_data_dir(), "credentials.json")
+
+
+def libs_available() -> bool:
+    """구글 라이브러리가 이 빌드에 들어 있는가."""
     try:
         import googleapiclient  # noqa: F401
         import google_auth_oauthlib  # noqa: F401
         return True
     except ImportError:
         return False
+
+
+def is_available(base_dir: str | None = None) -> bool:
+    """구글 연동을 켤 수 있는 상태인가 (라이브러리 + 열쇠 파일)."""
+    return credentials_path() is not None and libs_available()
+
+
+def install_credentials(src_path: str) -> None:
+    """사용자가 고른 열쇠 파일(JSON)을 검사해 제자리에 복사한다.
+
+    잘못된 파일이면 ValueError — 설정 창이 쉬운 말로 안내한다.
+    """
+    import json
+    import shutil
+    try:
+        with open(src_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        raise ValueError("JSON 파일이 아니거나 열 수 없습니다.")
+    if "installed" not in data and "web" not in data:
+        raise ValueError("구글 OAuth 클라이언트 파일이 아닙니다.\n"
+                         "(구글 클라우드에서 받은 client_secret JSON을 골라주세요)")
+    dst = os.path.join(_data_dir(), "credentials.json")
+    shutil.copyfile(src_path, dst)
 
 
 def _service():
@@ -41,18 +95,24 @@ def _service():
     from googleapiclient.discovery import build
 
     creds = None
-    if os.path.exists(TOKEN_PATH):
-        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+    tok = token_path()
+    if os.path.exists(tok):
+        creds = Credentials.from_authorized_user_file(tok, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDENTIALS_PATH, SCOPES)
+            cred = credentials_path()
+            if not cred:
+                raise RuntimeError("구글 열쇠 파일(credentials.json)이 없습니다.")
+            flow = InstalledAppFlow.from_client_secrets_file(cred, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open(TOKEN_PATH, "w", encoding="utf-8") as f:
+        with open(tok, "w", encoding="utf-8") as f:
             f.write(creds.to_json())
-    return build("calendar", "v3", credentials=creds)
+    # static_discovery=False: 무거운 API 문서 뭉치를 동봉하지 않고
+    # 접속할 때 받아온다 (로그인 자체가 온라인이라 추가 제약 없음)
+    return build("calendar", "v3", credentials=creds,
+                 static_discovery=False)
 
 
 def ensure_login() -> None:

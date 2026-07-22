@@ -51,6 +51,21 @@ def main() -> None:
     from ui import theme
     app.setStyleSheet(theme.SYSTEM_QSS)
 
+    # 단일 실행 가드 — 이미 떠 있는데 또 실행하면 프로세스만 쌓이고
+    # "창이 안 뜬다"고 느끼게 된다. 두 번째 실행은 안내 후 종료.
+    import tempfile
+    from PyQt6.QtCore import QLockFile
+    lock = QLockFile(os.path.join(tempfile.gettempdir(), "coolm_helper.lock"))
+    lock.setStaleLockTime(0)                 # 비정상 종료 잠금은 무시
+    if not lock.tryLock(100):
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            None, "COOL-비서",
+            "COOL-비서가 이미 실행되고 있어요.\n"
+            "화면 오른쪽 가장자리의 펭귄을 확인해 주세요. 🐧")
+        return
+    app._coolm_lock = lock                   # GC 방지 — 잠금 유지
+
     # 앱 아이콘 (작업표시줄·창 제목) — 펭귄
     from PyQt6.QtGui import QIcon
     ico = os.path.join(BASE_DIR, "assets", "app.ico")

@@ -168,7 +168,10 @@ def show_startup_alerts(widget) -> None:
         widget.config["desk_migration_notice_done"] = True
         pipeline.save_config(widget.base_dir, widget.config)
     if not alerts:
-        return
+        # 알림이 없어도 '켜졌다'는 것은 보이게 — 창이 없는 앱이라
+        # 실행됐는지 몰라 헤매는 문제 방지 (2026-07-22 사용자 피드백)
+        alerts = ["COOL-비서가 켜졌어요 — 오늘은 새 알림이 없어요.\n"
+                  "이 펭귄을 누르면 메뉴가 열립니다."]
     bubble = AlertBubble(alerts, widget)
     widget._alert_bubble = bubble          # GC 방지
     bubble.show()
