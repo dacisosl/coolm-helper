@@ -203,24 +203,31 @@ class EventItemCard(QFrame):
         lay.addWidget(self.detail)
 
     def _apply_card_style(self) -> None:
-        """카드 골격 + 왼쪽 3px 중요도색 막대 — 중요도가 바뀌면 다시 칠한다."""
-        fg, _bg = theme.PRIORITY_COLORS.get(
-            self.event.priority, theme.PRIORITY_COLORS["보통"])
+        """깨끗한 흰 카드 — 중요도는 칩의 색 점(●)이 담당한다."""
         self.setStyleSheet(
             f"EventItemCard{{background:{theme.CARD};border:none;"
-            f"border-left:3px solid {fg};"
             f"border-radius:{theme.RADIUS_MD}px}}"
             f"EventItemCard:hover{{background:{theme.CARD_TINT}}}")
 
     def _update_labels(self) -> None:
         e = self.event
-        self._apply_card_style()
+        fg, _bg = theme.PRIORITY_COLORS.get(
+            e.priority, theme.PRIORITY_COLORS["보통"])
         self.title_label.setText(e.title)
-        self.chip.setText(e.priority)
         chip_qss = theme.priority_chip(e.priority)
         if isinstance(self.chip, QPushButton):
-            chip_qss = f"QPushButton{{{chip_qss};border:none}}"
-        self.chip.setStyleSheet(chip_qss)
+            # 버튼 칩: 색 점 아이콘 + 중립 알약
+            from ui.icons import dot_icon
+            self.chip.setText(e.priority)
+            self.chip.setIcon(dot_icon(fg))
+            self.chip.setStyleSheet(f"QPushButton{{{chip_qss}}}"
+                                    f"QPushButton:hover{{border-color:{fg}}}")
+        else:
+            # 라벨 칩(full 모드): 리치텍스트 색 점
+            self.chip.setTextFormat(Qt.TextFormat.RichText)
+            self.chip.setText(
+                f'<span style="color:{fg}">●</span> {e.priority}')
+            self.chip.setStyleSheet(chip_qss)
         # 시간이 있으면 '시간 ↵ 제목' 두 줄, 종일이면 제목 한 줄
         if e.all_day:
             self.time_line.hide()

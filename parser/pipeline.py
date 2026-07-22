@@ -39,6 +39,7 @@ DEFAULT_CONFIG = {
     "recent_count": 10,          # 가장 최근 쪽지 N개 (날짜 기준 아님)
     "google_sync_enabled": False,   # 저장 모드: False=로컬(기본) / True=구글 연동
     "widget_style": "mini",         # mini(펭귄 도킹) | detail(카드형)
+    "character_mode": True,         # 쿨쿠리 무드(잠·받아적기·놀람) 켜기
     "widget_always_on_top": True,
     "widget_opacity": 100,          # 50~100 (%)
     "favorites_enabled": False,     # 즐겨찾기 보관함

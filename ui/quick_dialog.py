@@ -65,12 +65,25 @@ class QuickDialog(QDialog):
         self.setStyleSheet(theme.BASE_QSS)
 
         lay = QVBoxLayout(self)
+        srow = QHBoxLayout()
+        srow.setSpacing(8)
+        # 쿨쿠리가 쪽지를 받아 적는 모습 (캐릭터 모드일 때)
+        cfg = pipeline.load_config(base_dir)
+        if cfg.get("character_mode", True):
+            from ui.penguin_icon import penguin_pixmap
+            kookuri = QLabel()
+            kookuri.setPixmap(penguin_pixmap(base_dir, 44, "work"))
+            kookuri.setToolTip("쿨쿠리가 쪽지를 옮겨 적고 있어요")
+            kookuri.setStyleSheet("background:transparent")
+            srow.addWidget(kookuri,
+                           alignment=Qt.AlignmentFlag.AlignTop)
         self.status = QLabel()
         self.status.setWordWrap(True)
         self.status.setStyleSheet(
             f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
             f"border-radius:8px;padding:7px;font-size:11px")
-        lay.addWidget(self.status)
+        srow.addWidget(self.status, stretch=1)
+        lay.addLayout(srow)
 
         # 감지된 일정이 여러 개면 여기서 선택
         self.event_combo = QComboBox()

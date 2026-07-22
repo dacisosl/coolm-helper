@@ -153,15 +153,38 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
 
         card, c = _card("펭귄 위젯",
                         "화면에 떠 있는 작은 도우미의 모양을 고릅니다.")
-        self.style_mini = QRadioButton("미니 — 오른쪽 벽의 펭귄")
-        self.style_mini.setToolTip("클릭하면 메뉴가 나오는 작은 펭귄 (기본)")
-        self.style_detail = QRadioButton("상세 — 버튼이 다 보이는 카드형")
-        if self.config.get("widget_style", "mini") == "detail":
-            self.style_detail.setChecked(True)
-        else:
-            self.style_mini.setChecked(True)
-        c.addWidget(self.style_mini)
-        c.addWidget(self.style_detail)
+        # 미니/상세 — 라디오 대신 칩 두 개 중 하나를 고르는 방식
+        chip_row = QHBoxLayout()
+        chip_row.setSpacing(8)
+        self.style_chips = {}
+        self._style_pick = self.config.get("widget_style", "mini")
+
+        def _style_chip(key: str, label: str, tip: str) -> QPushButton:
+            b = QPushButton(label)
+            b.setCheckable(True)
+            b.setToolTip(tip)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(
+                f"QPushButton{{background:{theme.CARD_TINT};color:{theme.SUBTLE};"
+                f"border:1px solid {theme.BORDER};border-radius:15px;"
+                f"padding:6px 16px;font-weight:bold}}"
+                f"QPushButton:hover{{border-color:{theme.PRIMARY}}}"
+                f"QPushButton:checked{{background:{theme.PRIMARY};color:white;"
+                f"border-color:{theme.PRIMARY}}}")
+            b.clicked.connect(lambda _, k=key: self._pick_style(k))
+            self.style_chips[key] = b
+            return b
+
+        chip_row.addWidget(_style_chip(
+            "mini", "🐧 미니", "오른쪽 벽의 작은 펭귄 — 클릭하면 메뉴 (기본)"))
+        chip_row.addWidget(_style_chip(
+            "detail", "🗂 상세", "버튼이 다 보이는 카드형"))
+        chip_row.addStretch()
+        c.addLayout(chip_row)
+        self._pick_style(self._style_pick)
+        lay.addWidget(card)
+
+        card, c = _card("기능")
         try:
             import autostart
             auto_on = autostart.is_enabled()
@@ -175,9 +198,13 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             "화면 전환 애니메이션", bool(self.config.get("animations_enabled", True)),
             "창·알림이 부드럽게 나타나요. 끄면 즉시 표시됩니다.")
         c.addWidget(row)
-        lay.addWidget(card)
-
-        card, c = _card("기능")
+        self.char_cb, row = _check(
+            "캐릭터 변환 모드 (쿨쿠리)",
+            bool(self.config.get("character_mode", True)),
+            "상황에 따라 펭귄 '쿨쿠리'의 모습이 바뀝니다.\n"
+            "오늘 일정이 없으면 잠들고(안심!), 간편 등록에서는 받아 적고,\n"
+            "밀린 일 알림에서는 깜짝 놀라요.")
+        c.addWidget(row)
         self.fav_cb, row = _check(
             "즐겨찾기 보관함", bool(self.config.get("favorites_enabled")),
             "자주 쓰는 문구를 저장해 두는 보관함.\n"
@@ -518,9 +545,15 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             return
         self.parent()._offer_update(info)   # 플로팅 위젯의 공용 업데이트 안내 사용
 
+    def _pick_style(self, key: str) -> None:
+        """펭귄 위젯 스타일 칩 — 둘 중 하나만 눌린 상태로 유지."""
+        self._style_pick = key
+        for k, b in self.style_chips.items():
+            b.setChecked(k == key)
+
     def _save(self) -> None:
-        self.config["widget_style"] = ("detail" if self.style_detail.isChecked()
-                                       else "mini")
+        self.config["widget_style"] = self._style_pick
+        self.config["character_mode"] = self.char_cb.isChecked()
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
         self.config["proof_provider"] = ("openrouter"

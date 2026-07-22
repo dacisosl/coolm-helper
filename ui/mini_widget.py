@@ -92,11 +92,34 @@ class MiniWidget(WidgetBase):
         self._moved = False
         self._last_bar_open = 0.0
         self.apply_config()
+        # 쿨쿠리 무드: 오늘 일정·밀린 일이 없으면 잠든다 (보면 안심)
+        self._store_cb = self._update_mood
+        self.store.subscribe(self._store_cb)
+        self._update_mood()
+
+    def closeEvent(self, ev):
+        self.store.unsubscribe(self._store_cb)
+        super().closeEvent(ev)
+
+    def _update_mood(self) -> None:
+        from datetime import date
+        mood = "base"
+        if self.config.get("character_mode", True):
+            overdue, today, _up = self.store.sections(date.today())
+            if not overdue and not today:
+                mood = "sleep"
+        self.penguin.setPixmap(penguin_pixmap(self.base_dir, 46, mood))
+        self.penguin.setToolTip(
+            ("쿨쿠리가 자고 있어요 — 오늘은 일정이 없어요 💤\n" if mood == "sleep"
+             else "COOL-비서\n")
+            + "클릭: 메뉴 / 더블클릭: 바로 등록 / 드래그: 이동 / 우클릭: 옵션")
 
     def apply_config(self) -> None:
         super().apply_config()
         if hasattr(self, "demo_chip"):
             self.demo_chip.setVisible(bool(self.config.get("demo_mode")))
+        if hasattr(self, "_store_cb"):
+            self._update_mood()      # 설정에서 캐릭터 모드 토글 즉시 반영
 
     def place_default(self) -> None:
         """오른쪽 벽 중앙에 도킹."""

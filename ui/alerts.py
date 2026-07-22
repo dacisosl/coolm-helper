@@ -59,12 +59,23 @@ class AlertBubble(QWidget):
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 9, 12, 9)
         lay.setSpacing(3)
+        body = QHBoxLayout()
+        body.setSpacing(8)
+        # 놀란 쿨쿠리 — 알림이 있다는 걸 캐릭터가 대신 말해준다
+        if getattr(anchor, "config", {}).get("character_mode", True):
+            from ui.penguin_icon import penguin_pixmap
+            base_dir = getattr(anchor, "base_dir", "")
+            kookuri = QLabel()
+            kookuri.setPixmap(penguin_pixmap(base_dir, 38, "surprise"))
+            kookuri.setStyleSheet("background:transparent")
+            body.addWidget(kookuri, alignment=Qt.AlignmentFlag.AlignTop)
         self.text = QLabel()
         self.text.setWordWrap(True)
         self.text.setStyleSheet(
             f"color:{theme.TEXT};font-size:12px;font-weight:bold;"
             f"background:transparent")
-        lay.addWidget(self.text)
+        body.addWidget(self.text, stretch=1)
+        lay.addLayout(body)
         self.hint = QLabel()
         self.hint.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:10px;background:transparent")
