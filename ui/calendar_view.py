@@ -46,6 +46,17 @@ class EventCalendar(QCalendarWidget):
         sun = QTextCharFormat(fmt)
         sun.setForeground(QColor(theme.SUNDAY))
         self.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, sun)
+        # 휠로 월이 휙휙 넘어가는 것 방지 (2026-07-22 사용자 요청)
+        # — 월 이동은 ◀▶ 버튼으로만
+        view = self.findChild(QWidget, "qt_calendar_calendarview")
+        if view is not None:
+            view.installEventFilter(self)
+
+    def eventFilter(self, obj, ev):
+        from PyQt6.QtCore import QEvent
+        if ev.type() == QEvent.Type.Wheel:
+            return True                    # 휠 월 넘김 차단
+        return super().eventFilter(obj, ev)
 
     def set_counts(self, counts: dict[date, tuple[int, bool]]) -> None:
         self._counts = counts

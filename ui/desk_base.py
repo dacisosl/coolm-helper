@@ -30,17 +30,19 @@ _OPACITIES = (60, 75, 90, 100)
 
 
 class _GripHint(QWidget):
-    """카드 우하단에 항상 보이는 대각선 점점 — '여기 잡으면 크기 조절'.
+    """카드 우하단에 항상 보이는 대각선 점점 — 잡고 끌면 크기 조절.
 
     카드(자식 위젯) 위에 얹히는 오버레이라 어느 위젯·배경에서도 보인다.
-    마우스는 통과시켜 실제 리사이즈는 부모의 코너 판정이 처리한다.
+    아래 깔린 목록이 클릭을 삼키지 않도록 마우스를 직접 받아
+    부모(DeskWidgetBase)의 우하단 코너 리사이즈로 넘긴다.
     """
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.setFixedSize(16, 16)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setFixedSize(18, 18)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+        self.setToolTip("잡고 끌면 크기 조절")
 
     def paintEvent(self, ev):
         p = QPainter(self)
@@ -51,8 +53,24 @@ class _GripHint(QWidget):
         p.setBrush(c)
         for i in range(3):
             for j in range(3 - i):
-                p.drawEllipse(13 - j * 4, 13 - i * 4, 2, 2)
+                p.drawEllipse(15 - j * 4, 15 - i * 4, 2, 2)
         p.end()
+
+    # 부모의 리사이즈 로직에 위임 — move/release는 global 좌표만 쓴다
+    def mousePressEvent(self, ev):
+        if ev.button() != Qt.MouseButton.LeftButton:
+            return
+        w = self.parentWidget()
+        w._mode = "resize"
+        w._edges = _EDGE_R | _EDGE_B
+        w._start_geo = w.geometry()
+        w._start_pos = ev.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, ev):
+        self.parentWidget().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        self.parentWidget().mouseReleaseEvent(ev)
 
 
 class DeskWidgetBase(QWidget):
@@ -288,7 +306,7 @@ class DeskWidgetBase(QWidget):
         super().resizeEvent(ev)
         # 그립 점점을 카드 우하단 안쪽에 붙인다 (카드 여백 8px 감안)
         if getattr(self, "_grip_hint", None) is not None:
-            self._grip_hint.move(self.width() - 26, self.height() - 26)
+            self._grip_hint.move(self.width() - 28, self.height() - 28)
             self._grip_hint.raise_()
 
     # ── 저장 ────────────────────────────────────────────────

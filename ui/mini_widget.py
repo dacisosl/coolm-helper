@@ -47,12 +47,17 @@ class _IconBar(QWidget):
             buttons.append(("chat", "문구 보정 (공개용 글)", owner.open_proof))
         buttons.append(("gear", "설정", owner.open_settings))
 
+        # 메뉴 크기: 설정 → 일반 → 펭귄 위젯에서 보통(100)/크게(135) 선택
+        from PyQt6.QtCore import QSize
+        scale = int(owner.config.get("menu_scale", 100)) / 100
+        btn_px = round(40 * scale)
+        icon_px = round(22 * scale)
         for name, tip, handler in buttons:
             b = QPushButton()
-            b.setIcon(icon(name))
-            b.setIconSize(ICON_SIZE)
+            b.setIcon(icon(name, icon_px))
+            b.setIconSize(QSize(icon_px, icon_px))
             b.setToolTip(tip)
-            b.setFixedSize(40, 40)
+            b.setFixedSize(btn_px, btn_px)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
                 f"QPushButton{{background:transparent;border:none;"

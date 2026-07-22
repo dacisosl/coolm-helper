@@ -183,6 +183,38 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         chip_row.addStretch()
         c.addLayout(chip_row)
         self._pick_style(self._style_pick)
+
+        # 메뉴 크기 — 펭귄 메뉴(팝업)의 아이콘 크기 선택 (보통/크게)
+        srow = QHBoxLayout()
+        srow.setSpacing(8)
+        slab = QLabel("메뉴 크기")
+        slab.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
+                           f"border:none")
+        srow.addWidget(slab)
+        self.scale_chips = {}
+        self._scale_pick = int(self.config.get("menu_scale", 100))
+
+        def _scale_chip(val: int, label: str) -> QPushButton:
+            b = QPushButton(label)
+            b.setCheckable(True)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(
+                f"QPushButton{{background:{theme.CARD_TINT};color:{theme.SUBTLE};"
+                f"border:1px solid {theme.BORDER};border-radius:{theme.RADIUS_LG}px;"
+                f"padding:5px 14px;font-weight:bold}}"
+                f"QPushButton:hover{{border-color:{theme.PRIMARY}}}"
+                f"QPushButton:checked{{background:{theme.PRIMARY};color:white;"
+                f"border-color:{theme.PRIMARY}}}")
+            b.clicked.connect(lambda _, v=val: self._pick_scale(v))
+            self.scale_chips[val] = b
+            return b
+
+        srow.addWidget(_scale_chip(100, "보통"))
+        srow.addWidget(_scale_chip(135, "크게"))
+        srow.addStretch()
+        c.addLayout(srow)
+        self._pick_scale(self._scale_pick if self._scale_pick in (100, 135)
+                         else 100)
         lay.addWidget(card)
 
         card, c = _card("기능")
@@ -534,8 +566,15 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         for k, b in self.style_chips.items():
             b.setChecked(k == key)
 
+    def _pick_scale(self, val: int) -> None:
+        """메뉴 크기 칩 — 보통(100)/크게(135) 중 하나만."""
+        self._scale_pick = val
+        for v, b in self.scale_chips.items():
+            b.setChecked(v == val)
+
     def _save(self) -> None:
         self.config["widget_style"] = self._style_pick
+        self.config["menu_scale"] = self._scale_pick
         self.config["character_mode"] = self.char_cb.isChecked()
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
