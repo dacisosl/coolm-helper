@@ -17,6 +17,18 @@ from ui.calendar_view import CalendarWindow
 from ui.review_dialog import ReviewDialog
 
 
+def _desk_widgets_flat(app) -> list:
+    """데스크 레지스트리의 모든 위젯 (notes는 {id: 위젯} dict라 평탄화)."""
+    reg = getattr(app, "_coolm_desk", None) or {}
+    out = []
+    for k, v in reg.items():
+        if k == "notes":
+            out.extend(w for w in dict(v).values() if w is not None)
+        elif v is not None:
+            out.append(v)
+    return out
+
+
 class _UpdateChecker(QObject):
     found = pyqtSignal(dict)
 
@@ -60,6 +72,7 @@ class WidgetBase(QWidget):
                 pass
         self.cal_win: CalendarWindow | None = None
         self._drag: QPoint | None = None
+        app._coolm_widget = self     # 트레이·위젯 – 버튼이 참조 (스왑 시 갱신)
         QTimer.singleShot(2000, self._auto_update_check)
         QTimer.singleShot(300, self.ensure_desk_widgets)
         QTimer.singleShot(2500, self._show_startup_alerts)   # 세션당 1회
@@ -243,10 +256,18 @@ class WidgetBase(QWidget):
         super().showEvent(ev)
 
     def send_to_tray(self) -> None:
-        """펭귄(위젯)을 숨기고 트레이로 보낸다 — 트레이 클릭으로 복귀."""
+        """펭귄과 바탕화면 위젯 전부를 트레이로 보낸다 — 클릭으로 복귀."""
         self._in_tray = True
         self.hide()
         app = QApplication.instance()
+        # 열려 있는 바탕화면 위젯(할일·주간·플래너·포스트잇)도 같이 숨김
+        for w in _desk_widgets_flat(app):
+            try:
+                if w.isVisible():
+                    w._in_tray = True
+                    w.hide()
+            except RuntimeError:
+                pass
         tray = getattr(app, "_coolm_tray", None)
         if tray is not None and not getattr(app, "_coolm_tray_tip_shown", False):
             app._coolm_tray_tip_shown = True     # 안내 풍선은 세션당 1회

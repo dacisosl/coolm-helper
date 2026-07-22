@@ -103,6 +103,16 @@ def main() -> None:
             cur.place_default()             # 화면 밖이어도 확실히 복귀
             cur.show()
             cur.raise_()
+            # 트레이로 같이 들어갔던 바탕화면 위젯들도 복귀
+            from ui.widget_base import _desk_widgets_flat
+            for dw in _desk_widgets_flat(app):
+                try:
+                    if getattr(dw, "_in_tray", False):
+                        dw._in_tray = False
+                        dw.show()
+                        dw.raise_()
+                except RuntimeError:
+                    pass
 
         tray = QSystemTrayIcon(app.windowIcon(), app)
         tray.setToolTip("COOL-비서 — 펭귄 꺼내기")
