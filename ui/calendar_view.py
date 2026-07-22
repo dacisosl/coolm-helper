@@ -102,10 +102,7 @@ class EventItemCard(QFrame):
         self.store = store
         self.on_change = on_change   # 저장/삭제 후 부모 갱신 콜백
         self.full = full
-        self.setStyleSheet(
-            f"EventItemCard{{background:{theme.CARD};border:none;"
-            f"border-radius:{theme.RADIUS_LG}px}}"
-            f"EventItemCard:hover{{background:{theme.CARD_TINT}}}")
+        self._apply_card_style()     # 왼쪽 중요도색 막대 포함 (시안 agenda 스타일)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(12, 10, 12, 10)
         lay.setSpacing(6)
@@ -205,8 +202,19 @@ class EventItemCard(QFrame):
         d.addLayout(btns)
         lay.addWidget(self.detail)
 
+    def _apply_card_style(self) -> None:
+        """카드 골격 + 왼쪽 3px 중요도색 막대 — 중요도가 바뀌면 다시 칠한다."""
+        fg, _bg = theme.PRIORITY_COLORS.get(
+            self.event.priority, theme.PRIORITY_COLORS["보통"])
+        self.setStyleSheet(
+            f"EventItemCard{{background:{theme.CARD};border:none;"
+            f"border-left:3px solid {fg};"
+            f"border-radius:{theme.RADIUS_MD}px}}"
+            f"EventItemCard:hover{{background:{theme.CARD_TINT}}}")
+
     def _update_labels(self) -> None:
         e = self.event
+        self._apply_card_style()
         self.title_label.setText(e.title)
         self.chip.setText(e.priority)
         chip_qss = theme.priority_chip(e.priority)
@@ -342,7 +350,7 @@ class CalendarWindow(QWidget):
                  favorites_enabled: bool = False, parent=None):
         super().__init__(parent)
         self.store = store
-        self.setWindowTitle("내 캘린더 — 쿨 일정 도우미")
+        self.setWindowTitle("내 캘린더 — COOL-비서")
         self.resize(800, 540)
         self.setWindowFlags(Qt.WindowType.Window
                             | Qt.WindowType.FramelessWindowHint)

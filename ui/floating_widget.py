@@ -38,7 +38,7 @@ class FloatingWidget(WidgetBase):
 
         title_row = QHBoxLayout()
         demo_suffix = " · 데모" if self.config.get("demo_mode") else ""
-        title = QLabel("쿨 일정 도우미" + demo_suffix)
+        title = QLabel("COOL-비서" + demo_suffix)
         title.setStyleSheet(
             f"color:{theme.PRIMARY_DARK};font-weight:bold;font-size:14px")
         title_row.addWidget(title, stretch=1)

@@ -20,18 +20,20 @@ from PyQt6.QtWidgets import (
 
 from ui import motion
 
-# ── 클로드 무드 팔레트 (이 창 전용 — theme.py의 앱 팔레트와 별개) ──
-CREAM = "#faf9f5"        # 배경
-INK = "#1f1e1d"          # 본문 글자
-INK_SOFT = "#6e6a63"     # 보조 글자
-CARD = "#ffffff"
-CARD_BORDER = "#e8e4db"
-CORAL = "#c96442"        # CTA (테라코타)
-CORAL_HOVER = "#b5573a"
-CORAL_PRESSED = "#9e4b32"
-PILL_BG = "#f0ede4"
+from ui import theme
 
-_SERIF = "font-family:'Georgia','Malgun Gothic',serif"
+# ── 이 창의 무드 매핑 (v1.1 딥 네이비 컨셉 — theme 토큰을 그대로 쓴다) ──
+CREAM = theme.BG              # 배경
+INK = theme.TEXT              # 본문 글자
+INK_SOFT = theme.SUBTLE       # 보조 글자
+CARD = theme.CARD
+CARD_BORDER = theme.BORDER
+CORAL = theme.PRIMARY         # CTA (딥 네이비)
+CORAL_HOVER = theme.PRIMARY_DARK
+CORAL_PRESSED = theme.PRIMARY_PRESSED
+PILL_BG = theme.PRIMARY_LIGHT
+
+_SERIF = "font-family:'Malgun Gothic','Segoe UI',sans-serif"
 
 
 class _Downloader(QObject):

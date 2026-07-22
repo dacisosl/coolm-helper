@@ -1,48 +1,50 @@
 # -*- coding: utf-8 -*-
-"""공용 테마 — 쿨메신저 블루 + 화이트, 라이트 모드 고정.
+"""공용 테마 — COOL-비서 딥 네이비 (MD3 톤), 라이트 모드 고정.
 
-디자인 토큰(2026-07-21 리마스터, emil-design-eng 기준):
-- 모서리 3단(RADIUS_SM/MD/LG), 타이포 5단(FONT_XS~XL), 간격 4배수(SPACE_*)
+디자인 토큰(2026-07-22 v1.1 리디자인 — 사용자 제공 MD3 시안 기준):
+- 팔레트: 딥 네이비 프라이머리(#006699/#004d75) + 옅은 회청 배경(#f9f9fc)
+  + 보라 터셔리 악센트(#571ac0). 이전의 밝은 하늘색 테마를 대체.
+- 모서리 3단(4/8/12 — 시안의 각진 감성), 타이포 5단, 간격 4배수
 - 색은 전부 이 파일의 상수로 (하드코딩 hex 금지)
 - 눌림 피드백(:pressed)은 배경 한 단계 어둡게 + 1px 하강(레이아웃 시프트 없음)
 - 그림자는 make_shadow(parent, level) 한 함수로 통일
 """
 
-# ── 색상 ──────────────────────────────────────────────
-PRIMARY = "#1e88e5"
-PRIMARY_DARK = "#1565c0"
-PRIMARY_PRESSED = "#0d47a1"     # 파란 버튼 눌림
-PRIMARY_LIGHT = "#e8f2fd"
-LIGHT_PRESSED = "#d8e9fb"       # 연파랑 눌림(텍스트/아이콘 버튼)
-BG = "#f4f8fd"
-CARD = "#ffffff"
-CARD_TINT = "#fbfdff"           # 아주 연한 카드 톤(hover·에디터 배경)
-BORDER = "#dce6f2"
-TEXT = "#222b36"
-SUBTLE = "#78859a"
-DANGER = "#e53935"
-DANGER_FG = "#c62828"           # 진한 빨강 글자(중요도 '높음' 등)
-DANGER_BG = "#fdecea"           # 위험 연한 배경
-DANGER_PRESSED = "#f9d9d5"      # 삭제류 눌림
+# ── 색상 (MD3 시안 매핑) ──────────────────────────────
+PRIMARY = "#006699"             # primary-container — 주요 버튼·활성
+PRIMARY_DARK = "#004d75"        # primary — 제목·강조 글자
+PRIMARY_PRESSED = "#003f5e"     # 버튼 눌림
+PRIMARY_LIGHT = "#cce5ff"       # primary-fixed — 연한 파랑 배경·칩
+LIGHT_PRESSED = "#b3d7f5"       # 연파랑 눌림(텍스트/아이콘 버튼)
+BG = "#f9f9fc"                  # background
+CARD = "#ffffff"                # surface-container-lowest
+CARD_TINT = "#f3f3f6"           # surface-container-low (hover·에디터 배경)
+BORDER = "#d3dae2"              # outline-variant(연화)
+TEXT = "#1a1c1e"                # on-surface
+SUBTLE = "#40484f"              # on-surface-variant — 보조 글자
+DANGER = "#ba1a1a"              # error
+DANGER_FG = "#93000a"           # on-error-container(중요도 '높음' 등)
+DANGER_BG = "#ffdad6"           # error-container
+DANGER_PRESSED = "#f5c2bc"      # 삭제류 눌림
 SUCCESS_BG = "#e9f7ec"
 SUCCESS_BORDER = "#bfe5c8"
 SUCCESS_FG = "#2e7d32"          # 등록됨 초록 글자
 SUCCESS_SEL = "#dff0e2"         # 등록됨 + 선택 배경
-SUNDAY = "#e57373"              # 일요일 빨강
-ACCENT = "#f5a623"             # 강조 노랑(뱃지·주말 강조·아이콘)
-ACCENT_BG = "#fff8e6"          # 강조 연노랑 배경
-LOW_FG = "#66738a"             # 중요도 '낮음' 글자
-LOW_BG = "#eef1f5"             # 중요도 '낮음' 배경
-DISABLED_BG = "#a5c9ef"        # 비활성 파란 버튼
-SCROLL_HANDLE = "#c3d2e5"      # 스크롤바 핸들
-TOAST_BG = "#323a45"           # 토스트 어두운 배경
-TOAST_ACTION = "#82c8ff"       # 토스트 액션(되돌리기) 글자
-TOAST_ACTION_HOVER = "#b3ddff"
+SUNDAY = "#d05a5a"              # 일요일 빨강(차분하게)
+ACCENT = "#571ac0"              # tertiary 보라 — AI·주말·특별 강조
+ACCENT_BG = "#e9ddff"           # tertiary-fixed 연보라 배경
+LOW_FG = "#40484f"              # 중요도 '낮음' 글자 (on-surface-variant)
+LOW_BG = "#eeeef0"              # 중요도 '낮음' 배경 (surface-container)
+DISABLED_BG = "#9cbcd1"        # 비활성 네이비 버튼
+SCROLL_HANDLE = "#c0c7d0"      # 스크롤바 핸들 (outline-variant)
+TOAST_BG = "#2f3133"           # 토스트 어두운 배경 (inverse-surface)
+TOAST_ACTION = "#90cdff"       # 토스트 액션 글자 (inverse-primary)
+TOAST_ACTION_HOVER = "#bfe0ff"
 
-# ── 모서리 3단 ────────────────────────────────────────
-RADIUS_SM = 6      # 칩·인라인 소형 버튼·리스트 항목
-RADIUS_MD = 10     # 입력칸·버튼·토스트·열(column)
-RADIUS_LG = 14     # 카드·창·말풍선
+# ── 모서리 3단 (시안: 절제된 각) ─────────────────────
+RADIUS_SM = 4      # 칩·인라인 소형 버튼·리스트 항목
+RADIUS_MD = 8      # 입력칸·버튼·토스트·열(column)
+RADIUS_LG = 12     # 카드·창·말풍선
 
 # ── 타이포 5단 ────────────────────────────────────────
 FONT_XS = 11       # 힌트·메타·칩
@@ -84,7 +86,7 @@ def make_shadow(parent, level: int = 1):
     s = QGraphicsDropShadowEffect(parent)
     s.setBlurRadius(blur)
     s.setOffset(0, dy)
-    s.setColor(QColor(30, 136, 229, alpha))   # PRIMARY rgb
+    s.setColor(QColor(0, 102, 153, alpha))   # PRIMARY rgb (딥 네이비)
     return s
 
 
@@ -163,10 +165,16 @@ TEXT_BTN = (
     f"QPushButton:pressed{{background:{LIGHT_PRESSED};"
     f"padding:7px 10px 5px 10px}}")
 
-# 다이얼로그 헤더 라벨 (5종 창이 공유)
+# 다이얼로그 헤더 라벨 (5종 창이 공유) — 시안의 밑줄 섹션 제목
 DIALOG_HEADER = (
     f"font-size:{FONT_LG}px;font-weight:bold;color:{PRIMARY_DARK};"
-    f"background:transparent")
+    f"background:transparent;border:none;"
+    f"border-bottom:1px solid {BORDER};padding-bottom:6px")
+
+# 섹션 위 작은 라벨 (시안의 uppercase label 대응 — 자간 살린 회색 소제목)
+SECTION_LABEL = (
+    f"font-size:{FONT_XS}px;font-weight:bold;color:{SUBTLE};"
+    f"letter-spacing:1px;background:transparent")
 
 # 제목 입력칸 — 등록·간편등록·일정추가 창의 한 줄 바 공용
 TITLE_EDIT = (

@@ -1,8 +1,8 @@
-; ── 쿨메신저 일정 도우미 설치파일 (Inno Setup 6) ──────────────
+; ── COOL-비서 설치파일 (Inno Setup 6) ──────────────
 ; 사용법: build.bat 실행 후, Inno Setup Compiler로 이 파일을 열어 컴파일.
 ; 결과: Output\CoolmHelper-Setup.exe
 
-#define AppName "쿨메신저 일정 도우미"
+#define AppName "COOL-비서"
 #define AppVersion "1.0.0"
 #define AppExe "CoolmHelper.exe"
 
@@ -29,6 +29,9 @@ DisableProgramGroupPage=yes
 Type: filesandordirs; Name: "{app}\_internal"
 Type: files; Name: "{app}\python*.dll"
 Type: files; Name: "{app}\*.pyd"
+; 앱 이름이 'COOL-비서'로 바뀌면서(v1.1.0) 옛 이름 바로가기를 정리
+Type: files; Name: "{autodesktop}\쿨메신저 일정 도우미.lnk"
+Type: filesandordirs; Name: "{autoprograms}\쿨메신저 일정 도우미"
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"

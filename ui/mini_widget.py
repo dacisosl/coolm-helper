@@ -75,7 +75,7 @@ class MiniWidget(WidgetBase):
         self.penguin = QLabel()
         self.penguin.setPixmap(penguin_pixmap(self.base_dir, 46))
         self.penguin.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.penguin.setToolTip("쿨 일정 도우미\n클릭: 메뉴 / 더블클릭: 바로 등록 / "
+        self.penguin.setToolTip("COOL-비서\n클릭: 메뉴 / 더블클릭: 바로 등록 / "
                                 "드래그: 이동 / 우클릭: 옵션")
         lay.addWidget(self.penguin)
         # 데모 모드 표시 뱃지
