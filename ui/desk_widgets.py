@@ -528,6 +528,73 @@ class SimpleTodoWidget(DeskWidgetBase):
             self._column("앞으로 할 일", theme.LOW_FG, upcoming, False), 1)
 
 
+# ── ①-b 오늘 할 일 (단일 목록 투두) ──────────────────────────
+class TodayTodoWidget(DeskWidgetBase):
+    """오늘 일정만 한 줄씩 — 체크하며 지우는 투두리스트 (v1.5.0).
+
+    할 일 보드의 '오늘' 열 하나만 떼어낸 가장 단순한 위젯.
+    헤더는 시그니처 오렌지('오늘'의 색), 행은 _TodoRow 재사용.
+    """
+
+    MIN_W, MIN_H = 220, 180
+
+    def __init__(self, store, config, base_dir, conf):
+        super().__init__(store, config, base_dir, conf)
+        root, head = _make_card(self, "오늘 할 일")
+        # 제목을 '오늘' 색으로 (다른 위젯과 같은 자리·크기, 색만 시그니처)
+        title = head.itemAt(0).widget()
+        title.setStyleSheet(
+            f"font-size:13px;font-weight:bold;color:{theme.SIGNATURE_DARK};"
+            f"background:transparent")
+        head.insertWidget(head.count() - 2,
+                          _add_event_button(self, default_deadline=True))
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea{border:none;background:transparent}")
+        inner = QWidget()
+        inner.setStyleSheet("background:transparent")
+        self.rows_lay = QVBoxLayout(inner)
+        self.rows_lay.setContentsMargins(0, 0, 0, 0)
+        self.rows_lay.setSpacing(3)
+        scroll.setWidget(inner)
+        root.addWidget(scroll, stretch=1)
+        self.refresh()
+
+    def place_default(self) -> None:
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.resize(260, 300)
+        self.move(screen.right() - self.width() - 40,
+                  screen.center().y() - 150)
+
+    def refresh(self) -> None:
+        while self.rows_lay.count():
+            item = self.rows_lay.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        events = self.store.on_date(date.today())
+        events.sort(key=day_sort_key)
+        if not events:
+            if self.config.get("character_mode", True):
+                pic = QLabel()
+                from ui.penguin_icon import penguin_pixmap
+                pic.setPixmap(penguin_pixmap(self.base_dir, 44, "sleep"))
+                pic.setStyleSheet("background:transparent")
+                pic.setToolTip("쿨쿠리가 자고 있어요 — 오늘은 한가해요")
+                self.rows_lay.addWidget(
+                    pic, alignment=Qt.AlignmentFlag.AlignHCenter)
+            empty = QLabel("오늘은 한가해요")
+            empty.setStyleSheet(
+                f"color:{theme.SUBTLE};font-size:{self.font_px(10)}px;"
+                f"background:transparent")
+            self.rows_lay.addWidget(
+                empty, alignment=Qt.AlignmentFlag.AlignHCenter)
+        for e in events:
+            self.rows_lay.addWidget(_TodoRow(e, self.store, owner=self))
+        self.rows_lay.addStretch()
+
+
 # ── ② 주간 일정 ──────────────────────────────────────────────
 class _DayColumn(QFrame):
     """주간 보기의 하루 열 (반절 캘린더에서 이식)."""
@@ -789,10 +856,13 @@ class PlannerWidget(DeskWidgetBase):
         self.cal.set_counts(counts)
         self.refresh_day()
 
+    RANGE_DAYS = 21   # 상세보기: 선택 날짜부터 3주치 (2026-07-22 사용자 결정)
+
     def refresh_day(self) -> None:
         d = self._selected
+        end = d + timedelta(days=self.RANGE_DAYS)
         self.day_label.setText(
-            f"{d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]})")
+            f"{d.month}월 {d.day}일 ~ {end.month}월 {end.day}일 · 3주")
         self.day_label.setStyleSheet(
             f"font-size:{self.font_px(12)}px;font-weight:bold;"
             f"color:{theme.PRIMARY_DARK};background:transparent;padding-top:2px")
@@ -800,16 +870,34 @@ class PlannerWidget(DeskWidgetBase):
             item = self.items_lay.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        events = self.store.on_date(d)
-        events.sort(key=day_sort_key)
-        if not events:
-            empty = QLabel("일정이 없습니다.")
+        today = date.today()
+        shown = 0
+        for i in range(self.RANGE_DAYS + 1):
+            day = d + timedelta(days=i)
+            events = self.store.on_date(day)
+            if not events:
+                continue
+            events.sort(key=day_sort_key)
+            shown += len(events)
+            # 날짜 소제목 — '오늘'은 시그니처 오렌지
+            is_today = day == today
+            head = QLabel(f"{day.month}월 {day.day}일 "
+                          f"({WEEKDAY_KO[day.weekday()]})"
+                          + (" · 오늘" if is_today else ""))
+            head.setStyleSheet(
+                f"font-size:{self.font_px(10)}px;font-weight:bold;"
+                f"color:{theme.SIGNATURE_DARK if is_today else theme.SUBTLE};"
+                f"background:transparent;padding-top:4px")
+            self.items_lay.addWidget(head)
+            for e in events:
+                self.items_lay.addWidget(
+                    EventItemCard(e, self.store,
+                                  lambda reload_day: QTimer.singleShot(
+                                      0, self.refresh)))
+        if not shown:
+            empty = QLabel("이 기간에는 일정이 없습니다.")
             empty.setStyleSheet(
                 f"color:{theme.SUBTLE};font-size:{self.font_px(11)}px;"
                 f"background:transparent")
             self.items_lay.addWidget(empty)
-        for e in events:
-            self.items_lay.addWidget(
-                EventItemCard(e, self.store,
-                              lambda reload_day: QTimer.singleShot(0, self.refresh)))
         self.items_lay.addStretch()

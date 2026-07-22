@@ -115,6 +115,8 @@ class AlertBubble(QWidget):
             motion.pop_in(self, ms=200, rise=6)
 
     def mousePressEvent(self, ev) -> None:
+        # 일정 말풍선을 누르면 '오늘 할 일' 위젯을 바로 보여준다 (1회)
+        self._open_today_widget()
         self.idx += 1
         if self.idx >= len(self.alerts):
             self.close()
@@ -122,6 +124,20 @@ class AlertBubble(QWidget):
                 self.on_done()
         else:
             self._sync()
+
+    def _open_today_widget(self) -> None:
+        """말풍선 클릭 → 오늘 할 일 위젯 켜기 (설정에도 저장)."""
+        if getattr(self, "_today_opened", False):
+            return
+        self._today_opened = True
+        anchor = self.anchor
+        try:
+            if hasattr(anchor, "apply_desk_widget"):
+                from parser.pipeline import desk_conf
+                if not desk_conf(anchor.config, "today").get("enabled"):
+                    anchor.apply_desk_widget("today", True)
+        except Exception:
+            pass                      # 위젯 표시 실패가 알림을 막지 않게
 
 
 INTRO_STEPS = [

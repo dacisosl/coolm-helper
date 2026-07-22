@@ -258,6 +258,8 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                  "달력과 그날 일정 목록이 한 몸인 위젯"),
                 ("simple", "할 일 보드",
                  "지난 일 | 오늘 | 앞으로 — 3열 투두리스트"),
+                ("today", "오늘 할 일 목록",
+                 "오늘 것만 한 줄씩 체크하는 심플 투두"),
                 ("weekly", "주간 일정", "이번 주를 한눈에")):
             cb, row = _check(label,
                              bool(desk_conf(self.config, kind).get("enabled")),

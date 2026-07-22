@@ -57,6 +57,9 @@ DEFAULT_CONFIG = {
                     "always_on_top": False, "font_scale": 100},
         "weekly":  {"enabled": False, "geometry": None, "opacity": 90,
                     "always_on_top": False, "font_scale": 100},
+        # today: 오늘 할 일만 한 줄씩 — 투두리스트 (v1.5.0)
+        "today":   {"enabled": False, "geometry": None, "opacity": 95,
+                    "always_on_top": False, "font_scale": 100},
         "notes": [],   # 포스트잇: {event_id, geometry, opacity, always_on_top, font_scale}
     },
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
@@ -69,7 +72,7 @@ DEFAULT_CONFIG = {
 }
 
 
-DESK_KINDS = ("planner", "simple", "weekly")
+DESK_KINDS = ("planner", "simple", "weekly", "today")
 
 
 def _desk_default() -> dict:

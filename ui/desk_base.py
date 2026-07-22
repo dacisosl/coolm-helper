@@ -29,6 +29,32 @@ _HEADER_H = 40       # 상단 이동 드래그 영역 높이
 _OPACITIES = (60, 75, 90, 100)
 
 
+class _GripHint(QWidget):
+    """카드 우하단에 항상 보이는 대각선 점점 — '여기 잡으면 크기 조절'.
+
+    카드(자식 위젯) 위에 얹히는 오버레이라 어느 위젯·배경에서도 보인다.
+    마우스는 통과시켜 실제 리사이즈는 부모의 코너 판정이 처리한다.
+    """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setFixedSize(16, 16)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+    def paintEvent(self, ev):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        c = QColor(theme.SUBTLE)
+        c.setAlpha(150)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        for i in range(3):
+            for j in range(3 - i):
+                p.drawEllipse(13 - j * 4, 13 - i * 4, 2, 2)
+        p.end()
+
+
 class DeskWidgetBase(QWidget):
     """서브클래스는 content 카드 UI와 refresh()만 구성한다.
 
@@ -57,6 +83,7 @@ class DeskWidgetBase(QWidget):
         self._edit_bar: QWidget | None = None
         self._font_label: QLabel | None = None
         self.apply_window_conf(first=True)
+        self._grip_hint = _GripHint(self)   # 우하단 크기조절 점점 (전 위젯)
         self._store_cb = lambda: QTimer.singleShot(0, self.refresh)
         store.subscribe(self._store_cb)
 
@@ -253,17 +280,16 @@ class DeskWidgetBase(QWidget):
                     if (x, y) == ((w - s) // 2, (h - s) // 2):
                         continue       # 중앙은 제외
                     p.drawRoundedRect(x, y, s, s, 2, 2)
-        else:
-            # 평소에도 오른쪽 아래에 은은한 대각선 그립 — "여기 잡으면
-            # 크기 조절" 힌트
-            grip = QColor(theme.SUBTLE)
-            grip.setAlpha(110)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(grip)
-            for i in range(3):
-                for j in range(3 - i):
-                    p.drawEllipse(w - 6 - j * 4, h - 6 - i * 4, 2, 2)
         p.end()
+        # 평상시 그립 힌트는 _GripHint 오버레이가 카드 위에 그린다
+        # (여기 paintEvent는 자식 카드 아래에 깔려 카드 안에선 안 보임)
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        # 그립 점점을 카드 우하단 안쪽에 붙인다 (카드 여백 8px 감안)
+        if getattr(self, "_grip_hint", None) is not None:
+            self._grip_hint.move(self.width() - 26, self.height() - 26)
+            self._grip_hint.raise_()
 
     # ── 저장 ────────────────────────────────────────────────
     def _save_config(self) -> None:
@@ -285,6 +311,10 @@ class DeskWidgetBase(QWidget):
             e |= _EDGE_T
         if pos.y() >= self.height() - _MARGIN:
             e |= _EDGE_B
+        # 우하단 점점(그립 힌트) 부근 24×24는 카드 위라도 코너 리사이즈
+        if (pos.x() >= self.width() - 24
+                and pos.y() >= self.height() - 24):
+            e = _EDGE_R | _EDGE_B
         return e
 
     @staticmethod
@@ -414,7 +444,8 @@ def _widget_class(kind: str):
     from ui import desk_widgets
     return {"planner": desk_widgets.PlannerWidget,
             "simple": desk_widgets.SimpleTodoWidget,
-            "weekly": desk_widgets.WeeklyWidget}[kind]
+            "weekly": desk_widgets.WeeklyWidget,
+            "today": desk_widgets.TodayTodoWidget}[kind]
 
 
 def ensure_desk_widgets(owner) -> None:
