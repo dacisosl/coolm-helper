@@ -240,7 +240,6 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
         f"background:transparent")
     head.addWidget(title)
     head.addStretch()
-    head.addWidget(widget.make_pin_button())   # 📌 바로 고정 (v1.4)
     head.addWidget(widget.make_edit_button())
     root.addLayout(head)
     root.addWidget(widget.build_edit_bar())
@@ -787,8 +786,14 @@ class PlannerWidget(DeskWidgetBase):
     def __init__(self, store, config, base_dir, conf):
         super().__init__(store, config, base_dir, conf)
         self._selected = date.today()
-        root, _head = _make_card(self, "📋 캘린더 · 할 일",
-                                 extra_qss=theme.CALENDAR_QSS)
+        root, head = _make_card(self, "📋 캘린더 · 할 일",
+                                extra_qss=theme.CALENDAR_QSS)
+        # ☰ 상세보기 토글 — 편집 모드에 안 들어가도 헤더에서 바로 (v1.5.3)
+        self.detail_btn = self.make_header_toggle(
+            "list", "달력 아래 일정 목록(상세보기) 보이기/숨기기",
+            checked=bool(conf.get("show_detail", True)))
+        self.detail_btn.toggled.connect(self._set_show_detail)
+        head.insertWidget(head.count() - 1, self.detail_btn)
         self.cal = EventCalendar()
         self.cal.clicked.connect(
             lambda qd: self._pick(date(qd.year(), qd.month(), qd.day())))
@@ -808,16 +813,6 @@ class PlannerWidget(DeskWidgetBase):
         self.items_lay.setSpacing(6)
         self.detail_scroll.setWidget(inner)
         root.addWidget(self.detail_scroll, stretch=4)
-        # 편집 도구줄에 '아래 상세보기' 토글 — 끄면 순수 달력처럼 쓴다
-        self.detail_cb = QCheckBox("상세보기")
-        self.detail_cb.setToolTip("달력 아래에 그날 일정 목록을 펼칠지")
-        self.detail_cb.setStyleSheet(
-            f"QCheckBox{{color:{theme.SUBTLE};font-size:10px;"
-            f"background:transparent}}")
-        self.detail_cb.setChecked(bool(conf.get("show_detail", True)))
-        self.detail_cb.toggled.connect(self._set_show_detail)
-        bar_lay = self._edit_bar.layout()
-        bar_lay.insertWidget(bar_lay.count() - 2, self.detail_cb)  # 📌 앞에
         self._apply_detail()
         self.refresh()
 

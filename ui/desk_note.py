@@ -52,7 +52,6 @@ class PostItWidget(DeskWidgetBase):
         self.when_label = QLabel()
         head.addWidget(self.when_label)
         head.addStretch()
-        head.addWidget(self.make_pin_button())   # 📌 바로 고정 (v1.4)
         head.addWidget(self.make_edit_button())
         close_btn = QPushButton("✕")
         close_btn.setToolTip("포스트잇 내리기 (일정은 그대로 남아요)")
