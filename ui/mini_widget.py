@@ -30,9 +30,9 @@ class _IconBar(QWidget):
         card = QFrame()
         card.setObjectName("bar")
         card.setStyleSheet(
-            f"#bar{{background:{theme.CARD};border-radius:14px;"
-            f"border:1px solid {theme.BORDER}}}")
-        card.setGraphicsEffect(theme.make_shadow(self, 1))
+            f"#bar{{background:{theme.CARD};border-radius:{theme.RADIUS_LG}px;"
+            f"border:none}}")
+        card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(6, 8, 6, 8)
@@ -56,7 +56,7 @@ class _IconBar(QWidget):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
                 f"QPushButton{{background:transparent;border:none;"
-                f"border-radius:10px}}"
+                f"border-radius:{theme.RADIUS_MD}px}}"
                 f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
                 f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
             b.clicked.connect(lambda _, h=handler: (self.close(), h()))
@@ -83,7 +83,7 @@ class MiniWidget(WidgetBase):
         self.demo_chip.setFixedSize(16, 16)
         self.demo_chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.demo_chip.setStyleSheet(
-            f"background:{theme.ACCENT};color:white;border-radius:8px;"  # 8=16px의 반(원형)
+            f"background:{theme.PRIMARY};color:white;border-radius:8px;"  # 8=16px의 반(원형)
             f"font-size:{theme.FONT_XS}px;font-weight:bold")
         self.demo_chip.setToolTip("데모 모드가 켜져 있습니다 (설정 → 데이터에서 끄기)")
         self.demo_chip.move(0, 0)

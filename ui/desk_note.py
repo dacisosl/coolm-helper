@@ -40,7 +40,8 @@ class PostItWidget(DeskWidgetBase):
         card.setObjectName("postit")
         card.setStyleSheet(
             theme.BASE_QSS
-            + f"#postit{{background:{theme.POSTIT_BG};border-radius:10px;"
+            + f"#postit{{background:{theme.POSTIT_BG};"
+              f"border-radius:{theme.RADIUS_LG}px;"
               f"border:1px solid {theme.POSTIT_BORDER}}}")
         outer.addWidget(card)
         root = QVBoxLayout(card)

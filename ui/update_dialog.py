@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""업데이트 안내·진행 창 (2026-07-21 리디자인).
+"""업데이트 안내·진행 창 (2026-07-22 v1.3 프리미엄 무드).
 
-클로드(Claude) 앱 감성: 크림 배경, 세리프 헤드라인, 테라코타 CTA,
-넉넉한 여백. 앱 본체(파랑·화이트)와 달리 '특별한 순간' 전용 무드다.
+앱 본체와 같은 딥 네이비/화이트/라이트그레이 — 넉넉한 여백, 큰 라운드,
+은은한 그림자. 앱의 다른 창들과 통일된 차분한 무드.
 
 ① 안내 화면: 헤드라인 + 버전 알약 + 변경사항 카드 + [나중에 / 지금 업데이트]
 ② 진행 화면: 다운로드 게이지(MB·%) → 끝나면 조용히 설치 실행 + 앱 종료
@@ -22,18 +22,18 @@ from ui import motion
 
 from ui import theme
 
-# ── 이 창의 무드 매핑 (v1.1 딥 네이비 컨셉 — theme 토큰을 그대로 쓴다) ──
+# ── 이 창의 색 별칭 (theme 토큰 그대로 — 앱 전체와 통일) ──
 CREAM = theme.BG              # 배경
-INK = theme.TEXT              # 본문 글자
-INK_SOFT = theme.SUBTLE       # 보조 글자
+INK = theme.TEXT             # 본문 글자
+INK_SOFT = theme.SUBTLE      # 보조 글자
 CARD = theme.CARD
 CARD_BORDER = theme.BORDER
-CORAL = theme.PRIMARY         # CTA (딥 네이비)
-CORAL_HOVER = theme.PRIMARY_DARK
-CORAL_PRESSED = theme.PRIMARY_PRESSED
+ACCENT = theme.PRIMARY       # CTA (딥 네이비)
+ACCENT_HOVER = theme.PRIMARY_DARK
+ACCENT_PRESSED = theme.PRIMARY_PRESSED
 PILL_BG = theme.PRIMARY_LIGHT
 
-_SERIF = "font-family:'Malgun Gothic','Segoe UI',sans-serif"
+_HEAD_FONT = "font-family:'Malgun Gothic','Segoe UI',sans-serif"
 
 
 class _Downloader(QObject):
@@ -89,14 +89,14 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         head = QLabel("새로운 버전이<br>준비됐어요")
         head.setTextFormat(Qt.TextFormat.RichText)
         head.setStyleSheet(
-            f"{_SERIF};font-size:26px;font-weight:bold;color:{INK}")
+            f"{_HEAD_FONT};font-size:{theme.FONT_HERO}px;font-weight:bold;color:{INK}")
         lay.addWidget(head)
         lay.addSpacing(10)
 
         pill = QLabel(f"v{APP_VERSION}  →  v{self.info.get('version')}")
         pill.setStyleSheet(
             f"background:{PILL_BG};color:{INK};font-size:12px;"
-            f"font-weight:bold;border-radius:11px;padding:4px 12px")
+            f"font-weight:bold;border-radius:{theme.RADIUS_LG}px;padding:4px 12px")
         prow = QHBoxLayout()
         prow.addWidget(pill)
         prow.addStretch()
@@ -107,8 +107,8 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         notes = str(self.info.get("notes", "")).strip()
         card = QFrame()
         card.setStyleSheet(
-            f"QFrame{{background:{CARD};border:1px solid {CARD_BORDER};"
-            f"border-radius:14px}}")
+            f"QFrame{{background:{CARD};border:none;"
+            f"border-radius:{theme.RADIUS_LG}px}}")
         cl = QVBoxLayout(card)
         cl.setContentsMargins(16, 12, 16, 12)
         cl.setSpacing(6)
@@ -149,11 +149,11 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         go = QPushButton("지금 업데이트")
         go.setCursor(Qt.CursorShape.PointingHandCursor)
         go.setStyleSheet(
-            f"QPushButton{{background:{CORAL};color:white;border:none;"
-            f"border-radius:10px;padding:11px 22px;font-size:14px;"
+            f"QPushButton{{background:{ACCENT};color:white;border:none;"
+            f"border-radius:{theme.RADIUS_MD}px;padding:11px 22px;font-size:{theme.FONT_MD}px;"
             f"font-weight:bold}}"
-            f"QPushButton:hover{{background:{CORAL_HOVER}}}"
-            f"QPushButton:pressed{{background:{CORAL_PRESSED};"
+            f"QPushButton:hover{{background:{ACCENT_HOVER}}}"
+            f"QPushButton:pressed{{background:{ACCENT_PRESSED};"
             f"padding:12px 22px 10px 22px}}")
         go.clicked.connect(self._start_download)
         btns.addWidget(go)
@@ -170,7 +170,7 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
 
         self.prog_head = QLabel("새 버전을 받고 있어요…")
         self.prog_head.setStyleSheet(
-            f"{_SERIF};font-size:22px;font-weight:bold;color:{INK}")
+            f"{_HEAD_FONT};font-size:{theme.FONT_XXL}px;font-weight:bold;color:{INK}")
         lay.addWidget(self.prog_head)
         lay.addSpacing(16)
 
@@ -181,7 +181,7 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         self.bar.setStyleSheet(
             f"QProgressBar{{background:{PILL_BG};border:none;"
             f"border-radius:4px}}"
-            f"QProgressBar::chunk{{background:{CORAL};border-radius:4px}}")
+            f"QProgressBar::chunk{{background:{ACCENT};border-radius:4px}}")
         lay.addWidget(self.bar)
         lay.addSpacing(8)
 
@@ -236,7 +236,7 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         close.setCursor(Qt.CursorShape.PointingHandCursor)
         close.setStyleSheet(
             f"QPushButton{{background:{PILL_BG};color:{INK};border:none;"
-            f"border-radius:10px;padding:9px 18px;font-weight:bold}}"
+            f"border-radius:{theme.RADIUS_MD}px;padding:9px 18px;font-weight:bold}}"
             f"QPushButton:hover{{background:{CARD_BORDER}}}")
         close.clicked.connect(self.reject)
         page = self.stack.currentWidget()

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """공용 테마 — COOL-비서 딥 네이비 (MD3 톤), 라이트 모드 고정.
 
-디자인 토큰(2026-07-22 v1.1 리디자인 — 사용자 제공 MD3 시안 기준):
-- 팔레트: 딥 네이비 프라이머리(#006699/#004d75) + 옅은 회청 배경(#f9f9fc)
-  + 보라 터셔리 악센트(#571ac0). 이전의 밝은 하늘색 테마를 대체.
-- 모서리 3단(4/8/12 — 시안의 각진 감성), 타이포 5단, 간격 4배수
+디자인 토큰(2026-07-22 v1.3 프리미엄 신뢰 무드):
+- 팔레트: 딥 네이비 프라이머리(#006699/#004d75) + 옅은 회청 배경(#f9f9fc).
+  강조는 중립 슬레이트, 포인트는 시그니처 오렌지('오늘'). 보라 폐기.
+- 모서리 4단(6/10/16/20 — 넉넉한 라운드), 타이포 5단+, 간격 4배수
+- 카드는 무테 + 은은한 그림자(make_shadow)로 분리
 - 색은 전부 이 파일의 상수로 (하드코딩 hex 금지)
 - 눌림 피드백(:pressed)은 배경 한 단계 어둡게 + 1px 하강(레이아웃 시프트 없음)
 - 그림자는 make_shadow(parent, level) 한 함수로 통일
@@ -20,6 +21,7 @@ BG = "#f9f9fc"                  # background
 CARD = "#ffffff"                # surface-container-lowest
 CARD_TINT = "#f3f3f6"           # surface-container-low (hover·에디터 배경)
 BORDER = "#d3dae2"              # outline-variant(연화)
+BORDER_SUBTLE = "#e6eaef"       # 아주 옅은 hairline — 카드 내부 구분·데스크위젯
 TEXT = "#1a1c1e"                # on-surface
 SUBTLE = "#40484f"              # on-surface-variant — 보조 글자
 DANGER = "#ba1a1a"              # error
@@ -31,8 +33,8 @@ SUCCESS_BORDER = "#bfe5c8"
 SUCCESS_FG = "#2e7d32"          # 등록됨 초록 글자
 SUCCESS_SEL = "#dff0e2"         # 등록됨 + 선택 배경
 SUNDAY = "#d05a5a"              # 일요일 빨강(차분하게)
-ACCENT = "#571ac0"              # tertiary 보라 — AI·주말·특별 강조
-ACCENT_BG = "#e9ddff"           # tertiary-fixed 연보라 배경
+ACCENT = "#4a5b6e"              # 중립 슬레이트 — 은은한 강조(보라 폐기, v1.3)
+ACCENT_BG = "#eef1f5"           # 아주 연한 회청 강조 배경
 SIGNATURE = "#f59300"           # 시그니처 '쿨쿠리 오렌지' — 부리색.
                                 # 네이비의 보색 포인트: '오늘'·캐릭터 강조 전용
 SIGNATURE_BG = "#fff1dd"        # 시그니처 연한 배경
@@ -45,10 +47,11 @@ TOAST_BG = "#2f3133"           # 토스트 어두운 배경 (inverse-surface)
 TOAST_ACTION = "#90cdff"       # 토스트 액션 글자 (inverse-primary)
 TOAST_ACTION_HOVER = "#bfe0ff"
 
-# ── 모서리 3단 (시안: 절제된 각) ─────────────────────
-RADIUS_SM = 4      # 칩·인라인 소형 버튼·리스트 항목
-RADIUS_MD = 8      # 입력칸·버튼·토스트·열(column)
-RADIUS_LG = 12     # 카드·창·말풍선
+# ── 모서리 4단 (v1.3 프리미엄: 넉넉한 라운드) ─────────
+RADIUS_SM = 6      # 칩·인라인 소형 버튼·리스트 항목
+RADIUS_MD = 10     # 입력칸·버튼·토스트·열(column)
+RADIUS_LG = 16     # 카드·말풍선
+RADIUS_XL = 20     # 창·대형 카드 (시안의 20~24px 감성)
 
 # ── 타이포 5단 ────────────────────────────────────────
 FONT_XS = 11       # 힌트·메타·칩
@@ -56,6 +59,8 @@ FONT_SM = 12       # 보조 라벨·작은 버튼
 FONT_MD = 13       # 본문 기본
 FONT_LG = 15       # 섹션 헤더
 FONT_XL = 18       # 창 제목
+FONT_XXL = 22      # 큰 헤드라인(업데이트 진행 등)
+FONT_HERO = 26     # 히어로 헤드라인(안내문구 보정 첫 화면)
 
 # ── 간격 (4의 배수) ──────────────────────────────────
 SPACE_XS = 4
@@ -86,11 +91,12 @@ def make_shadow(parent, level: int = 1):
     """카드/팝오버용 표준 그림자. level 1=가벼움(팝오버·말풍선), 2=창 카드."""
     from PyQt6.QtGui import QColor
     from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-    blur, dy, alpha = {1: (16, 3, 70), 2: (24, 4, 55)}[level]
+    # v1.3: 더 크고 부드럽고 옅게 — 프리미엄 calm (테두리 대신 그림자로 분리)
+    blur, dy, alpha = {1: (20, 4, 38), 2: (34, 8, 30)}[level]
     s = QGraphicsDropShadowEffect(parent)
     s.setBlurRadius(blur)
     s.setOffset(0, dy)
-    s.setColor(QColor(0, 102, 153, alpha))   # PRIMARY rgb (딥 네이비)
+    s.setColor(QColor(20, 40, 70, alpha))   # 짙은 네이비 그림자(중립)
     return s
 
 
@@ -169,11 +175,10 @@ TEXT_BTN = (
     f"QPushButton:pressed{{background:{LIGHT_PRESSED};"
     f"padding:7px 10px 5px 10px}}")
 
-# 다이얼로그 헤더 라벨 (5종 창이 공유) — 시안의 밑줄 섹션 제목
+# 다이얼로그 헤더 라벨 (5종 창이 공유) — 밑줄 없이 크기·여백으로 위계
 DIALOG_HEADER = (
-    f"font-size:{FONT_LG}px;font-weight:bold;color:{PRIMARY_DARK};"
-    f"background:transparent;border:none;"
-    f"border-bottom:1px solid {BORDER};padding-bottom:6px")
+    f"font-size:{FONT_XL}px;font-weight:bold;color:{PRIMARY_DARK};"
+    f"background:transparent;border:none;padding:2px 0 6px 0")
 
 # 섹션 위 작은 라벨 (시안의 uppercase label 대응 — 자간 살린 회색 소제목)
 SECTION_LABEL = (
@@ -182,9 +187,9 @@ SECTION_LABEL = (
 
 # 제목 입력칸 — 등록·간편등록·일정추가 창의 한 줄 바 공용
 TITLE_EDIT = (
-    f"QLineEdit{{font-size:14px;font-weight:bold;background:{CARD};"
-    f"border:1px solid {BORDER};border-radius:{RADIUS_SM + 2}px;padding:8px}}"
-    f"QLineEdit:focus{{border:2px solid {PRIMARY};padding:7px}}")
+    f"QLineEdit{{font-size:{FONT_LG}px;font-weight:bold;background:{CARD};"
+    f"border:1px solid {BORDER};border-radius:{RADIUS_MD}px;padding:9px 11px}}"
+    f"QLineEdit:focus{{border:2px solid {PRIMARY};padding:8px 10px}}")
 
 # 개인정보 경고 라벨 — 빨간 알약
 WARN_LABEL = (
@@ -205,6 +210,23 @@ QCalendarWidget QSpinBox {{ background:{CARD}; color:{TEXT}; }}
 QCalendarWidget QAbstractItemView {{ background:{CARD}; color:{TEXT};
     border:none; outline:0; font-size:{FONT_MD}px;
     selection-background-color:{PRIMARY}; selection-color:white; }}
+"""
+
+# 시스템 팝업 통일 — main.py에서 app.setStyleSheet로 전역 적용.
+# ⚠ QMessageBox/QMenu 셀렉터만 담는다 — QWidget 전역 규칙을 넣으면
+#   반투명 데스크위젯(WA_TranslucentBackground) 배경을 덮어 회귀함.
+SYSTEM_QSS = f"""
+QMessageBox {{ background:{CARD}; }}
+QMessageBox QLabel {{ color:{TEXT}; font-size:{FONT_MD}px; background:transparent; }}
+QMessageBox QPushButton {{ background:{CARD}; color:{PRIMARY_DARK};
+    border:1px solid {BORDER}; border-radius:{RADIUS_MD}px;
+    padding:6px 16px; font-weight:bold; min-width:64px; }}
+QMessageBox QPushButton:hover {{ background:{PRIMARY_LIGHT}; border-color:{PRIMARY}; }}
+QMessageBox QPushButton:default {{ background:{PRIMARY}; color:white; border:none; }}
+QMenu {{ background:{CARD}; color:{TEXT}; border:1px solid {BORDER};
+    border-radius:{RADIUS_MD}px; padding:4px; }}
+QMenu::item {{ padding:6px 18px; border-radius:{RADIUS_SM}px; }}
+QMenu::item:selected {{ background:{PRIMARY_LIGHT}; color:{PRIMARY_DARK}; }}
 """
 
 # 포스트잇 위젯 (은은한 노란 메모지)

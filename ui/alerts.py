@@ -52,9 +52,9 @@ class AlertBubble(QWidget):
         card = QFrame()
         card.setObjectName("bubble")
         card.setStyleSheet(
-            f"#bubble{{background:{theme.CARD};border:2px solid {theme.PRIMARY};"
+            f"#bubble{{background:{theme.CARD};border:none;"
             f"border-radius:{theme.RADIUS_LG}px}}")
-        card.setGraphicsEffect(theme.make_shadow(self, 1))
+        card.setGraphicsEffect(theme.make_shadow(self, 2))
         outer.addWidget(card)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 9, 12, 9)

@@ -37,13 +37,10 @@ class FavoritesTab(QWidget):
         rl.setContentsMargins(10, 0, 0, 0)
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("제목")
-        self.title_edit.setStyleSheet(
-            f"QLineEdit{{font-size:14px;font-weight:bold;background:{theme.CARD};"
-            f"border:1px solid {theme.BORDER};border-radius:8px;padding:8px}}"
-            f"QLineEdit:focus{{border:2px solid {theme.PRIMARY}}}")
+        self.title_edit.setStyleSheet(theme.TITLE_EDIT)
         rl.addWidget(self.title_edit)
         self.meta = QLabel()
-        self.meta.setStyleSheet(f"color:{theme.SUBTLE};font-size:11px")
+        self.meta.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px")
         rl.addWidget(self.meta)
         self.content_edit = QTextEdit()
         self.content_edit.setPlaceholderText("내용")

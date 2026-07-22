@@ -114,8 +114,8 @@ class DatePickerButton(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(
             f"QPushButton{{background:{theme.CARD};color:{theme.TEXT};"
-            f"border:1px solid {theme.BORDER};border-radius:8px;"
-            f"padding:7px 14px;font-size:13px;text-align:left}}"
+            f"border:1px solid {theme.BORDER};border-radius:{theme.RADIUS_MD}px;"
+            f"padding:8px 14px;font-size:{theme.FONT_MD}px;text-align:left}}"
             f"QPushButton:hover{{border-color:{theme.PRIMARY}}}")
         self.clicked.connect(self._open)
         self._sync()
@@ -233,7 +233,7 @@ class ReviewDialog(motion.FadeInMixin, QDialog):
         self.list = QListWidget()
         self.list.setStyleSheet(
             f"QListWidget{{background:{theme.CARD};border:1px solid {theme.BORDER};"
-            f"border-radius:10px;padding:4px}}"
+            f"border-radius:{theme.RADIUS_LG}px;padding:4px}}"
             f"QListWidget::item{{border:none;padding:1px}}"
             f"QListWidget::item:selected{{background:transparent}}")
         self.list.currentRowChanged.connect(self._show_detail)
