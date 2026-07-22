@@ -40,7 +40,7 @@ class _IconBar(QWidget):
 
         buttons = [("bolt", "바로 등록 — 지금 보고 있는 쪽지를 즉시 등록 "
                     "(펭귄 더블클릭으로도 열려요)", owner.open_quick)]
-        buttons.append(("inbox", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
+        buttons.append(("mail", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
                         owner.open_review))
         # 캘린더·할일은 v0.11.0부터 바탕화면 위젯으로 이동 (관리는 설정에서)
         if owner.config.get("proof_enabled"):

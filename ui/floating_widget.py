@@ -83,7 +83,7 @@ class FloatingWidget(WidgetBase):
         lay.addWidget(quick_btn)
 
         add_btn = QPushButton(" 쪽지 목록")
-        add_btn.setIcon(icon("inbox"))
+        add_btn.setIcon(icon("mail"))
         add_btn.setIconSize(ICON_SIZE)
         add_btn.setStyleSheet(secondary)
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
