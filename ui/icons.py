@@ -79,6 +79,25 @@ def svg(name: str) -> str:
             f'{_PATHS[name]}</svg>')
 
 
+def dot_icon(color: str, size: int = 8) -> QIcon:
+    """작은 색 원(●) 아이콘 — 중요도 칩의 상태 점 (리니어/노션풍)."""
+    key = ("dot", color, size)
+    if key in _cache:
+        return _cache[key]
+    from PyQt6.QtGui import QColor
+    pm = QPixmap(size, size)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(color))
+    p.drawEllipse(0, 0, size, size)
+    p.end()
+    ic = QIcon(pm)
+    _cache[key] = ic
+    return ic
+
+
 def icon(name: str, size: int = 22) -> QIcon:
     key = (name, size)
     if key in _cache:

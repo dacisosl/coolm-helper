@@ -33,6 +33,10 @@ SUCCESS_SEL = "#dff0e2"         # 등록됨 + 선택 배경
 SUNDAY = "#d05a5a"              # 일요일 빨강(차분하게)
 ACCENT = "#571ac0"              # tertiary 보라 — AI·주말·특별 강조
 ACCENT_BG = "#e9ddff"           # tertiary-fixed 연보라 배경
+SIGNATURE = "#f59300"           # 시그니처 '쿨쿠리 오렌지' — 부리색.
+                                # 네이비의 보색 포인트: '오늘'·캐릭터 강조 전용
+SIGNATURE_BG = "#fff1dd"        # 시그니처 연한 배경
+SIGNATURE_DARK = "#a96800"      # 시그니처 진한 글자용 (연한 배경 위)
 LOW_FG = "#40484f"              # 중요도 '낮음' 글자 (on-surface-variant)
 LOW_BG = "#eeeef0"              # 중요도 '낮음' 배경 (surface-container)
 DISABLED_BG = "#9cbcd1"        # 비활성 네이비 버튼
@@ -217,7 +221,11 @@ PRIORITY_COLORS = {
 
 
 def priority_chip(priority: str) -> str:
-    """중요도 라벨용 스타일시트."""
-    fg, bg = PRIORITY_COLORS.get(priority, PRIORITY_COLORS["보통"])
-    return (f"background:{bg};color:{fg};border-radius:{RADIUS_SM}px;"
-            f"padding:2px 9px;font-size:{FONT_XS}px;font-weight:bold")
+    """중요도 칩 스타일 — 색 점(●) + 중립 알약 (색 배경 대신 점만 색).
+
+    점은 아이콘(dot_icon)이나 리치텍스트 ●로 그린다 — 칩 자체는
+    옅은 회색 알약이라 카드가 알록달록해지지 않는다.
+    """
+    return (f"background:{CARD_TINT};color:{TEXT};"
+            f"border:1px solid {BORDER};border-radius:11px;"
+            f"padding:2px 10px;font-size:{FONT_XS}px;font-weight:bold")

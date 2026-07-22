@@ -465,7 +465,8 @@ class SimpleTodoWidget(DeskWidgetBase):
         # 주간 위젯의 하루 열(_DayColumn)과 같은 골격·여백·크기
         fpx = self.font_px
         col = QFrame()
-        bg = theme.PRIMARY_LIGHT if today_col else theme.CARD
+        # '오늘'은 시그니처 쿨쿠리 오렌지로 — 앱의 포인트 색
+        bg = theme.SIGNATURE_BG if today_col else theme.CARD
         col.setStyleSheet(
             f"QFrame{{background:{bg};border-radius:{theme.RADIUS_MD}px}}")
         lay = QVBoxLayout(col)
@@ -488,11 +489,23 @@ class SimpleTodoWidget(DeskWidgetBase):
         rows.setContentsMargins(0, 0, 0, 0)
         rows.setSpacing(3)
         if not events:
-            empty = QLabel("없음")
+            if today_col and self.config.get("character_mode", True):
+                # 오늘 할 일이 없으면 잠든 쿨쿠리 — 보면 안심
+                pic = QLabel()
+                from ui.penguin_icon import penguin_pixmap
+                pic.setPixmap(penguin_pixmap(self.base_dir, 44, "sleep"))
+                pic.setStyleSheet("background:transparent")
+                pic.setToolTip("쿨쿠리가 자고 있어요 — 오늘은 한가해요")
+                rows.addWidget(pic, alignment=Qt.AlignmentFlag.AlignHCenter)
+                empty = QLabel("오늘은 한가해요")
+            else:
+                empty = QLabel("없음")
             empty.setStyleSheet(
                 f"color:{theme.SUBTLE};font-size:{fpx(9)}px;"
                 f"background:transparent")
-            rows.addWidget(empty)
+            rows.addWidget(empty, alignment=(
+                Qt.AlignmentFlag.AlignHCenter if today_col
+                else Qt.AlignmentFlag.AlignLeft))
         for e in events:
             rows.addWidget(_TodoRow(e, self.store, owner=self))
         rows.addStretch()
@@ -509,7 +522,7 @@ class SimpleTodoWidget(DeskWidgetBase):
         self.cols.addWidget(
             self._column("지난 일", theme.DANGER_FG, overdue, False), 1)
         self.cols.addWidget(
-            self._column("오늘 할 일", theme.PRIMARY_DARK, today, True), 1)
+            self._column("오늘 할 일", theme.SIGNATURE_DARK, today, True), 1)
         self.cols.addWidget(
             self._column("앞으로 할 일", theme.LOW_FG, upcoming, False), 1)
 
@@ -525,7 +538,8 @@ class _DayColumn(QFrame):
         has_events = bool(owner.store.on_date(d))
         # 주말(접힌 열)에 일정이 있으면 강조해서 놓치지 않게 한다
         weekend_accent = slim and has_events
-        bg = (theme.PRIMARY_LIGHT if today
+        # '오늘'은 시그니처 쿨쿠리 오렌지
+        bg = (theme.SIGNATURE_BG if today
               else theme.ACCENT_BG if weekend_accent else theme.CARD)
         border = theme.ACCENT if weekend_accent else "transparent"
         self.setStyleSheet(
@@ -537,7 +551,8 @@ class _DayColumn(QFrame):
         lay.setSpacing(3)
         fpx = owner.font_px
         wd = WEEKDAY_KO[d.weekday()]
-        color = (theme.SUNDAY if d.weekday() == 6 else
+        color = (theme.SIGNATURE_DARK if today else
+                 theme.SUNDAY if d.weekday() == 6 else
                  theme.PRIMARY if d.weekday() == 5 else theme.SUBTLE)
         head = QLabel(f"{d.day} ({wd})")
         head.setStyleSheet(f"color:{color};font-size:{fpx(10)}px;"
