@@ -1,5 +1,5 @@
 {
-  "version": "0.18.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.18.0/CoolmHelper-Setup.exe",
-  "notes": "궁금한 건 누르고, 옮기는 건 잡는 맛이 나요\r\n\r\n- 화면 곳곳의 물음표(?)를 이제 클릭하면 설명 말풍선이 바로 떠요. 마우스를 올려 기다릴 필요가 없습니다. (설정 창, 안내문구 보정 창 등 전부)\r\n- 할 일·주간 위젯에서 점 손잡이(⠿)를 잡으면 항목이 살짝 떠오르는 그림자 효과와 함께 손 모양 커서로 바뀌어, 잡아서 옮기는 느낌이 확실해졌어요."
+  "version": "0.18.1",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v0.18.1/CoolmHelper-Setup.exe",
+  "notes": "제목 수정이 어디서나 그 자리에서 됩니다\r\n\r\n- 주간 일정표도 편집 모드(렌치)에서 제목을 그 자리에서 바로 고칠 수 있어요 (할 일 보드와 동일).\r\n- 캘린더·할 일 위젯의 일정 상세보기에서도 제목을 수정할 수 있고, 수정 영역이 흰 패널로 감싸져 '지금 고치는 중'이 한눈에 보여요.\r\n- 편집 도구줄의 투명도 슬라이더가 적당한 길이로 줄었어요."
 }
