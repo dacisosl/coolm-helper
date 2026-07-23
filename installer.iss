@@ -3,7 +3,7 @@
 ; 결과: Output\CoolmHelper-Setup.exe
 
 #define AppName "COOL-비서"
-#define AppVersion "1.6.7"
+#define AppVersion "1.6.8"
 #define AppExe "CoolmHelper.exe"
 
 [Setup]
