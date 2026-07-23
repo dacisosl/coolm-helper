@@ -1,5 +1,5 @@
 {
-  "version": "1.6.5",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.5/CoolmHelper-Setup.exe",
-  "notes": "- 설정 → 일반에서 '안내문구 보정(AI)'을 켜면, 별도 키 입력 없이 바로 글을 다듬을 수 있어요.\r\n- 복잡한 API 키 입력칸은 없앴어요."
+  "version": "1.6.6",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.6/CoolmHelper-Setup.exe",
+  "notes": "- '글 다듬기'에서 나던 오류(latin-1 codec…)를 수정했어요. 이제 정상 동작합니다."
 }
