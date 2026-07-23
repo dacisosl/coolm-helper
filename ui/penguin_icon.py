@@ -153,14 +153,24 @@ SURPRISE_SVG = f"""
 
 _MOODS = {"base": PENGUIN_SVG, "sleep": SLEEP_SVG,
           "work": WORK_SVG, "surprise": SURPRISE_SVG}
+
+# 무드별 사용자 이미지 파일 — assets/에 올려두면 SVG 대신 이걸 쓴다.
+# (사용자가 직접 그린 펭귄 PNG를 넣을 수 있게, 2026-07-23)
+# 각 무드마다 여러 후보 파일명을 순서대로 찾는다(첫 번째로 존재하는 것 사용).
+_MOOD_FILES = {
+    "base": ("penguin.png", "penguin_base.png"),
+    "sleep": ("penguin_sleep.png",),
+    "work": ("penguin_work.png",),
+    "surprise": ("penguin_surprise.png",),
+}
 _cache: dict = {}
 
 
 def penguin_pixmap(base_dir: str, size: int = 44,
                    mood: str = "base") -> QPixmap:
-    """쿨쿠리 픽스맵. mood=base일 때만 assets/penguin.png 대체를 허용."""
-    if mood == "base":
-        custom = os.path.join(base_dir, "assets", "penguin.png")
+    """쿨비서 픽스맵. assets/에 무드별 이미지가 있으면 그걸, 없으면 SVG."""
+    for fname in _MOOD_FILES.get(mood, ()):
+        custom = os.path.join(base_dir, "assets", fname)
         if os.path.exists(custom):
             pm = QPixmap(custom)
             if not pm.isNull():
