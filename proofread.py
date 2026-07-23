@@ -78,9 +78,10 @@ OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
 OPENROUTER_FALLBACKS = ["google/gemini-flash-1.5", "openai/gpt-4o-mini"]
 OPENROUTER_HEADERS = {
     "Content-Type": "application/json",
-    # OpenRouter 권장 헤더 (일부 모델은 없으면 거부하기도 함)
+    # OpenRouter 권장 헤더 (일부 모델은 없으면 거부하기도 함).
+    # ⚠ HTTP 헤더 값은 latin-1만 가능 — 한글 금지(그래서 앱명은 영문으로).
     "HTTP-Referer": "https://github.com/dacisosl/coolm-helper",
-    "X-Title": "COOL-비서",
+    "X-Title": "COOL Helper",
 }
 
 
