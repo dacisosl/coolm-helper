@@ -239,45 +239,13 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             "자주 쓰는 문구를 저장해 두는 보관함.\n"
             "일정 등록 창의 ☆ 버튼과 캘린더 창의 ★ 탭이 생깁니다.")
         c.addWidget(row)
+        # 안내문구 보정 — 앱에 내장된 AI 키로 동작하므로 키 입력칸이 필요 없다.
+        # (별도 키를 쓰던 사용자는 config.proof_api_key가 있으면 그대로 우선 사용됨)
         self.proof_cb, row = _check(
             "안내문구 보정 (AI)", bool(self.config.get("proof_enabled")),
             "가정통신문 등 공개할 글을 AI로 다듬는 기능.\n"
-            "아래에 API 키를 넣어야 동작합니다.")
+            "켜면 별도 설정 없이 바로 쓸 수 있어요.")
         c.addWidget(row)
-        # 보정 켜면 나타나는 API 키 영역 (Gemini 또는 OpenRouter)
-        self.proof_area = QWidget()
-        self.proof_area.setStyleSheet("background:transparent;border:none")
-        pa = QVBoxLayout(self.proof_area)
-        pa.setContentsMargins(22, 0, 0, 0)
-        pa.setSpacing(6)
-        prow = QHBoxLayout()
-        self.prov_gemini = QRadioButton("Gemini 키")
-        self.prov_gemini.setToolTip("구글 AI 스튜디오에서 무료 발급 (AIza…)")
-        self.prov_openrouter = QRadioButton("OpenRouter 키")
-        self.prov_openrouter.setToolTip(
-            "여러 AI를 한 키로 쓰는 서비스 (sk-or-…)")
-        if self.config.get("proof_provider", "gemini") == "openrouter":
-            self.prov_openrouter.setChecked(True)
-        else:
-            self.prov_gemini.setChecked(True)
-        prow.addWidget(self.prov_gemini)
-        prow.addWidget(self.prov_openrouter)
-        prow.addStretch()
-        pa.addLayout(prow)
-        self.proof_key_edit = QLineEdit(self.config.get("proof_api_key", ""))
-        self.proof_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.proof_key_edit.setToolTip(
-            "키는 이 PC의 config.json에만 저장됩니다.\n"
-            "예전에 쪽지 등으로 공유된 적 있는 키는 쓰지 말고 새로 발급받으세요.")
-        pa.addWidget(self.proof_key_edit)
-        key_btn = QPushButton("무료 키 발급 페이지 열기")
-        key_btn.setStyleSheet(theme.TEXT_BTN)
-        key_btn.clicked.connect(self._open_key_page)
-        pa.addWidget(key_btn, alignment=Qt.AlignmentFlag.AlignLeft)
-        c.addWidget(self.proof_area)
-        self.proof_cb.toggled.connect(self._sync_proof_area)
-        self.prov_gemini.toggled.connect(self._sync_proof_area)
-        self._sync_proof_area()
         lay.addWidget(card)
 
         card, c = _card("바탕화면 위젯",
@@ -302,21 +270,6 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         lay.addWidget(card)
         lay.addStretch()
         return w
-
-    def _sync_proof_area(self) -> None:
-        self.proof_area.setVisible(self.proof_cb.isChecked())
-        if self.prov_gemini.isChecked():
-            self.proof_key_edit.setPlaceholderText(
-                "AIza… 로 시작하는 Gemini 키를 붙여넣으세요")
-        else:
-            self.proof_key_edit.setPlaceholderText(
-                "sk-or-… 로 시작하는 OpenRouter 키를 붙여넣으세요")
-
-    def _open_key_page(self) -> None:
-        import webbrowser
-        webbrowser.open("https://aistudio.google.com/apikey"
-                        if self.prov_gemini.isChecked()
-                        else "https://openrouter.ai/settings/keys")
 
     # ── 구글 연동 ───────────────────────────────────────────
     def _google_state(self) -> tuple[bool, bool]:
@@ -578,10 +531,6 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         self.config["character_mode"] = self.char_cb.isChecked()
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
-        self.config["proof_provider"] = ("openrouter"
-                                         if self.prov_openrouter.isChecked()
-                                         else "gemini")
-        self.config["proof_api_key"] = self.proof_key_edit.text().strip()
         self.config["alert_days"] = [3, 1]   # 알림은 기본값 고정
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         # 바탕화면 위젯은 체크 즉시 반영·저장되므로 여기서는 건드리지 않는다

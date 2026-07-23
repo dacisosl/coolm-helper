@@ -67,6 +67,21 @@ jobs:
       - name: 테스트
         run: python -m unittest discover -s tests
 
+      - name: 공용 AI 키 주입 (시크릿 OPENROUTER_KEY 있을 때만)
+        shell: python
+        env:
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+        run: |
+          import base64, os
+          key = os.environ.get("OPENROUTER_KEY", "").strip()
+          if key:
+              os.makedirs("assets", exist_ok=True)
+              with open("assets/proof.key", "wb") as f:
+                  f.write(base64.b64encode(key.encode("utf-8")))
+              print("assets/proof.key 생성 — 내장 키 포함 빌드")
+          else:
+              print("OPENROUTER_KEY 시크릿 없음 — 내장 키 없이 빌드")
+
       - name: 빌드 (PyInstaller)
         run: python build.py
 
