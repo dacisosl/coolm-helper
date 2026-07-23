@@ -87,9 +87,10 @@ def _gemini(text: str, config: dict) -> str:
         raise RuntimeError("응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요.")
 
 
-# 값싼 Flash 기본 모델 — 막히면(없어짐 등) 아래 후보로 폴백.
-OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
-OPENROUTER_FALLBACKS = ["google/gemini-flash-1.5", "openai/gpt-4o-mini"]
+# 최신 Flash 기본 모델 — 막히면(슬러그 다름 등) 아래 후보로 자동 폴백.
+OPENROUTER_MODEL = "google/gemini-3.6-flash"
+OPENROUTER_FALLBACKS = ["google/gemini-2.5-flash",
+                        "google/gemini-2.0-flash-001", "openai/gpt-4o-mini"]
 OPENROUTER_HEADERS = {
     "Content-Type": "application/json",
     # OpenRouter 권장 헤더 (일부 모델은 없으면 거부하기도 함).
@@ -188,8 +189,7 @@ def _openrouter(text: str, config: dict, key: str | None = None) -> str:
             last = str(e)
             continue
     raise RuntimeError(
-        f"모델을 찾지 못했어요 ({last or model}). 설정 → 일반에서 'AI 모델' 이름을 "
-        "바꿔보세요 (예: google/gemini-2.0-flash-001).")
+        f"AI 모델을 찾지 못했어요 ({last or model}). 잠시 후 다시 시도해 주세요.")
 
 
 _PROVIDERS = {"gemini": _gemini, "openrouter": _openrouter}
