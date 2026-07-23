@@ -15,3 +15,6 @@ __pycache__/
 build/
 dist/
 *.spec
+
+# 빌드 때만 주입되는 공용 AI 키 (커밋 금지)
+assets/proof.key

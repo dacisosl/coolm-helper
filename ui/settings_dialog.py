@@ -270,6 +270,16 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
             "키는 이 PC의 config.json에만 저장됩니다.\n"
             "예전에 쪽지 등으로 공유된 적 있는 키는 쓰지 말고 새로 발급받으세요.")
         pa.addWidget(self.proof_key_edit)
+        # 모델(고급) — 비워두면 기본값. provider에 따라 저장 키가 다르다.
+        self.proof_model_edit = QLineEdit()
+        self.proof_model_edit.setToolTip("AI 모델 이름 (비워두면 기본값)")
+        pa.addWidget(self.proof_model_edit)
+        proof_note = QLabel("키를 비워둬도 기본 제공 키로 바로 쓸 수 있어요. "
+                            "직접 발급한 키를 넣으면 그 키를 우선 사용합니다.")
+        proof_note.setWordWrap(True)
+        proof_note.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_XS}px;background:transparent")
+        pa.addWidget(proof_note)
         key_btn = QPushButton("무료 키 발급 페이지 열기")
         key_btn.setStyleSheet(theme.TEXT_BTN)
         key_btn.clicked.connect(self._open_key_page)
@@ -308,9 +318,16 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         if self.prov_gemini.isChecked():
             self.proof_key_edit.setPlaceholderText(
                 "AIza… 로 시작하는 Gemini 키를 붙여넣으세요")
+            self.proof_model_edit.setText(self.config.get("proof_model", "") or "")
+            self.proof_model_edit.setPlaceholderText(
+                "예: gemini-2.0-flash (비워두면 기본값)")
         else:
             self.proof_key_edit.setPlaceholderText(
                 "sk-or-… 로 시작하는 OpenRouter 키를 붙여넣으세요")
+            self.proof_model_edit.setText(
+                self.config.get("proof_model_openrouter", "") or "")
+            self.proof_model_edit.setPlaceholderText(
+                "예: google/gemini-2.0-flash-001 (비워두면 기본값)")
 
     def _open_key_page(self) -> None:
         import webbrowser
@@ -582,6 +599,15 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                                          if self.prov_openrouter.isChecked()
                                          else "gemini")
         self.config["proof_api_key"] = self.proof_key_edit.text().strip()
+        # AI 모델 — provider에 맞는 키로 저장(빈칸이면 기본값 사용)
+        model_val = self.proof_model_edit.text().strip()
+        if self.prov_openrouter.isChecked():
+            if model_val:
+                self.config["proof_model_openrouter"] = model_val
+            else:
+                self.config.pop("proof_model_openrouter", None)
+        elif model_val:
+            self.config["proof_model"] = model_val
         self.config["alert_days"] = [3, 1]   # 알림은 기본값 고정
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         # 바탕화면 위젯은 체크 즉시 반영·저장되므로 여기서는 건드리지 않는다
