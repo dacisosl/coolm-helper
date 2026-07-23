@@ -37,31 +37,31 @@ PENGUIN_SVG = f"""
 </svg>
 """
 
-# 벌러덩 누워 자는 쿨쿠리 (잠만보 무드) — 배 내밀고, 눈 ︶︶, 볼 발그레 + Zz
+# 정면으로 앉아 자는 쿨쿠리 (첨부 이미지 반영) — 감은 눈, 하품하는 벌린 부리,
+# 볼 발그레, 양옆 벌린 날개, 앞발 2개, 오른쪽 위로 커지는 Z z z
 SLEEP_SVG = f"""
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 100">
-  <ellipse cx="74" cy="70" rx="42" ry="23" fill="{_BODY}"/>
-  <ellipse cx="82" cy="64" rx="27" ry="15" fill="#ffffff"/>
-  <circle cx="30" cy="60" r="21" fill="{_BODY}"/>
-  <circle cx="22" cy="53" r="8" fill="#ffffff"/>
-  <circle cx="38" cy="51" r="8" fill="#ffffff"/>
-  <path d="M18 53 Q22 57 26 53" stroke="{_BODY}" stroke-width="2.6"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 120">
+  <ellipse cx="53" cy="66" rx="41" ry="47" fill="{_BODY}"/>
+  <path d="M15 58 Q1 74 12 94 Q21 103 29 90 L27 62 Z" fill="{_BODY}"/>
+  <path d="M91 58 Q105 74 94 94 Q85 103 77 90 L79 62 Z" fill="{_BODY}"/>
+  <ellipse cx="53" cy="82" rx="28" ry="31" fill="#ffffff"/>
+  <ellipse cx="41" cy="112" rx="12.5" ry="7" fill="{_ORANGE}"/>
+  <ellipse cx="65" cy="112" rx="12.5" ry="7" fill="{_ORANGE}"/>
+  <ellipse cx="28" cy="61" rx="6.5" ry="4.2" fill="#f2a9b4" opacity="0.9"/>
+  <ellipse cx="78" cy="61" rx="6.5" ry="4.2" fill="#f2a9b4" opacity="0.9"/>
+  <path d="M33 49 Q41 58 49 49" stroke="{_BODY}" stroke-width="3.2"
         fill="none" stroke-linecap="round"/>
-  <path d="M34 51 Q38 55 42 51" stroke="{_BODY}" stroke-width="2.6"
+  <path d="M57 49 Q65 58 73 49" stroke="{_BODY}" stroke-width="3.2"
         fill="none" stroke-linecap="round"/>
-  <ellipse cx="16" cy="63" rx="4.2" ry="2.8" fill="#f2a9b4" opacity="0.85"/>
-  <ellipse cx="43" cy="60" rx="4.2" ry="2.8" fill="#f2a9b4" opacity="0.85"/>
-  <ellipse cx="30" cy="65" rx="5.5" ry="4" fill="{_ORANGE}"/>
-  <ellipse cx="30" cy="66" rx="2.6" ry="2" fill="#c97d0e"/>
-  <ellipse cx="66" cy="57" rx="13" ry="5.5" fill="{_BODY}"
-           transform="rotate(18 66 57)"/>
-  <ellipse cx="105" cy="50" rx="9" ry="5" fill="{_ORANGE}"
-           transform="rotate(-40 105 50)"/>
-  <ellipse cx="113" cy="62" rx="9" ry="5" fill="{_ORANGE}"
-           transform="rotate(-20 113 62)"/>
-  <path d="M50 18 h14 l-14 12 h14" stroke="#6aa9e9" stroke-width="5"
+  <path d="M45 54 Q53 50 61 54 Q59 67 53 70 Q47 67 45 54 Z" fill="{_ORANGE}"/>
+  <path d="M45 54 Q53 57 61 54" stroke="#c97d0e" stroke-width="1.6"
+        fill="none" stroke-linecap="round"/>
+  <ellipse cx="53" cy="62" rx="3.4" ry="4.6" fill="#7a3b12"/>
+  <path d="M66 31 h7.5 l-7.5 8 h7.5" stroke="{_BODY}" stroke-width="3"
         fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M76 6 h10 l-10 9 h10" stroke="#9cc3ef" stroke-width="4"
+  <path d="M79 19 h8.5 l-8.5 9 h8.5" stroke="{_BODY}" stroke-width="3.4"
+        fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M93 5 h10 l-10 10 h10" stroke="{_BODY}" stroke-width="3.9"
         fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 """
