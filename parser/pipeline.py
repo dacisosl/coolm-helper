@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
     "store_dir": "store",
     "recent_count": 10,          # 가장 최근 쪽지 N개 (날짜 기준 아님)
     "google_sync_enabled": False,   # 저장 모드: False=로컬(기본) / True=구글 연동
-    "widget_style": "mini",         # mini(펭귄 도킹) | detail(카드형)
+    "widget_style": "detail",       # mini(펭귄 도킹) | detail(카드형) — 기본 상세(2026-07-23)
     "menu_scale": 100,              # 펭귄 메뉴 아이콘 크기 (100=보통, 135=크게)
     "character_mode": True,         # 쿨쿠리 무드(잠·받아적기·놀람) 켜기
     "widget_always_on_top": True,
@@ -51,12 +51,13 @@ DEFAULT_CONFIG = {
     "desk_widgets": {               # 바탕화면 위젯 (v0.10.0~)
         # planner(캘린더·할일)는 달력 위젯의 단일 창구 — 기본 켬.
         # show_detail: 아래 '그날 일정 목록'을 펼칠지 (끄면 순수 달력)
-        "planner": {"enabled": True, "geometry": None, "opacity": 95,
+        # 기본 바탕화면 위젯 = 주간 일정 하나만 (2026-07-23 사용자 기본값)
+        "planner": {"enabled": False, "geometry": None, "opacity": 95,
                     "always_on_top": False, "font_scale": 100,
                     "show_detail": True},
         "simple":  {"enabled": False, "geometry": None, "opacity": 90,
                     "always_on_top": False, "font_scale": 100},
-        "weekly":  {"enabled": False, "geometry": None, "opacity": 90,
+        "weekly":  {"enabled": True, "geometry": None, "opacity": 90,
                     "always_on_top": False, "font_scale": 100},
         # today: 오늘 할 일만 한 줄씩 — 투두리스트 (v1.5.0)
         "today":   {"enabled": False, "geometry": None, "opacity": 95,
@@ -209,6 +210,13 @@ def load_config(base_dir: str) -> dict:
             profile, "Documents", "CoolMessenger Files", "Received Files")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
+        # 처음 설치: Windows 시작 시 자동 실행 기본 켜기 (2026-07-23 사용자 기본값).
+        # winreg는 Windows 전용 — 다른 OS/테스트에서는 조용히 건너뛴다.
+        try:
+            import autostart
+            autostart.enable(base_dir)
+        except Exception:
+            pass
         return config
 
 

@@ -101,9 +101,11 @@ class TestDeskConf(unittest.TestCase):
         self.assertTrue(config["desk_widgets"]["weekly"]["enabled"])
 
     def test_default_config_not_polluted(self):
-        # load_config는 깊은 복사를 쓰므로 DEFAULT_CONFIG 원본은 항상 꺼져 있어야 한다
-        for kind in ("simple", "weekly"):
-            self.assertFalse(DEFAULT_CONFIG["desk_widgets"][kind]["enabled"])
+        # load_config는 깊은 복사를 쓰므로 DEFAULT_CONFIG 원본은 선언값 그대로여야 한다.
+        # 기본 바탕화면 위젯 = 주간 하나만 (2026-07-23 사용자 기본값)
+        self.assertTrue(DEFAULT_CONFIG["desk_widgets"]["weekly"]["enabled"])
+        self.assertFalse(DEFAULT_CONFIG["desk_widgets"]["simple"]["enabled"])
+        self.assertFalse(DEFAULT_CONFIG["desk_widgets"]["planner"]["enabled"])
 
 
 class TestPruneNotes(unittest.TestCase):

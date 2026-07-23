@@ -78,8 +78,12 @@ def _scale_calendar(cal: EventCalendar, widget_h: int, scale_pct: int,
     """
     px = max(9, min(16, widget_h // divisor))
     px = max(8, round(px * scale_pct / 100))
+    # 이 stylesheet가 달력 본체에 직접 걸리면서 조상(CALENDAR_QSS)의 선택색을
+    # 덮어써, 선택 날짜가 회색으로 나오던 버그가 있었다(2026-07-23). 여기서도
+    # 선택 배경을 시그니처 주황으로 명시한다.
     cal.setStyleSheet(
-        f"QCalendarWidget QAbstractItemView{{font-size:{px}px}}"
+        f"QCalendarWidget QAbstractItemView{{font-size:{px}px;"
+        f"selection-background-color:{theme.SIGNATURE};selection-color:white}}"
         f"QCalendarWidget QToolButton{{font-size:{px + 1}px}}")
 
 
