@@ -25,17 +25,6 @@ _TIP = ("공개용 글 전용 — 붙여넣은 내용은 AI 서버(Gemini/OpenRo
         "전송돼요.\n개인정보가 들어간 글은 넣지 마세요. "
         "쪽지는 자동으로 불러오지 않아요.")
 
-class _PromptEdit(QTextEdit):
-    """Enter=보내기, Shift+Enter=줄바꿈."""
-    submitted = pyqtSignal()
-
-    def keyPressEvent(self, ev):
-        if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and \
-                not (ev.modifiers() & Qt.KeyboardModifier.ShiftModifier):
-            self.submitted.emit()
-            return
-        super().keyPressEvent(ev)
-
 
 class _Worker(QObject):
     done = pyqtSignal(str)
@@ -125,7 +114,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
             f"color:{theme.SUBTLE};font-size:10px;font-weight:bold;"
             f"letter-spacing:2px;background:transparent")
         cl.addWidget(tag)
-        self.input_edit = _PromptEdit()
+        self.input_edit = QTextEdit()   # Enter는 줄바꿈 — 다듬기는 버튼 클릭만
         self.input_edit.setPlaceholderText(
             "안내할 내용을 간략하게 적어주세요.")
         self.input_edit.setToolTip(_TIP)
@@ -134,7 +123,6 @@ class ProofDialog(motion.FadeInMixin, QDialog):
             f"font-size:{theme.FONT_LG}px;line-height:150%;color:{theme.TEXT}}}")
         self.input_edit.setMinimumHeight(110)
         self.input_edit.setMaximumHeight(200)
-        self.input_edit.submitted.connect(self._go)
         cl.addWidget(self.input_edit)
         foot = QHBoxLayout()
         prov = ("OpenRouter"
@@ -167,7 +155,7 @@ class ProofDialog(motion.FadeInMixin, QDialog):
         self.go_btn = QPushButton("글 다듬기")
         self.go_btn.setFixedHeight(52)
         self.go_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.go_btn.setToolTip("Enter로도 보낼 수 있어요 (Shift+Enter는 줄바꿈)")
+        self.go_btn.setToolTip("이 버튼을 눌러야 다듬기가 실행돼요")
         self.go_btn.setStyleSheet(
             f"QPushButton{{background:{theme.PRIMARY};color:white;border:none;"
             f"border-radius:{theme.RADIUS_LG}px;font-size:{theme.FONT_LG}px;"
