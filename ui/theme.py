@@ -209,7 +209,7 @@ QCalendarWidget QMenu {{ background:{CARD}; color:{TEXT}; }}
 QCalendarWidget QSpinBox {{ background:{CARD}; color:{TEXT}; }}
 QCalendarWidget QAbstractItemView {{ background:{CARD}; color:{TEXT};
     border:none; outline:0; font-size:{FONT_MD}px;
-    selection-background-color:{PRIMARY}; selection-color:white; }}
+    selection-background-color:{SIGNATURE}; selection-color:white; }}
 """
 
 # 시스템 팝업 통일 — main.py에서 app.setStyleSheet로 전역 적용.
