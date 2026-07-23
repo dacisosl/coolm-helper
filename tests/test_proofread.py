@@ -120,6 +120,28 @@ class TestProofread(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             proofread.proofread("   ", {"proof_api_key": "K"})
 
+    def test_headers_are_latin1_safe(self):
+        # HTTP 헤더 값은 latin-1만 허용 — 한글 등이 들어가면 요청이 깨진다.
+        for k, v in proofread.OPENROUTER_HEADERS.items():
+            v.encode("latin-1")   # 실패하면 UnicodeEncodeError로 테스트 실패
+
+    def test_korean_body_ok_with_headers(self):
+        seen = {}
+
+        def fake(req, timeout=None):
+            # 실제 urllib처럼 헤더가 latin-1로 인코딩 가능한지 확인
+            for k, v in req.header_items():
+                v.encode("latin-1")
+            seen["ok"] = True
+            return _resp(OK)
+
+        with mock.patch("urllib.request.urlopen", fake):
+            out = proofread.proofread(
+                "내일 학부모 상담 있어요", {"proof_api_key": "K",
+                                        "proof_provider": "openrouter"})
+        self.assertEqual(out, "다듬은 글")
+        self.assertTrue(seen.get("ok"))
+
 
 if __name__ == "__main__":
     unittest.main()
