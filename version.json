@@ -1,5 +1,5 @@
 {
-  "version": "1.6.6",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.6/CoolmHelper-Setup.exe",
-  "notes": "- '글 다듬기'에서 나던 오류(latin-1 codec…)를 수정했어요. 이제 정상 동작합니다."
+  "version": "1.6.7",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.7/CoolmHelper-Setup.exe",
+  "notes": "- 안내문을 더 자연스럽고 깔끔한 공지 문장으로 다듬도록 개선했어요.\r\n- Enter로 실수로 실행되던 것을 막았어요. 이제 '글 다듬기' 버튼을 눌러야만 실행됩니다. (Enter는 줄바꿈)"
 }
