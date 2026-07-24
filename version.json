@@ -1,5 +1,5 @@
 {
-  "version": "1.6.8",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.8/CoolmHelper-Setup.exe",
-  "notes": "- 안내문구 보정에 최신 AI 모델(Gemini 3.6 Flash)을 적용했어요. 더 자연스럽게 다듬어집니다."
+  "version": "1.6.9",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.9/CoolmHelper-Setup.exe",
+  "notes": "- 달력에서 날짜를 고르면, 창을 클릭하지 않은 상태에서도 그 날이 또렷한 주황색으로 표시돼요."
 }
