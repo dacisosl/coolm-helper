@@ -79,12 +79,12 @@ class EventCalendar(QCalendarWidget):
             painter.save()
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(theme.SIGNATURE))
+            painter.setBrush(QColor(theme.SIGNATURE_SOFT))
             painter.drawRoundedRect(QRectF(rect.adjusted(3, 3, -3, -3)), 6, 6)
             f = QFont(self.font())
             f.setBold(True)
             painter.setFont(f)
-            painter.setPen(QColor("white"))
+            painter.setPen(QColor(theme.SIGNATURE_DARK))   # 연한 배경 위 진한 숫자
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(qdate.day()))
             painter.restore()
         else:

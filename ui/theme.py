@@ -38,6 +38,7 @@ ACCENT_BG = "#eef1f5"           # 아주 연한 회청 강조 배경
 SIGNATURE = "#f59300"           # 시그니처 '쿨쿠리 오렌지' — 부리색.
                                 # 네이비의 보색 포인트: '오늘'·캐릭터 강조 전용
 SIGNATURE_BG = "#fff1dd"        # 시그니처 연한 배경
+SIGNATURE_SOFT = "#ffe0c2"      # 파스텔 주황 — 달력 선택 날짜 배경(아주 연하게)
 SIGNATURE_DARK = "#a96800"      # 시그니처 진한 글자용 (연한 배경 위)
 LOW_FG = "#40484f"              # 중요도 '낮음' 글자 (on-surface-variant)
 LOW_BG = "#eeeef0"              # 중요도 '낮음' 배경 (surface-container)
