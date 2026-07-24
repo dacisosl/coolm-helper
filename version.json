@@ -1,5 +1,5 @@
 {
-  "version": "1.6.9",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.9/CoolmHelper-Setup.exe",
-  "notes": "- 달력에서 날짜를 고르면, 창을 클릭하지 않은 상태에서도 그 날이 또렷한 주황색으로 표시돼요."
+  "version": "1.6.10",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.6.10/CoolmHelper-Setup.exe",
+  "notes": "- 달력에서 고른 날짜의 배경을 눈이 편한 연한 파스텔 주황으로 다듬었어요."
 }
