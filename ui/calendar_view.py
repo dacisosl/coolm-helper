@@ -71,7 +71,24 @@ class EventCalendar(QCalendarWidget):
         self.updateCells()
 
     def paintCell(self, painter: QPainter, rect, qdate: QDate) -> None:
-        super().paintCell(painter, rect, qdate)
+        selected = qdate == self.selectedDate()
+        if selected:
+            # 선택 날짜 배경을 시그니처 주황으로 '직접' 그린다.
+            # 창이 포커스를 잃으면 Qt가 선택색을 회색으로 바꿔 스타일시트 주황이
+            # 안 먹던 문제 — 여기서 직접 그려 항상 주황이 되게 한다 (2026-07-23).
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(theme.SIGNATURE))
+            painter.drawRoundedRect(QRectF(rect.adjusted(3, 3, -3, -3)), 6, 6)
+            f = QFont(self.font())
+            f.setBold(True)
+            painter.setFont(f)
+            painter.setPen(QColor("white"))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(qdate.day()))
+            painter.restore()
+        else:
+            super().paintCell(painter, rect, qdate)
         info = self._counts.get(date(qdate.year(), qdate.month(), qdate.day()))
         if not info:
             return
@@ -79,7 +96,6 @@ class EventCalendar(QCalendarWidget):
         base = QColor(theme.DANGER) if has_high else QColor(theme.PRIMARY)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        selected = qdate == self.selectedDate()
         painter.setPen(Qt.PenStyle.NoPen)
         # 셀 크기에 맞춰 배지를 줄인다(반응형) — 가운데 날짜 숫자와 안 겹치게
         # 오른쪽 아래 구석에 붙이고, 아주 작은 셀에서는 숫자 대신 점만 찍는다
