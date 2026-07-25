@@ -215,6 +215,39 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         c.addLayout(srow)
         self._pick_scale(self._scale_pick if self._scale_pick in (100, 135)
                          else 100)
+
+        # 펭귄 크기 — 바탕화면 펭귄 자체의 크기 (2026-07-24 사용자 요청)
+        prow2 = QHBoxLayout()
+        prow2.setSpacing(8)
+        plab = QLabel("펭귄 크기")
+        plab.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
+                           f"border:none")
+        prow2.addWidget(plab)
+        self.peng_chips = {}
+        self._peng_pick = int(self.config.get("penguin_scale", 100))
+
+        def _peng_chip(val: int, label: str) -> QPushButton:
+            b = QPushButton(label)
+            b.setCheckable(True)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(
+                f"QPushButton{{background:{theme.CARD_TINT};color:{theme.SUBTLE};"
+                f"border:1px solid {theme.BORDER};border-radius:{theme.RADIUS_LG}px;"
+                f"padding:5px 14px;font-weight:bold}}"
+                f"QPushButton:hover{{border-color:{theme.PRIMARY}}}"
+                f"QPushButton:checked{{background:{theme.PRIMARY};color:white;"
+                f"border-color:{theme.PRIMARY}}}")
+            b.clicked.connect(lambda _, v=val: self._pick_peng(v))
+            self.peng_chips[val] = b
+            return b
+
+        for val, label in ((70, "작게"), (100, "보통"),
+                           (140, "크게"), (190, "아주 크게")):
+            prow2.addWidget(_peng_chip(val, label))
+        prow2.addStretch()
+        c.addLayout(prow2)
+        self._pick_peng(self._peng_pick
+                        if self._peng_pick in self.peng_chips else 100)
         lay.addWidget(card)
 
         card, c = _card("기능")
@@ -525,9 +558,16 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         for v, b in self.scale_chips.items():
             b.setChecked(v == val)
 
+    def _pick_peng(self, val: int) -> None:
+        """펭귄 크기 칩 — 작게(70)/보통(100)/크게(140)/아주 크게(190)."""
+        self._peng_pick = val
+        for v, b in self.peng_chips.items():
+            b.setChecked(v == val)
+
     def _save(self) -> None:
         self.config["widget_style"] = self._style_pick
         self.config["menu_scale"] = self._scale_pick
+        self.config["penguin_scale"] = self._peng_pick
         self.config["character_mode"] = self.char_cb.isChecked()
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
