@@ -1,5 +1,5 @@
 {
-  "version": "1.7.4",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.4/CoolmHelper-Setup.exe",
-  "notes": "- 안경 안쪽이 뚫려 있어 바탕화면이 비쳐 보이던 것을 메웠어요.\r\n- 바탕화면·설치파일 아이콘도 고친 그림으로 다시 만들었어요."
+  "version": "1.7.5",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.5/CoolmHelper-Setup.exe",
+  "notes": "- 지난 버전에서 한쪽 눈만 메워졌던 문제를 바로잡았어요. 이제 양쪽 안경 모두 배경이 비치지 않아요."
 }
