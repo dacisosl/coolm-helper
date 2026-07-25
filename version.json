@@ -1,5 +1,5 @@
 {
-  "version": "1.7.1",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.1/CoolmHelper-Setup.exe",
-  "notes": "- 설치 후 처음 켜면 쿨비서가 화면 가운데에서 인사하고 오른쪽 자리로 날아가요. (건너뛰기 가능)\r\n- 바탕화면·설치파일 아이콘도 새 펭귄 캐릭터로 바뀌었어요.\r\n- 펭귄 기본 크기가 '크게'로 바뀌었어요. (설정 → 일반에서 변경 가능)"
+  "version": "1.7.2",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.2/CoolmHelper-Setup.exe",
+  "notes": "- 업데이트 후 처음 켜면 쿨비서가 나타나 이번에 바뀐 점을 알려주고 응원 인사를 건네요.\r\n- 인사는 몇 초면 끝나고, 건너뛰기를 누르면 바로 넘어가요."
 }
