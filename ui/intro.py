@@ -11,10 +11,13 @@ three.js/웹엔진 없이 Qt 애니메이션만 사용한다(용량 0, 시작 �
 """
 from __future__ import annotations
 
+import math
+
 from PyQt6.QtCore import (
-    QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
-    QSequentialAnimationGroup, Qt,
+    QEasingCurve, QParallelAnimationGroup, QPropertyAnimation, QRect,
+    QSequentialAnimationGroup, Qt, QVariantAnimation,
 )
+from PyQt6.QtGui import QPainter, QPixmap, QTransform
 from PyQt6.QtWidgets import (
     QApplication, QGraphicsOpacityEffect, QLabel, QPushButton, QWidget,
 )
@@ -95,13 +98,25 @@ class IntroOverlay(QWidget):
         self.bubble.setGraphicsEffect(self._bub_fx)
         self._bub_fx.setOpacity(0.0)
 
-        # 클릭 안내 — 사용자가 눌러야 다음 말로 넘어간다
-        self.hint = QLabel("클릭하면 다음 →", self)
+        # 클릭 안내 — 사용자가 눌러야 다음 말로 넘어간다.
+        # 처음 보는 사람도 놓치지 않게 또렷한 알약 자막 + 은은한 깜빡임 (2026-07-25)
+        self.hint = QLabel("👆  화면을 클릭하면 다음 말로 넘어가요", self)
         self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.hint.setStyleSheet(
-            f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
-            f"background:transparent")
+            f"background:{theme.CARD};color:{theme.PRIMARY_DARK};"
+            f"border:1px solid {theme.BORDER};"
+            f"border-radius:{theme.RADIUS_LG}px;padding:9px 18px;"
+            f"font-size:{theme.FONT_MD}px;font-weight:bold")
         self.hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._hint_fx = QGraphicsOpacityEffect(self.hint)
+        self.hint.setGraphicsEffect(self._hint_fx)
+        self._hint_pulse = QPropertyAnimation(self._hint_fx, b"opacity", self)
+        self._hint_pulse.setDuration(1100)
+        self._hint_pulse.setStartValue(1.0)
+        self._hint_pulse.setKeyValueAt(0.5, 0.45)
+        self._hint_pulse.setEndValue(1.0)
+        self._hint_pulse.setLoopCount(-1)      # 계속 깜빡 — 클릭 유도
+        self._hint_pulse.start()
 
         self.skip = QPushButton("건너뛰기 ✕", self)
         self.skip.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -192,27 +207,68 @@ class IntroOverlay(QWidget):
         self._hop_anim = seq          # GC 방지
         seq.start()
 
-    def _fly_away(self) -> None:
-        """마지막 말까지 끝나면 오른쪽 벽으로 날아가 사라진다."""
+    def _walk_away(self) -> None:
+        """마지막 말이 끝나면 뒤돌아서 뒤뚱뒤뚱 걸어 오른쪽 자리로 돌아간다.
+
+        뒷모습 그림은 없으므로 좌우 반전으로 '돌아선' 느낌을 주고,
+        발끝을 축으로 좌우 갸우뚱 + 통통 튀는 리듬으로 펭귄 걸음을 흉내낸다.
+        """
         self.skip.hide()
         self.hint.hide()
-        seq = QSequentialAnimationGroup(self)
-        fly = QParallelAnimationGroup(self)
-        fg = QPropertyAnimation(self.peng, b"geometry", self)
-        fg.setDuration(950)
-        fg.setEndValue(self._dock_rect())
-        fg.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        fly.addAnimation(fg)
-        fb = QPropertyAnimation(self._bub_fx, b"opacity", self)
-        fb.setDuration(420); fb.setEndValue(0.0)
-        fly.addAnimation(fb)
-        seq.addAnimation(fly)
-        out = QPropertyAnimation(self._peng_fx, b"opacity", self)
-        out.setDuration(260); out.setEndValue(0.0)
-        seq.addAnimation(out)
-        self._anim = seq
-        seq.finished.connect(self.finish)
-        seq.start()
+        self._hint_pulse.stop()
+        # 뒤돌아선 느낌 — 좌우 반전한 그림으로 교체
+        src = penguin_pixmap(self.base_dir, 512, "base")
+        self._walk_src = src.transformed(QTransform().scale(-1, 1))
+        self.peng.setScaledContents(False)
+        bub = QPropertyAnimation(self._bub_fx, b"opacity", self)
+        bub.setDuration(300); bub.setEndValue(0.0); bub.start()
+        self._bub_anim = bub                    # GC 방지
+        start = self._center_rect(BIG)
+        end = self._dock_rect()
+        walk = QVariantAnimation(self)
+        walk.setDuration(2400)
+        walk.setStartValue(0.0); walk.setEndValue(1.0)
+        walk.setEasingCurve(QEasingCurve.Type.InOutSine)
+        walk.valueChanged.connect(
+            lambda t: self._walk_tick(float(t), start, end))
+
+        def _arrive():
+            out = QPropertyAnimation(self._peng_fx, b"opacity", self)
+            out.setDuration(260); out.setEndValue(0.0)
+            out.finished.connect(self.finish)
+            out.start()
+            self._out_anim = out                # GC 방지
+
+        walk.finished.connect(_arrive)
+        self._anim = walk
+        walk.start()
+
+    _WADDLE_STEPS = 7      # 걸음 수
+    _WADDLE_ANGLE = 9      # 갸우뚱 각도(°)
+
+    def _walk_tick(self, t: float, start: QRect, end: QRect) -> None:
+        """걷기 한 프레임: 위치 이동 + 발끝 축 갸우뚱 + 통통."""
+        x = start.x() + (end.x() - start.x()) * t
+        y = start.y() + (end.y() - start.y()) * t
+        size = max(24, round(start.width() + (end.width() - start.width()) * t))
+        phase = t * math.pi * self._WADDLE_STEPS * 2
+        ang = math.sin(phase) * self._WADDLE_ANGLE
+        bob = abs(math.sin(phase)) * size * 0.05
+        pad = int(size * 0.18)                  # 회전해도 안 잘리게 여유
+        box = size + pad * 2
+        self.peng.setGeometry(int(x) - pad, int(y - bob) - pad, box, box)
+        frame = QPixmap(box, box)
+        frame.fill(Qt.GlobalColor.transparent)
+        p = QPainter(frame)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        p.translate(box / 2, box - pad)         # 발끝을 회전축으로
+        p.rotate(ang)
+        scaled = self._walk_src.scaled(
+            size, size, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        p.drawPixmap(-scaled.width() // 2, -scaled.height(), scaled)
+        p.end()
+        self.peng.setPixmap(frame)
 
     def advance(self) -> None:
         """화면을 클릭할 때마다 다음 말 → 마지막이면 날아간다."""
@@ -227,10 +283,13 @@ class IntroOverlay(QWidget):
             self._set_line(self._lines[self._idx])
             self._hop()
             if self._idx == len(self._lines) - 1:
-                self.hint.setText("클릭하면 시작해요 →")
+                self.hint.setText("👆  한 번 더 누르면 시작해요!")
+                self.hint.adjustSize()
+                self.hint.move(self.width() // 2 - self.hint.width() // 2,
+                               self.hint.y())
         else:
             self._flying = True
-            self._fly_away()
+            self._walk_away()
 
     def start(self) -> None:
         self.show()
