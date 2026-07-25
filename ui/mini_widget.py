@@ -74,7 +74,7 @@ class MiniWidget(WidgetBase):
 
     def penguin_px(self) -> int:
         """설정 → 일반 → 펭귄 크기(%)를 반영한 실제 픽셀 (2026-07-24)."""
-        pct = int(self.config.get("penguin_scale", 100) or 100)
+        pct = int(self.config.get("penguin_scale", 140) or 140)
         return max(24, round(self.BASE_PX * max(50, min(300, pct)) / 100))
 
     def __init__(self, base_dir: str):
