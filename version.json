@@ -1,5 +1,5 @@
 {
-  "version": "1.7.2",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.2/CoolmHelper-Setup.exe",
-  "notes": "- 업데이트 후 처음 켜면 쿨비서가 나타나 이번에 바뀐 점을 알려주고 응원 인사를 건네요.\r\n- 인사는 몇 초면 끝나고, 건너뛰기를 누르면 바로 넘어가요."
+  "version": "1.7.3",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.3/CoolmHelper-Setup.exe",
+  "notes": "- 지난 버전에서 인사 모션이 안 뜨던 문제를 고쳤어요. 이번 업데이트부터 쿨비서가 새 소식을 전합니다.\r\n- 바뀐 내용을 못 읽어오던 경우에도 앱에 들어 있는 안내문을 대신 보여줘요."
 }
