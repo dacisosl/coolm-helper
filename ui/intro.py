@@ -26,16 +26,42 @@ DOCK = 70          # 오른쪽 벽에 붙을 때 크기(px)
 LINE1 = "안녕하세요, 저는 <b>쿨비서</b>예요"
 LINE2 = "쪽지를 <b>일정</b>으로 만들어 드릴게요"
 LINE3 = "여기 오른쪽에 있을게요!"
+FIRST_LINES = (LINE1, LINE2, LINE3)
+
+# 업데이트 후 마무리 응원 멘트 (버전마다 하나씩 골라 쓴다)
+CHEERS = (
+    "오늘도 힘내세요, 제가 도울게요!",
+    "오늘 하루도 순조롭길 바라요!",
+    "바쁜 하루, 일정은 제게 맡기세요!",
+    "언제나 여기서 기다릴게요!",
+)
+
+
+def update_lines(version: str, notes: str = "") -> list[str]:
+    """업데이트 인트로 문구: 버전 알림 → 변경점 1~2줄 → 응원."""
+    lines = [f"<b>v{version}</b>로 업데이트했어요!"]
+    for raw in (notes or "").splitlines():
+        item = raw.strip().lstrip("-•").strip()
+        if item:
+            lines.append(item if len(item) <= 42 else item[:41] + "…")
+        if len(lines) >= 3:          # 너무 길지 않게 최대 2줄만
+            break
+    if len(lines) == 1:
+        lines.append("자잘한 개선이 담겨 있어요")
+    lines.append(CHEERS[sum(ord(c) for c in version) % len(CHEERS)])
+    return lines
 
 
 class IntroOverlay(QWidget):
     """전체 화면 투명 오버레이 위에서 펭귄이 움직인다."""
 
-    def __init__(self, base_dir: str, on_done=None, parent=None):
+    def __init__(self, base_dir: str, on_done=None, parent=None,
+                 lines=FIRST_LINES):
         super().__init__(parent)
         self.base_dir = base_dir
         self._on_done = on_done
         self._done = False
+        self._lines = list(lines) or list(FIRST_LINES)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint
                             | Qt.WindowType.Tool
                             | Qt.WindowType.WindowStaysOnTopHint)
@@ -54,7 +80,7 @@ class IntroOverlay(QWidget):
         self._peng_fx.setOpacity(0.0)
 
         # 말풍선
-        self.bubble = QLabel(LINE1, self)
+        self.bubble = QLabel(self._lines[0], self)
         self.bubble.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.bubble.setTextFormat(Qt.TextFormat.RichText)
         self.bubble.setStyleSheet(
@@ -135,8 +161,8 @@ class IntroOverlay(QWidget):
             hop.setEndValue(big.translated(0, dy))
             hop.setEasingCurve(QEasingCurve.Type.InOutQuad)
             seq.addAnimation(hop)
-        # 문구 2·3을 충분히 읽고 나서 날아가도록 (아래 타이머와 맞춘 값)
-        seq.addPause(1600)
+        # 남은 문구를 다 읽고 나서 날아가도록 (문구 하나당 900ms)
+        seq.addPause(max(700, 900 * (len(self._lines) - 1) - 100))
 
         # 3) 오른쪽 벽으로 슝 (작아지며) + 말풍선 사라짐
         fly = QParallelAnimationGroup(self)
@@ -161,9 +187,11 @@ class IntroOverlay(QWidget):
         self.raise_()
         self._anim = self.build()
         self._anim.finished.connect(self.finish)
-        # 말풍선 문구 전환 — 등장(0.62s)+통통(0.76s)=1.38s 뒤부터,
-        # 날아가기 시작(약 2.98s) 전에 3번째 문구까지 보이도록 맞춘 값
-        for ms, text in ((1450, LINE2), (2350, LINE3)):
+        # 말풍선 문구 전환 — 등장(0.62s)+통통(0.76s)=1.38s 뒤부터 900ms 간격.
+        # 위 addPause와 맞물려 마지막 문구까지 보이고 나서 날아간다.
+        steps = [(1450 + 900 * i, t)
+                 for i, t in enumerate(self._lines[1:])]
+        for ms, text in steps:
             t = QTimer(self)
             t.setSingleShot(True)
             t.timeout.connect(lambda h=text: self._set_line(h))
@@ -189,14 +217,21 @@ class IntroOverlay(QWidget):
         self.deleteLater()
 
 
-def play_intro(base_dir: str, on_done=None) -> bool:
-    """첫 실행 인트로를 재생한다. 재생하지 않으면 False(호출자가 바로 진행)."""
+def play_intro(base_dir: str, on_done=None, lines=FIRST_LINES) -> bool:
+    """인트로를 재생한다. 재생하지 않으면 False(호출자가 바로 진행)."""
     if not motion.is_enabled():
         return False
     app = QApplication.instance()
     if app is None:
         return False
-    overlay = IntroOverlay(base_dir, on_done=on_done)
+    overlay = IntroOverlay(base_dir, on_done=on_done, lines=lines)
     app._coolm_intro = overlay          # GC 방지
     overlay.start()
     return True
+
+
+def play_update_intro(base_dir: str, version: str, notes: str = "",
+                      on_done=None) -> bool:
+    """업데이트 직후 인사 — 새 버전 소식 + 변경점 + 응원 멘트."""
+    return play_intro(base_dir, on_done=on_done,
+                      lines=update_lines(version, notes))
