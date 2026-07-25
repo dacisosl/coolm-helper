@@ -26,16 +26,18 @@ def fix_image(path: str) -> int:
     arr = np.array(im)
     alpha = arr[:, :, 3]
 
-    # 바깥(0,0)에서 이어지지 않는 투명 영역 = 렌즈 안쪽 구멍
-    mask = Image.fromarray((alpha < 250).astype(np.uint8) * 255, "L").copy()
-    ImageDraw.floodfill(mask, (0, 0), 128)      # copy() 필수 — 배열 기반은 실패
-    region = np.array(mask) == 255
+    # 캐릭터 실루엣(불투명 덩어리) 안쪽의 빈 곳 = 렌즈 구멍.
+    # ※ 예전엔 '바깥과 안 이어진 투명 영역'을 floodfill로 찾았는데,
+    #   한쪽 안경테에 틈이 있어 배경과 이어진 렌즈를 놓쳤다(한쪽 눈만 메워짐,
+    #   2026-07-25). 실루엣 기준 binary_fill_holes로 바꿔 양쪽 다 잡는다.
+    solid = alpha >= 200
+    region = ndimage.binary_fill_holes(solid) & ~solid
     if not region.any():
         return 0
 
     hole = region & (alpha < 128)               # 완전히 빈 곳 → 새로 칠한다
     lum = arr[:, :, :3].astype(np.float32) @ np.array([0.299, 0.587, 0.114])
-    src = (alpha >= 250) & (lum < 110)          # 머리(어두운) 픽셀에서 색을 가져옴
+    src = solid & (lum < 110)                   # 머리(어두운) 픽셀에서 색을 가져옴
     idx = ndimage.distance_transform_edt(
         ~src, return_distances=False, return_indices=True)
 
