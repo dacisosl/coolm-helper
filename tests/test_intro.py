@@ -46,9 +46,10 @@ class TestVersionDetect(unittest.TestCase):
         from ui import alerts
         self.alerts = alerts
 
-    def test_fresh_install_is_not_update(self):
-        # 기록이 없으면(최초 설치) 업데이트 인트로가 아니라 첫 실행 인트로
-        self.assertFalse(self.alerts._is_new_version(_FakeWidget({})))
+    def test_missing_record_counts_as_update(self):
+        # 이 기능이 없던 옛 버전에서 올라온 사용자 — 기록이 없어도 인사해야 한다
+        # (v1.7.2에서 인사가 안 뜨던 버그)
+        self.assertTrue(self.alerts._is_new_version(_FakeWidget({})))
 
     def test_older_version_is_update(self):
         w = _FakeWidget({"last_seen_version": "0.0.1"})
@@ -64,6 +65,23 @@ class TestVersionDetect(unittest.TestCase):
         self.alerts._mark_version_seen(w)
         self.assertEqual(w.config["last_seen_version"], APP_VERSION)
         self.assertNotIn("pending_update_notes", w.config)
+
+    def test_marked_version_stops_repeat(self):
+        # 인사한 뒤에는 같은 버전에서 다시 뜨지 않는다
+        w = _FakeWidget({})
+        self.alerts._mark_version_seen(w)
+        self.assertFalse(self.alerts._is_new_version(w))
+
+    def test_bundled_notes_read(self):
+        import os
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "release_notes.txt"), "w",
+                  encoding="utf-8") as f:
+            f.write("제목 줄\n\n- 변경 하나\n- 변경 둘\n")
+        body = self.alerts._bundled_notes(d)
+        self.assertIn("변경 하나", body)
+        self.assertNotIn("제목 줄", body)
+        self.assertEqual(self.alerts._bundled_notes(tempfile.mkdtemp()), "")
 
 
 if __name__ == "__main__":

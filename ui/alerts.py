@@ -153,9 +153,26 @@ INTRO_STEPS = [
 
 
 def _is_new_version(widget) -> bool:
-    """지난 실행 이후 버전이 올라갔는지 (설치 직후 첫 실행인지)."""
-    seen = widget.config.get("last_seen_version")
-    return bool(seen) and seen != APP_VERSION
+    """지난 실행 이후 버전이 올라갔는지 (업데이트 직후 첫 실행인지).
+
+    호출 시점에는 이미 '첫 실행(intro_done False)'을 걸러낸 뒤이므로,
+    기록(last_seen_version)이 아예 없으면 = 이 기능이 없던 옛 버전에서
+    막 올라온 사용자 → 업데이트로 본다. (v1.7.2에서 기록이 없어 인사가
+    안 뜨던 버그 수정, 2026-07-25)
+    """
+    return widget.config.get("last_seen_version") != APP_VERSION
+
+
+def _bundled_notes(base_dir: str) -> str:
+    """앱과 함께 설치된 release_notes.txt의 본문(첫 줄=제목 제외)."""
+    import os
+    try:
+        with open(os.path.join(base_dir, "release_notes.txt"),
+                  encoding="utf-8") as f:
+            lines = f.read().strip().splitlines()
+        return "\n".join(lines[1:]).strip()
+    except Exception:
+        return ""
 
 
 def _mark_version_seen(widget) -> None:
@@ -201,11 +218,16 @@ def show_startup_alerts(widget) -> None:
 
     # 업데이트 직후 첫 실행: 새 소식 + 응원 멘트를 쿨비서가 전한다
     if _is_new_version(widget):
-        notes = widget.config.pop("pending_update_notes", "")
-        _mark_version_seen(widget)
+        # 옛 버전에서 올라온 경우 저장된 변경점이 없으므로 앱에 동봉된
+        # release_notes.txt를 대신 읽는다.
+        notes = (widget.config.pop("pending_update_notes", "")
+                 or _bundled_notes(widget.base_dir))
+        _mark_version_seen(widget)      # 못 띄우더라도 기록은 남긴다
         from ui.intro import play_update_intro
         if play_update_intro(widget.base_dir, APP_VERSION, notes):
             return
+    else:
+        _mark_version_seen(widget)
 
     days = tuple(widget.config.get("alert_days", [3, 1])) or (3, 1)
     alerts = build_alerts(widget.store, days=days)
