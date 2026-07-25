@@ -107,6 +107,7 @@ class FavoritesTab(QWidget):
         fav = items[row]
         self._current_id = fav.id
         self.title_edit.setText(fav.title)
+        self.title_edit.setCursorPosition(0)
         self.content_edit.setPlainText(fav.content)
         try:
             when = datetime.fromisoformat(fav.created).strftime("%Y-%m-%d %H:%M")

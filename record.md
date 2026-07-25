@@ -966,3 +966,9 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   ndimage.binary_fill_holes → 내부 빈 곳 전부 검출(틈 유무 무관).
   원본에서 다시 만들어 이중 적용 방지 후 재실행 → 4종 모두 잔여 0px.
 - 아이콘 재생성. 100 테스트 통과.
+
+## 2026-07-25 (v1.7.6) — 긴 제목이 중간부터 보이던 문제
+- QLineEdit은 setText/생성자 모두 커서를 끝에 두어, 칸보다 긴 제목은 뒷부분만
+  보였음(사용자: "제목이 중간에서부터 나오네"). setText/생성 직후
+  setCursorPosition(0) 추가 — review_dialog, quick_dialog(2곳), favorites_view,
+  desk_note, calendar_view(2곳), desk_widgets(2곳) 전부 통일. 100 테스트 통과.
