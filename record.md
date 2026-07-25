@@ -972,3 +972,12 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   보였음(사용자: "제목이 중간에서부터 나오네"). setText/생성 직후
   setCursorPosition(0) 추가 — review_dialog, quick_dialog(2곳), favorites_view,
   desk_note, calendar_view(2곳), desk_widgets(2곳) 전부 통일. 100 테스트 통과.
+
+## 2026-07-25 (v1.7.7) — 인트로를 클릭 진행식으로
+- 기존엔 타이머로 문구가 자동 전환돼 "저 혼자 말하고 넘어간다"는 피드백.
+  QTimer 자동 전환 제거 → build()는 등장 모션만, advance()가 클릭마다
+  다음 문구 + _hop()(OutBounce 깡충). 마지막 문구에서 한 번 더 클릭하면
+  _fly_away()로 도킹·페이드아웃 후 finish().
+- 등장 모션 중 클릭은 등장을 즉시 완료(문구는 유지), 날아가는 중 클릭은 무시.
+- 하단에 '클릭하면 다음 →' 힌트(마지막엔 '클릭하면 시작해요 →'),
+  스페이스/엔터로도 진행, Esc·[건너뛰기]는 즉시 종료. 100 테스트 통과.

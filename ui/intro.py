@@ -2,17 +2,18 @@
 """설치 후 첫 실행 인트로 — 화면 가운데에서 쿨비서가 등장해 오른쪽 벽으로 날아간다.
 
 three.js/웹엔진 없이 Qt 애니메이션만 사용한다(용량 0, 시작 빠름).
-- 1단계: 화면 중앙에 펭귄이 통통 튀며 등장 (OutBack) + 말풍선 인사
-- 2단계: 말풍선 문구가 바뀌며 살짝 흔들림
-- 3단계: 오른쪽 벽(도킹 위치)으로 작아지며 날아가 사라짐
-아무 곳이나 클릭하거나 [건너뛰기]를 누르면 즉시 끝난다.
+- 1단계: 화면 중앙에 펭귄이 통통 튀며 등장 (OutBack) + 첫 인사
+- 2단계: **사용자가 클릭할 때마다** 다음 말 (깡충 뛰며 전환)
+  — 저 혼자 말하고 넘어가지 않도록 자동 진행을 없앰 (2026-07-25 사용자 요청)
+- 3단계: 마지막 말에서 한 번 더 클릭하면 오른쪽 벽으로 날아가 사라짐
+[건너뛰기]·Esc는 즉시 종료, 스페이스/엔터로도 넘길 수 있다.
 애니메이션이 꺼져 있으면(motion.is_enabled False) 아예 재생하지 않는다.
 """
 from __future__ import annotations
 
 from PyQt6.QtCore import (
     QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
-    QSequentialAnimationGroup, Qt, QTimer,
+    QSequentialAnimationGroup, Qt,
 )
 from PyQt6.QtWidgets import (
     QApplication, QGraphicsOpacityEffect, QLabel, QPushButton, QWidget,
@@ -62,6 +63,8 @@ class IntroOverlay(QWidget):
         self._on_done = on_done
         self._done = False
         self._lines = list(lines) or list(FIRST_LINES)
+        self._idx = 0            # 지금 보여주는 말의 순번
+        self._flying = False     # 날아가는 중이면 클릭 무시
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint
                             | Qt.WindowType.Tool
                             | Qt.WindowType.WindowStaysOnTopHint)
@@ -92,6 +95,14 @@ class IntroOverlay(QWidget):
         self.bubble.setGraphicsEffect(self._bub_fx)
         self._bub_fx.setOpacity(0.0)
 
+        # 클릭 안내 — 사용자가 눌러야 다음 말로 넘어간다
+        self.hint = QLabel("클릭하면 다음 →", self)
+        self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hint.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
+            f"background:transparent")
+        self.hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
         self.skip = QPushButton("건너뛰기 ✕", self)
         self.skip.setCursor(Qt.CursorShape.PointingHandCursor)
         self.skip.setStyleSheet(
@@ -104,7 +115,6 @@ class IntroOverlay(QWidget):
         self.skip.clicked.connect(self.finish)
         self._layout_pieces()
         self._anim: QSequentialAnimationGroup | None = None
-        self._timers: list[QTimer] = []
 
     # ── 배치 ────────────────────────────────────────────────
     def _center_rect(self, size: int) -> QRect:
@@ -126,6 +136,9 @@ class IntroOverlay(QWidget):
                          big.top() - self.bubble.height() - 12)
         self.skip.move(self.width() - self.skip.width() - 28,
                        self.height() - self.skip.height() - 28)
+        self.hint.adjustSize()
+        self.hint.move(self.width() // 2 - self.hint.width() // 2,
+                       big.bottom() + 16)
 
     def _set_line(self, html: str) -> None:
         self.bubble.setText(html)
@@ -135,6 +148,7 @@ class IntroOverlay(QWidget):
 
     # ── 재생 ────────────────────────────────────────────────
     def build(self) -> QSequentialAnimationGroup:
+        """등장 모션만 — 이후 진행은 사용자의 클릭으로 (2026-07-25)."""
         big = self._center_rect(BIG)
         seq = QSequentialAnimationGroup(self)
 
@@ -161,10 +175,28 @@ class IntroOverlay(QWidget):
             hop.setEndValue(big.translated(0, dy))
             hop.setEasingCurve(QEasingCurve.Type.InOutQuad)
             seq.addAnimation(hop)
-        # 남은 문구를 다 읽고 나서 날아가도록 (문구 하나당 900ms)
-        seq.addPause(max(700, 900 * (len(self._lines) - 1) - 100))
+        return seq
 
-        # 3) 오른쪽 벽으로 슝 (작아지며) + 말풍선 사라짐
+    def _hop(self) -> None:
+        """다음 말을 할 때 한 번 깡충 — 말이 바뀐 걸 눈으로 알린다."""
+        big = self._center_rect(BIG)
+        seq = QSequentialAnimationGroup(self)
+        up = QPropertyAnimation(self.peng, b"geometry", self)
+        up.setDuration(150); up.setEndValue(big.translated(0, -14))
+        up.setEasingCurve(QEasingCurve.Type.OutQuad)
+        seq.addAnimation(up)
+        down = QPropertyAnimation(self.peng, b"geometry", self)
+        down.setDuration(180); down.setEndValue(big)
+        down.setEasingCurve(QEasingCurve.Type.OutBounce)
+        seq.addAnimation(down)
+        self._hop_anim = seq          # GC 방지
+        seq.start()
+
+    def _fly_away(self) -> None:
+        """마지막 말까지 끝나면 오른쪽 벽으로 날아가 사라진다."""
+        self.skip.hide()
+        self.hint.hide()
+        seq = QSequentialAnimationGroup(self)
         fly = QParallelAnimationGroup(self)
         fg = QPropertyAnimation(self.peng, b"geometry", self)
         fg.setDuration(950)
@@ -175,39 +207,53 @@ class IntroOverlay(QWidget):
         fb.setDuration(420); fb.setEndValue(0.0)
         fly.addAnimation(fb)
         seq.addAnimation(fly)
-
-        # 4) 도착 후 사라짐 (미니 위젯이 이 자리에 나타난다)
         out = QPropertyAnimation(self._peng_fx, b"opacity", self)
         out.setDuration(260); out.setEndValue(0.0)
         seq.addAnimation(out)
-        return seq
+        self._anim = seq
+        seq.finished.connect(self.finish)
+        seq.start()
+
+    def advance(self) -> None:
+        """화면을 클릭할 때마다 다음 말 → 마지막이면 날아간다."""
+        if self._done or self._flying:
+            return
+        if self._anim is not None and \
+                self._anim.state() == QSequentialAnimationGroup.State.Running:
+            self._anim.setCurrentTime(self._anim.totalDuration())  # 등장 건너뛰기
+            return
+        if self._idx < len(self._lines) - 1:
+            self._idx += 1
+            self._set_line(self._lines[self._idx])
+            self._hop()
+            if self._idx == len(self._lines) - 1:
+                self.hint.setText("클릭하면 시작해요 →")
+        else:
+            self._flying = True
+            self._fly_away()
 
     def start(self) -> None:
         self.show()
         self.raise_()
         self._anim = self.build()
-        self._anim.finished.connect(self.finish)
-        # 말풍선 문구 전환 — 등장(0.62s)+통통(0.76s)=1.38s 뒤부터 900ms 간격.
-        # 위 addPause와 맞물려 마지막 문구까지 보이고 나서 날아간다.
-        steps = [(1450 + 900 * i, t)
-                 for i, t in enumerate(self._lines[1:])]
-        for ms, text in steps:
-            t = QTimer(self)
-            t.setSingleShot(True)
-            t.timeout.connect(lambda h=text: self._set_line(h))
-            t.start(ms)
-            self._timers.append(t)
+        self._anim.start()
         self._anim.start()
 
-    def mousePressEvent(self, ev):     # 아무 데나 클릭하면 건너뛰기
-        self.finish()
+    def mousePressEvent(self, ev):     # 아무 데나 클릭 = 다음 말 (건너뛰기는 버튼)
+        self.advance()
+
+    def keyPressEvent(self, ev):       # 스페이스·엔터로도 넘길 수 있게
+        if ev.key() in (Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.advance()
+        elif ev.key() == Qt.Key.Key_Escape:
+            self.finish()
+        else:
+            super().keyPressEvent(ev)
 
     def finish(self) -> None:
         if self._done:
             return
         self._done = True
-        for t in self._timers:
-            t.stop()
         if self._anim is not None:
             self._anim.stop()
         self.hide()
