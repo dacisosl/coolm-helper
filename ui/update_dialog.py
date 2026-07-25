@@ -199,12 +199,27 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         return page
 
     def _start_download(self) -> None:
+        # 새 버전의 변경점을 남겨 둔다 — 설치 후 다시 켜졌을 때 쿨비서가
+        # 인사하며 알려주는 데 쓴다 (2026-07-25).
+        self._remember_notes()
         self.stack.setCurrentIndex(1)
         self._dl = _Downloader(self.info["url"], self)
         self._dl.progress.connect(self._on_progress)
         self._dl.done.connect(self._on_done)
         self._dl.failed.connect(self._on_failed)
         self._dl.start()
+
+    def _remember_notes(self) -> None:
+        """설치 후 인사에 쓸 버전·변경점을 config에 저장 (실패해도 무시)."""
+        owner = self.parent()
+        if owner is None or not hasattr(owner, "config"):
+            return
+        try:
+            from parser import pipeline
+            owner.config["pending_update_notes"] = self.info.get("notes", "")
+            pipeline.save_config(owner.base_dir, owner.config)
+        except Exception:
+            pass
 
     def _on_progress(self, done: int, total: int) -> None:
         mb = done / 1048576

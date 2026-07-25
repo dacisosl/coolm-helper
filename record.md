@@ -924,3 +924,14 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
 - alerts.show_startup_alerts: 첫 실행(intro_done False)일 때 인트로 먼저 →
   끝나면 기존 안내 말풍선(INTRO_STEPS)으로 체인.
 - 89 테스트 통과 + 스킵/콜백/중복종료/비활성 케이스 수동 검증.
+
+## 2026-07-25 (v1.7.2) — 업데이트 직후 인사 모션
+- intro.py 일반화: IntroOverlay(lines=...)로 문구 주입, 문구 수에 맞춰 타이밍
+  자동 조정(문구당 900ms). update_lines(version, notes)가 "vX로 업데이트했어요"
+  + 변경점 최대 2줄(42자 컷) + 응원 멘트(CHEERS 4종, 버전 해시로 선택) 구성.
+  play_update_intro() 추가.
+- 변경점 전달: update_dialog._remember_notes()가 다운로드 시작 시
+  config["pending_update_notes"]에 저장 → 설치·재시작 후 사용.
+- 감지: alerts._is_new_version(last_seen_version != APP_VERSION, 기록 없으면
+  최초 설치로 보고 첫 실행 인트로) / _mark_version_seen()으로 기록·정리.
+- tests/test_intro.py 9종 추가(문구 구성·자르기·불릿 제거·버전 감지). 98 통과.

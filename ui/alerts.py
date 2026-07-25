@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 
 from store.event_store import EventStore
 from ui import theme
+from version import APP_VERSION
 
 
 def build_alerts(store: EventStore, today: date | None = None,
@@ -151,6 +152,24 @@ INTRO_STEPS = [
 ]
 
 
+def _is_new_version(widget) -> bool:
+    """지난 실행 이후 버전이 올라갔는지 (설치 직후 첫 실행인지)."""
+    seen = widget.config.get("last_seen_version")
+    return bool(seen) and seen != APP_VERSION
+
+
+def _mark_version_seen(widget) -> None:
+    if widget.config.get("last_seen_version") == APP_VERSION:
+        return
+    from parser import pipeline
+    widget.config["last_seen_version"] = APP_VERSION
+    widget.config.pop("pending_update_notes", None)
+    try:
+        pipeline.save_config(widget.base_dir, widget.config)
+    except Exception:
+        pass
+
+
 def show_startup_alerts(widget) -> None:
     """앱 세션당 한 번만 알림 말풍선을 띄운다. widget = WidgetBase 인스턴스.
 
@@ -175,9 +194,18 @@ def show_startup_alerts(widget) -> None:
 
         # 설치 후 첫 실행: 가운데 등장 → 오른쪽 벽으로 날아가는 인트로 먼저
         from ui.intro import play_intro
+        _mark_version_seen(widget)
         if not play_intro(widget.base_dir, on_done=show_bubble):
             show_bubble()
         return
+
+    # 업데이트 직후 첫 실행: 새 소식 + 응원 멘트를 쿨비서가 전한다
+    if _is_new_version(widget):
+        notes = widget.config.pop("pending_update_notes", "")
+        _mark_version_seen(widget)
+        from ui.intro import play_update_intro
+        if play_update_intro(widget.base_dir, APP_VERSION, notes):
+            return
 
     days = tuple(widget.config.get("alert_days", [3, 1])) or (3, 1)
     alerts = build_alerts(widget.store, days=days)
