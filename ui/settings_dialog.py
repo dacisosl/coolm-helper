@@ -224,7 +224,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                            f"border:none")
         prow2.addWidget(plab)
         self.peng_chips = {}
-        self._peng_pick = int(self.config.get("penguin_scale", 100))
+        self._peng_pick = int(self.config.get("penguin_scale", 140))
 
         def _peng_chip(val: int, label: str) -> QPushButton:
             b = QPushButton(label)
@@ -247,7 +247,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         prow2.addStretch()
         c.addLayout(prow2)
         self._pick_peng(self._peng_pick
-                        if self._peng_pick in self.peng_chips else 100)
+                        if self._peng_pick in self.peng_chips else 140)
         lay.addWidget(card)
 
         card, c = _card("기능")

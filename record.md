@@ -907,3 +907,20 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
 - 펭귄 크기 조절: config penguin_scale(%), MiniWidget.penguin_px()/_resize_to_penguin()
   으로 픽스맵·창 크기 동시 반영(오른쪽 벽 도킹 유지). 설정 → 일반에 칩 4종
   (작게70/보통100/크게140/아주크게190). 89 테스트 통과. 버전 규칙(부 0~9)에 따라 v1.7.0.
+
+## 2026-07-25 — 아이콘 새 캐릭터 반영 + 펭귄 기본 '크게'
+- app.ico / setup.ico를 새 캐릭터로 재생성(tools/make_icon.py → make_setup_icon.py).
+  두 파일은 한 번 만들어 커밋하는 바이너리라 캐릭터 교체 시 수동 재생성 필요.
+  나머지 화면(미니위젯·간편등록 work·위젯 빈상태 sleep·알림 surprise·창 아이콘)은
+  전부 penguin_pixmap 경유라 자동 반영됨. 업데이트 창은 텍스트뿐 — 캐릭터 없음.
+- 펭귄 기본 크기를 '크게'(140)로: DEFAULT_CONFIG + mini_widget/settings 폴백까지
+  140으로 맞춰 기존 사용자도 크게로 보이게. 89 테스트 통과.
+
+## 2026-07-25 (v1.7.1) — 첫 실행 인트로 모션
+- ui/intro.py 신규: 전체화면 투명 오버레이에서 펭귄이 ①뿅 등장(OutBack)
+  ②통통 인사 ③④말풍선 3단 ⑤오른쪽 벽으로 축소 이동(InOutCubic) ⑥페이드아웃.
+  총 4.2초, [건너뛰기]·아무데나 클릭으로 종료, motion 꺼져 있으면 미재생.
+  three.js/QtWebEngine 대신 Qt 애니메이션 — 용량 증가 0.
+- alerts.show_startup_alerts: 첫 실행(intro_done False)일 때 인트로 먼저 →
+  끝나면 기존 안내 말풍선(INTRO_STEPS)으로 체인.
+- 89 테스트 통과 + 스킵/콜백/중복종료/비활성 케이스 수동 검증.
