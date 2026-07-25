@@ -1,5 +1,5 @@
 {
-  "version": "1.7.5",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.5/CoolmHelper-Setup.exe",
-  "notes": "- 지난 버전에서 한쪽 눈만 메워졌던 문제를 바로잡았어요. 이제 양쪽 안경 모두 배경이 비치지 않아요."
+  "version": "1.7.6",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.6/CoolmHelper-Setup.exe",
+  "notes": "- 쪽지함에서 일정을 등록할 때 제목이 중간부터 보이던 것을 고쳤어요. 이제 맨 앞 글자부터 나옵니다.\r\n- 간편 등록, 즐겨찾기, 포스트잇 등 제목을 쓰는 다른 창도 똑같이 맞췄어요."
 }
