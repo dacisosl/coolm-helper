@@ -897,3 +897,13 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   무드별 이미지 지원까지 같이 날아갔음 → 재추가. assets/에 penguin.png(평소),
   penguin_sleep/work/surprise.png가 있으면 SVG 대신 사용, 없으면 SVG 폴백.
 - 사용자가 직접 만든 캐릭터 이미지를 넣을 준비. (배포는 이미지 도착 후 한 번에)
+
+## 2026-07-24 (v1.7.0) — 새 캐릭터 이미지 + 펭귄 크기 조절
+- 사용자가 만든 3D 펭귄(안경·넥타이) 이미지를 assets/에 반영: idle→penguin.png,
+  sleep→penguin_sleep.png, schedule→penguin_work.png, surprise→penguin_surprise.png.
+  원본이 720px 캔버스에 내용 30~40%뿐이라 투명 여백 crop→정사각 패딩(8% 여유)→512px.
+  업로드된 electron 원본 폴더는 assets/에 두면 exe에 통째로 들어가므로
+  character_source/로 이동(빌드 미포함).
+- 펭귄 크기 조절: config penguin_scale(%), MiniWidget.penguin_px()/_resize_to_penguin()
+  으로 픽스맵·창 크기 동시 반영(오른쪽 벽 도킹 유지). 설정 → 일반에 칩 4종
+  (작게70/보통100/크게140/아주크게190). 89 테스트 통과. 버전 규칙(부 0~9)에 따라 v1.7.0.

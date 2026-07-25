@@ -70,6 +70,12 @@ class _IconBar(QWidget):
 
 class MiniWidget(WidgetBase):
     WIDTH = 52
+    BASE_PX = 46          # 펭귄 기본 크기(보통=100%)
+
+    def penguin_px(self) -> int:
+        """설정 → 일반 → 펭귄 크기(%)를 반영한 실제 픽셀 (2026-07-24)."""
+        pct = int(self.config.get("penguin_scale", 100) or 100)
+        return max(24, round(self.BASE_PX * max(50, min(300, pct)) / 100))
 
     def __init__(self, base_dir: str):
         super().__init__(base_dir)
@@ -78,7 +84,7 @@ class MiniWidget(WidgetBase):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(2, 2, 2, 2)
         self.penguin = QLabel()
-        self.penguin.setPixmap(penguin_pixmap(self.base_dir, 46))
+        self.penguin.setPixmap(penguin_pixmap(self.base_dir, self.penguin_px()))
         self.penguin.setCursor(Qt.CursorShape.PointingHandCursor)
         self.penguin.setToolTip("COOL-비서\n클릭: 메뉴 / 더블클릭: 바로 등록 / "
                                 "드래그: 이동 / 우클릭: 옵션")
@@ -92,7 +98,7 @@ class MiniWidget(WidgetBase):
             f"font-size:{theme.FONT_XS}px;font-weight:bold")
         self.demo_chip.setToolTip("데모 모드가 켜져 있습니다 (설정 → 데이터에서 끄기)")
         self.demo_chip.move(0, 0)
-        self.resize(self.WIDTH, 54)
+        self._resize_to_penguin()
         self._bar: _IconBar | None = None
         self._moved = False
         self._last_bar_open = 0.0
@@ -101,6 +107,15 @@ class MiniWidget(WidgetBase):
         self._store_cb = self._update_mood
         self.store.subscribe(self._store_cb)
         self._update_mood()
+
+    def _resize_to_penguin(self) -> None:
+        """펭귄 크기에 맞춰 창 크기를 맞추고 오른쪽 벽에 계속 붙여 둔다."""
+        px = self.penguin_px()
+        self.WIDTH = px + 6
+        right = self.geometry().right()      # 커져도 오른쪽 모서리는 그대로
+        self.resize(self.WIDTH, px + 8)
+        if self.isVisible():
+            self.move(right - self.width() + 1, self.y())
 
     def closeEvent(self, ev):
         self.store.unsubscribe(self._store_cb)
@@ -113,7 +128,9 @@ class MiniWidget(WidgetBase):
             overdue, today, _up = self.store.sections(date.today())
             if not overdue and not today:
                 mood = "sleep"
-        self.penguin.setPixmap(penguin_pixmap(self.base_dir, 46, mood))
+        self.penguin.setPixmap(
+            penguin_pixmap(self.base_dir, self.penguin_px(), mood))
+        self._resize_to_penguin()
         self.penguin.setToolTip(
             ("쿨쿠리가 자고 있어요 — 오늘은 일정이 없어요 💤\n" if mood == "sleep"
              else "COOL-비서\n")
