@@ -167,9 +167,16 @@ def show_startup_alerts(widget) -> None:
             from parser import pipeline
             widget.config["intro_done"] = True
             pipeline.save_config(widget.base_dir, widget.config)
-        bubble = AlertBubble(INTRO_STEPS, widget, on_done=finish_intro)
-        widget._alert_bubble = bubble
-        bubble.show()
+
+        def show_bubble():
+            bubble = AlertBubble(INTRO_STEPS, widget, on_done=finish_intro)
+            widget._alert_bubble = bubble
+            bubble.show()
+
+        # 설치 후 첫 실행: 가운데 등장 → 오른쪽 벽으로 날아가는 인트로 먼저
+        from ui.intro import play_intro
+        if not play_intro(widget.base_dir, on_done=show_bubble):
+            show_bubble()
         return
 
     days = tuple(widget.config.get("alert_days", [3, 1])) or (3, 1)

@@ -915,3 +915,12 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   전부 penguin_pixmap 경유라 자동 반영됨. 업데이트 창은 텍스트뿐 — 캐릭터 없음.
 - 펭귄 기본 크기를 '크게'(140)로: DEFAULT_CONFIG + mini_widget/settings 폴백까지
   140으로 맞춰 기존 사용자도 크게로 보이게. 89 테스트 통과.
+
+## 2026-07-25 (v1.7.1) — 첫 실행 인트로 모션
+- ui/intro.py 신규: 전체화면 투명 오버레이에서 펭귄이 ①뿅 등장(OutBack)
+  ②통통 인사 ③④말풍선 3단 ⑤오른쪽 벽으로 축소 이동(InOutCubic) ⑥페이드아웃.
+  총 4.2초, [건너뛰기]·아무데나 클릭으로 종료, motion 꺼져 있으면 미재생.
+  three.js/QtWebEngine 대신 Qt 애니메이션 — 용량 증가 0.
+- alerts.show_startup_alerts: 첫 실행(intro_done False)일 때 인트로 먼저 →
+  끝나면 기존 안내 말풍선(INTRO_STEPS)으로 체인.
+- 89 테스트 통과 + 스킵/콜백/중복종료/비활성 케이스 수동 검증.
