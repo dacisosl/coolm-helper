@@ -178,6 +178,7 @@ class EventItemCard(QFrame):
         if not full:
             # 기본 모드에서도 제목은 그 자리에서 고칠 수 있게
             self.title_edit = QLineEdit(event.title)
+            self.title_edit.setCursorPosition(0)  # 긴 제목도 앞부터 보이게
             self.title_edit.setToolTip("제목")
             d.addWidget(self.title_edit)
 
@@ -187,6 +188,7 @@ class EventItemCard(QFrame):
             bar = QHBoxLayout()
             bar.setSpacing(6)
             self.title_edit = QLineEdit(event.title)
+            self.title_edit.setCursorPosition(0)  # 긴 제목도 앞부터 보이게
             self.title_edit.setToolTip("제목")
             bar.addWidget(self.title_edit, stretch=1)
             self.date_btn = DatePickerButton()

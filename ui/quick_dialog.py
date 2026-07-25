@@ -188,6 +188,7 @@ class QuickDialog(QDialog):
             # 후보가 없어도 내용으로 등록할 수 있게 기본 후보 구성
             roster_spans = []
             self.title_edit.setText(msg.title)
+            self.title_edit.setCursorPosition(0)
             self.body_edit.setHtml(highlight_html(msg.body, roster_spans))
             self.date_btn.set_date(datetime.now().date())
             self.time_combo.set_all_day()
@@ -212,6 +213,7 @@ class QuickDialog(QDialog):
             return
         c = self.candidates[idx]
         self.title_edit.setText(c.suggested_title)
+        self.title_edit.setCursorPosition(0)
         if c.title_spans:
             found = ", ".join(s.text for s in c.title_spans)
             self.warn.setText(f"⚠ 개인정보로 보이는 부분: {found}")

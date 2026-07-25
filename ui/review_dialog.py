@@ -385,6 +385,8 @@ class ReviewDialog(motion.FadeInMixin, QDialog):
             return
         c = self._current = self.candidates[idx]
         self.title_edit.setText(c.suggested_title)
+        # 긴 제목이 중간부터 보이지 않게 항상 맨 앞을 보여준다 (2026-07-25)
+        self.title_edit.setCursorPosition(0)
         if c.title_spans:
             found = ", ".join(s.text for s in c.title_spans)
             self.warn.setText(f"⚠ 개인정보로 보이는 부분: {found} — "

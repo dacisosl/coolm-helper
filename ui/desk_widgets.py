@@ -410,6 +410,7 @@ class _TodoRow(_DragField):
         if owner.edit_mode:
             # 인라인 편집: 그 자리에서 제목을 바로 타이핑
             self.title_edit = QLineEdit(event.title)
+            self.title_edit.setCursorPosition(0)  # 긴 제목도 앞부터 보이게
             self.title_edit.setMinimumWidth(10)   # 좁은 열에서도 안 넘치게
             self.title_edit.setStyleSheet(
                 f"QLineEdit{{background:{theme.CARD_TINT};border:1px solid "
@@ -684,6 +685,7 @@ class _WeekField(_DragField):
             col.addWidget(t)
         if owner is not None and owner.edit_mode:
             self.title_edit = QLineEdit(event.title)
+            self.title_edit.setCursorPosition(0)  # 긴 제목도 앞부터 보이게
             self.title_edit.setMinimumWidth(10)   # 좁은 열에서도 안 넘치게
             self.title_edit.setStyleSheet(
                 f"QLineEdit{{background:{theme.CARD_TINT};border:1px solid "

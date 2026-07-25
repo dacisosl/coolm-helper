@@ -68,6 +68,8 @@ class PostItWidget(DeskWidgetBase):
         root.addWidget(self.build_edit_bar())
 
         self.title_edit = QLineEdit(event.title)
+
+        self.title_edit.setCursorPosition(0)  # 긴 제목도 앞부터 보이게
         self.title_edit.textEdited.connect(lambda _: self._save_timer.start())
         root.addWidget(self.title_edit)
 
@@ -148,6 +150,7 @@ class PostItWidget(DeskWidgetBase):
         # 사용자가 그 필드를 편집 중이면 덮어쓰지 않는다 (재진입 가드)
         if not self.title_edit.hasFocus() and self.title_edit.text() != cur.title:
             self.title_edit.setText(cur.title)
+            self.title_edit.setCursorPosition(0)
         if not self.memo_edit.hasFocus() and \
                 self.memo_edit.toPlainText() != cur.memo:
             self.memo_edit.setPlainText(cur.memo)
