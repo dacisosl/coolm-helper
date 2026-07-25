@@ -44,6 +44,8 @@ def main() -> int:
         (os.path.join("docs", "설치안내.md"), "설치안내.md"),
         (os.path.join("docs", "개인정보고지.md"), "개인정보고지.md"),
         (os.path.join("calendar_sync", "SETUP.md"), "구글연동설정.md"),
+        # 업데이트 직후 쿨비서가 "이번에 바뀐 점"을 읽어 알려준다
+        ("release_notes.txt", "release_notes.txt"),
     ]
     for src, dst in bundle:
         shutil.copyfile(os.path.join(BASE, src), os.path.join(dist, dst))

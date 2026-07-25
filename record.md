@@ -935,3 +935,15 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
 - 감지: alerts._is_new_version(last_seen_version != APP_VERSION, 기록 없으면
   최초 설치로 보고 첫 실행 인트로) / _mark_version_seen()으로 기록·정리.
 - tests/test_intro.py 9종 추가(문구 구성·자르기·불릿 제거·버전 감지). 98 통과.
+
+## 2026-07-25 (v1.7.3) — 업데이트 인사가 안 뜨던 버그 수정
+- 원인: _is_new_version이 `bool(seen) and seen != APP_VERSION`이라, 기능이
+  처음 들어간 v1.7.2로 올라온 사용자는 last_seen_version 기록 자체가 없어
+  False → 인사 미재생. 게다가 그 경로에서 기록도 안 남겨 다음 업데이트도
+  계속 안 뜰 상태였음.
+- 수정: 기록 없음도 업데이트로 간주(호출 시점엔 이미 첫 실행을 걸러낸 뒤라
+  안전). 인사를 못 띄워도 _mark_version_seen을 항상 호출해 기록.
+- 변경점 폴백: 옛 버전에서 올라오면 pending_update_notes가 없으므로
+  앱에 동봉된 release_notes.txt를 읽는다(_bundled_notes). build.py가
+  release_notes.txt를 dist에 포함하도록 추가.
+- 테스트 3종 추가(기록 없음=업데이트, 재발 방지, 동봉 노트 읽기). 100 통과.
