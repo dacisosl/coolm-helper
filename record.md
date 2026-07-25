@@ -891,3 +891,9 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
 ## 2026-07-23 (v1.6.10) — 선택 날짜 색을 파스텔 주황으로
 - 선택 날짜 배경을 쨍한 SIGNATURE(#f59300) → 파스텔 SIGNATURE_SOFT(#ffe0c2),
   숫자는 SIGNATURE_DARK로. 사용자 선택(C, 아주 연한 파스텔). 89 통과. v1.6.10.
+
+## 2026-07-24 — 무드별 펭귄 이미지 지원 재추가
+- v1.6.3에서 캐릭터를 원본으로 되돌릴 때(git checkout f4615fd -- penguin_icon.py)
+  무드별 이미지 지원까지 같이 날아갔음 → 재추가. assets/에 penguin.png(평소),
+  penguin_sleep/work/surprise.png가 있으면 SVG 대신 사용, 없으면 SVG 폴백.
+- 사용자가 직접 만든 캐릭터 이미지를 넣을 준비. (배포는 이미지 도착 후 한 번에)
