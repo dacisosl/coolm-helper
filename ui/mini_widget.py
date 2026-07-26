@@ -214,15 +214,39 @@ class MiniWidget(WidgetBase):
                 self._bar.close()
             self.open_quick()                 # 더블클릭 = ⚡ 바로 등록
 
+    # 우클릭 → 투명도 선택지 (2026-07-25 사용자 요청)
+    OPACITY_STEPS = ((100, "진하게 (100%)"), (85, "조금 흐리게 (85%)"),
+                     (70, "흐리게 (70%)"), (55, "많이 흐리게 (55%)"),
+                     (40, "아주 흐리게 (40%)"))
+
+    def _set_opacity(self, pct: int) -> None:
+        """펭귄 투명도를 바로 적용하고 저장한다."""
+        from parser import pipeline
+        self.config["widget_opacity"] = int(pct)
+        self.setWindowOpacity(int(pct) / 100)
+        pipeline.save_config(self.base_dir, self.config)
+
     def contextMenuEvent(self, ev):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
+        menu.setStyleSheet(theme.BASE_QSS)
         act_tray = menu.addAction("트레이로 보내기 (펭귄 숨기기)")
         act_detail = menu.addAction("상세 위젯으로 전환")
+        # 투명도 — 고르면 바로 반영된다
+        cur = int(self.config.get("widget_opacity", 100) or 100)
+        sub = menu.addMenu("투명도")
+        opacity_acts = {}
+        for pct, label in self.OPACITY_STEPS:
+            a = sub.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(pct == cur)
+            opacity_acts[a] = pct
         menu.addSeparator()
         act_quit = menu.addAction("종료")
         chosen = menu.exec(ev.globalPos())
-        if chosen == act_tray:
+        if chosen in opacity_acts:
+            self._set_opacity(opacity_acts[chosen])
+        elif chosen == act_tray:
             self.send_to_tray()
         elif chosen == act_detail:
             from parser import pipeline

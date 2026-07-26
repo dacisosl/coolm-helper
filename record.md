@@ -991,3 +991,10 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   _walk_tick()이 프레임마다 발끝을 축으로 sin 갸우뚱(±9°, 7걸음) + |sin| 통통
   + 크기 축소를 QPainter로 직접 그림(회전 잘림 방지 pad 18%). 도착 후 페이드아웃.
 - 100 테스트 통과.
+
+## 2026-07-25 (v1.7.9) — 펭귄 우클릭 투명도 조절
+- MiniWidget.contextMenuEvent에 '투명도' 하위 메뉴 추가(OPACITY_STEPS 5단계:
+  100/85/70/55/40%). 현재 값에 체크 표시, 고르면 _set_opacity()가
+  setWindowOpacity 즉시 반영 + config["widget_opacity"] 저장(기존 키 재사용
+  → WidgetBase.apply_config가 재시작 시에도 그대로 복원).
+- 100 테스트 통과 + 오프스크린으로 적용·저장·재시작 유지 확인.
