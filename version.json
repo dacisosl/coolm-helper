@@ -1,5 +1,5 @@
 {
-  "version": "1.7.8",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.8/CoolmHelper-Setup.exe",
-  "notes": "- 인사 화면의 '클릭' 안내 자막이 또렷하게 보이도록 바꿨어요. (은은하게 깜빡이며 알려줘요)\r\n- 인사가 끝나면 날아가는 대신, 뒤돌아서 뒤뚱뒤뚱 펭귄 걸음으로 제자리에 돌아갑니다."
+  "version": "1.7.9",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.9/CoolmHelper-Setup.exe",
+  "notes": "- 펭귄을 우클릭하면 '투명도' 메뉴가 생겼어요. 진하게부터 아주 흐리게까지 5단계 중에 고르면 바로 적용됩니다.\r\n- 고른 값은 저장돼서 다음에 켤 때도 그대로예요."
 }
