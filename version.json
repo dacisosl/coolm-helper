@@ -1,5 +1,5 @@
 {
-  "version": "1.8.2",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.8.2/CoolmHelper-Setup.exe",
-  "notes": "- 메시지 관리함 창에서 보고 있는 쪽지를 못 읽던 문제를 고쳤어요. 본문을 읽는 방법을 3가지로 늘려 쿨메신저 버전이 달라도 읽힙니다.\r\n- '쪽지 읽기 진단'이 더 자세해졌어요. 안 읽히면 어떤 부품 때문인지까지 보여줍니다."
+  "version": "1.9.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.0/CoolmHelper-Setup.exe",
+  "notes": "- 포스트잇 맨 위의 날짜·시간을 눌러 그 자리에서 바꿀 수 있어요. 달력에서 날짜를 고르고 시간(또는 '종일')만 선택하면 끝입니다.\r\n- 새로 붙는 포스트잇이 잠깐 맨 앞으로 올라와요. 다른 창 뒤에 숨지 않고, 잠시 뒤 원래대로 돌아갑니다(항상 위 고정 아님).\r\n- 메모지 색을 고를 수 있어요. 포스트잇의 🔧를 누르면 나오는 색 동그라미에서 노랑·분홍·주황·초록·파랑·보라 중에 고르세요."
 }
