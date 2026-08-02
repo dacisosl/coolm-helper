@@ -104,9 +104,6 @@ class TestSleepMood(unittest.TestCase):
         self.assertTrue(overdue)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestOldMessageDates(unittest.TestCase):
     """오랜 시간이 지난 뒤 쪽지를 열어도 날짜가 제대로 잡혀야 한다.
@@ -140,3 +137,7 @@ class TestOldMessageDates(unittest.TestCase):
         cands = self.pipeline.candidates_from_message(msg, set(), allow_past=True)
         fixed = [self.pipeline._pull_back_year(c, self.now) for c in cands]
         self.assertTrue(all(c.start.year == 2026 for c in fixed))
+
+
+if __name__ == "__main__":
+    unittest.main()
