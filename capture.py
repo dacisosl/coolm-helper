@@ -156,19 +156,74 @@ def _gettext(hwnd: int, max_len: int = 65536) -> str:
     return buf.value or ""
 
 
-def _chrome_body(chrome_hwnd: int) -> str:
-    """크롬 자식 창의 문서 본문을 UIA TextPattern으로 읽는다 (~30ms)."""
+def _uia_text_from_hwnd(hwnd: int) -> str:
+    """hwnd 안의 본문을 UIA TextPattern으로 읽는다.
+
+    Document 컨트롤을 먼저 찾고, 없으면 TextPattern을 가진 아무 요소나
+    찾는다 (쿨메신저 버전에 따라 본문 컨트롤 종류가 달라서, 2026-08-02).
+    """
     import comtypes.gen.UIAutomationClient as UIAC
-    elem = _uia.iuia.ElementFromHandle(chrome_hwnd)
+    elem = _uia.iuia.ElementFromHandle(hwnd)
     cond = _uia.iuia.CreatePropertyCondition(
         _uia.UIA_dll.UIA_ControlTypePropertyId,
         _uia.UIA_dll.UIA_DocumentControlTypeId)
     doc = elem.FindFirst(_uia.tree_scope["descendants"], cond)
     if doc is None:
+        cond2 = _uia.iuia.CreatePropertyCondition(
+            _uia.UIA_dll.UIA_IsTextPatternAvailablePropertyId, True)
+        doc = elem.FindFirst(_uia.tree_scope["descendants"], cond2)
+    if doc is None:
         return ""
-    pat = doc.GetCurrentPattern(_uia.UIA_dll.UIA_TextPatternId)
-    tp = pat.QueryInterface(UIAC.IUIAutomationTextPattern)
-    return (tp.DocumentRange.GetText(-1) or "").strip()
+    try:
+        pat = doc.GetCurrentPattern(_uia.UIA_dll.UIA_TextPatternId)
+        tp = pat.QueryInterface(UIAC.IUIAutomationTextPattern)
+        return (tp.DocumentRange.GetText(-1) or "").strip()
+    except Exception:
+        return ""
+
+
+def _chrome_body(chrome_hwnd: int) -> str:
+    """(구 이름 유지) 내장 브라우저 자식 창의 본문 읽기."""
+    return _uia_text_from_hwnd(chrome_hwnd)
+
+
+IE_CHILD_CLASS = "Internet Explorer_Server"   # 옛 방식 내장 브라우저
+PLAIN_TEXT_CLASSES = ("EDIT", "STATIC")       # WM_GETTEXT로 읽히는 표준 컨트롤
+
+
+def _window_body(hwnd: int) -> tuple[str, str]:
+    """창 하나에서 본문을 3단계로 읽는다. (본문, 읽은 방법) 반환.
+
+    ① 내장 브라우저(크롬/IE) 자식 → UIA
+    ② RichEdit/Edit/Static 표준 컨트롤 → WM_GETTEXT
+    ③ 마지막 수단: 창 전체를 UIA로 탐색 (느릴 수 있어 최후에만)
+    """
+    kids = _children_by_class(hwnd)
+    best, how = "", ""
+    for h in (kids.get(CHROME_CHILD_CLASS, [])
+              + kids.get(IE_CHILD_CLASS, [])):
+        try:
+            t = _uia_text_from_hwnd(h)
+        except Exception:
+            continue
+        if len(t) > len(best):
+            best, how = t, "웹뷰"
+    if len(best) < MIN_BODY_LEN:
+        for cls, hwnds in kids.items():
+            u = cls.upper()
+            if "RICHEDIT" in u or u in PLAIN_TEXT_CLASSES:
+                for h in hwnds:
+                    t = _gettext(h).strip()
+                    if len(t) > len(best):
+                        best, how = t, "텍스트칸"
+    if len(best) < MIN_BODY_LEN:
+        try:
+            t = _uia_text_from_hwnd(hwnd)
+            if len(t) > len(best):
+                best, how = t, "전체탐색"
+        except Exception:
+            pass
+    return best, how
 
 
 def diagnose() -> str:
@@ -221,18 +276,14 @@ def diagnose() -> str:
 
     for i, hwnd in enumerate(wins[:4], 1):
         kids = _children_by_class(hwnd)
-        chrome = len(kids.get(CHROME_CHILD_CLASS, []))
-        rich = sum(len(v) for k, v in kids.items() if "RICHEDIT" in k.upper())
-        best = ""
-        for c in kids.get(CHROME_CHILD_CLASS, []):
-            try:
-                t = _chrome_body(c)
-            except Exception:
-                continue
-            if len(t) > len(best):
-                best = t
-        lines.append(f"   창{i}: 본문틀 {chrome}개 / 옛본문 {rich}개 / "
-                     f"읽은 글자 {len(best)}자")
+        # 어떤 부품으로 이뤄진 창인지 — 못 읽을 때 원인 파악의 핵심 정보
+        summary = ", ".join(
+            f"{cls}×{len(hs)}" for cls, hs in
+            sorted(kids.items(), key=lambda kv: -len(kv[1]))[:8])
+        body, how = _window_body(hwnd)
+        lines.append(f"   창{i}: 읽은 글자 {len(body)}자"
+                     + (f" ({how})" if how else "")
+                     + f" | 부품: {summary or '없음'}")
     got = read_current_message()
     lines.append("⑤ 결과: " + (f"제목 '{got.title[:20]}…' 읽음"
                               if got else "쪽지를 읽지 못함"))
@@ -248,26 +299,11 @@ def read_current_message() -> CapturedMessage | None:
         return None
     warmup()
     for hwnd in _cool_windows(pid):
-        kids = _children_by_class(hwnd)
-        body = ""
-        for chrome in kids.get(CHROME_CHILD_CLASS, []):
-            try:
-                t = _chrome_body(chrome)
-            except Exception:
-                continue
-            if len(t) > len(body):
-                body = t
-        if not body:                       # 구버전 대비: RichEdit 폴백
-            for cls, hwnds in kids.items():
-                if "RICHEDIT" in cls.upper():
-                    for h in hwnds:
-                        t = _gettext(h).strip()
-                        if len(t) > len(body):
-                            body = t
+        body, _how = _window_body(hwnd)
         if len(body) < MIN_BODY_LEN:
             continue
         title = ""
-        for h in kids.get("Edit", []):
+        for h in _children_by_class(hwnd).get("Edit", []):
             t = _gettext(h, 500).strip()
             if 2 <= len(t) <= 120:
                 title = t

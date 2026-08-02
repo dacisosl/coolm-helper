@@ -1025,3 +1025,15 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   _pull_back_year()로 180일 넘게 미래로 밀린 날짜를 1년 당겨 올해로 되돌린다.
   (진짜 미래 일정은 그대로.)
 - tests/test_quick_capture.py에 3종 추가(지난 날짜 유지·연도 당김·미래 유지). 111 통과.
+
+## 2026-08-02 (v1.8.2) — 본문 읽기 3단계 폴백 (메시지 관리함 대응)
+- 사용자 진단 결과: 창·프로세스·UIA 모두 정상인데 "창1 본문틀 1개/읽은 글자
+  0자" — 크롬 자식에서 Document 컨트롤을 못 찾음. 사용자는 '메시지 관리함'
+  창에서 쪽지를 읽는데, 이 창의 본문칸 폴백이 없었음.
+- capture 개편: _uia_text_from_hwnd(Document 우선, 없으면 IsTextPatternAvailable
+  요소) + _window_body 3단계 — ①웹뷰(크롬/Internet Explorer_Server) ②RichEdit/
+  Edit/Static WM_GETTEXT ③최후엔 창 전체 UIA 탐색. read_current_message가
+  이를 사용.
+- diagnose 강화: 창마다 자식 부품 클래스 요약(상위 8종×개수)과 읽은 방법
+  (웹뷰/텍스트칸/전체탐색)을 표시 — 다음에도 안 읽히면 원인이 바로 보인다.
+- 111 테스트 통과. (실동작은 사용자 학교 PC 진단 재실행으로 확인 예정)
