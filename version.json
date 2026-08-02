@@ -1,5 +1,5 @@
 {
-  "version": "1.9.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.0/CoolmHelper-Setup.exe",
-  "notes": "- 포스트잇 맨 위의 날짜·시간을 눌러 그 자리에서 바꿀 수 있어요. 달력에서 날짜를 고르고 시간(또는 '종일')만 선택하면 끝입니다.\r\n- 새로 붙는 포스트잇이 잠깐 맨 앞으로 올라와요. 다른 창 뒤에 숨지 않고, 잠시 뒤 원래대로 돌아갑니다(항상 위 고정 아님).\r\n- 메모지 색을 고를 수 있어요. 포스트잇의 🔧를 누르면 나오는 색 동그라미에서 노랑·분홍·주황·초록·파랑·보라 중에 고르세요."
+  "version": "1.9.1",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.1/CoolmHelper-Setup.exe",
+  "notes": "- ⚡ 간편 등록이 클립보드에서 내용을 가져오는 경우, 무엇을 등록할지 먼저 보여주고 물어봅니다. 읽어낸 날짜·제목과 본문을 확인한 뒤 [등록하기]를 누르세요.\r\n- 쿨메신저 화면에서 읽은 쪽지는 지금처럼 바로 등록됩니다."
 }
