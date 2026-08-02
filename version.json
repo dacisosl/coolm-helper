@@ -1,5 +1,5 @@
 {
-  "version": "1.7.9",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.7.9/CoolmHelper-Setup.exe",
-  "notes": "- 펭귄을 우클릭하면 '투명도' 메뉴가 생겼어요. 진하게부터 아주 흐리게까지 5단계 중에 고르면 바로 적용됩니다.\r\n- 고른 값은 저장돼서 다음에 켤 때도 그대로예요."
+  "version": "1.8.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.8.0/CoolmHelper-Setup.exe",
+  "notes": "- ⚡ 간편 등록을 누르면 수정 창 없이 곧바로 일정이 등록되고, 바탕화면에 포스트잇으로 붙습니다. 고칠 내용은 포스트잇에서 바로 수정하세요.\r\n- 학교 컴퓨터에서 '보고 있는 쪽지'를 못 읽던 문제를 고쳤어요. (쿨메신저 버전이 달라도 찾도록)\r\n- 오늘 할 일을 다 끝내면 쿨비서가 잠들어요. (완료한 일도 남은 일로 세던 문제 수정)\r\n- 펭귄 우클릭에 '쪽지 읽기 진단'을 넣었어요. 안 읽힐 때 원인을 확인할 수 있어요."
 }
