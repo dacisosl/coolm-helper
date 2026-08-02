@@ -106,3 +106,37 @@ class TestSleepMood(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOldMessageDates(unittest.TestCase):
+    """오랜 시간이 지난 뒤 쪽지를 열어도 날짜가 제대로 잡혀야 한다.
+
+    (2026-08-02 사용자 지적: 6월 쪽지를 8월에 열면 2027년으로 밀렸다)
+    """
+
+    def setUp(self):
+        from parser import pipeline
+        self.pipeline = pipeline
+        self.now = datetime(2026, 8, 2, 10, 0)
+        self.msg = Message(-1, "(화면에서 가져옴)", self.now,
+                           "6월 5일 회의 안내",
+                           "지난 번에 안내드렸듯이 6월 5일에 회의가 있습니다.")
+
+    def test_past_date_kept_when_allowed(self):
+        # 기본(allow_past=False)은 수신일 이후만 남긴다
+        normal = self.pipeline.candidates_from_message(self.msg, set())
+        loose = self.pipeline.candidates_from_message(self.msg, set(),
+                                                      allow_past=True)
+        self.assertGreaterEqual(len(loose), len(normal))
+
+    def test_year_pulled_back_to_this_year(self):
+        cands = self.pipeline.candidates_from_message(self.msg, set(),
+                                                      allow_past=True)
+        fixed = [self.pipeline._pull_back_year(c, self.now) for c in cands]
+        self.assertTrue(any(c.start.date() == date(2026, 6, 5) for c in fixed))
+
+    def test_future_date_untouched(self):
+        msg = Message(-1, "(화면)", self.now, "9월 3일 연수", "9월 3일 오후 2시 연수")
+        cands = self.pipeline.candidates_from_message(msg, set(), allow_past=True)
+        fixed = [self.pipeline._pull_back_year(c, self.now) for c in cands]
+        self.assertTrue(all(c.start.year == 2026 for c in fixed))

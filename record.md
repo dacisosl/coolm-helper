@@ -1014,3 +1014,14 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
 - **자는 무드**: sections()의 today가 완료 항목까지 포함해, 다 끝내도 안 자던
   문제 → not e.done 필터 추가.
 - tests/test_quick_capture.py 8종 추가(등록·핀·메모·빈제목·무드 4케이스). 108 통과.
+
+## 2026-08-02 (v1.8.1) — 오래된 쪽지 날짜 오독 수정
+- 사용자 지적: "오랜 시간이 지나고 쪽지를 확인할 수도 있잖아?" — 실제로 6월 쪽지를
+  8월에 ⚡로 읽으면 (a) DB 매칭 실패 시 received=now 기준이라 '6월 5일'이
+  _resolve_year 규칙(30일 이상 과거면 이듬해)에 걸려 **2027-06-05**로 밀리고,
+  (b) candidates_from_message가 수신일보다 과거인 일정을 버려 후보가 사라졌음.
+- 수정: candidates_from_message(allow_past=False) 매개변수 추가 — 화면 캡처
+  경로에서는 True로 지난 날짜 유지. quick_candidates는 매칭 실패 시
+  _pull_back_year()로 180일 넘게 미래로 밀린 날짜를 1년 당겨 올해로 되돌린다.
+  (진짜 미래 일정은 그대로.)
+- tests/test_quick_capture.py에 3종 추가(지난 날짜 유지·연도 당김·미래 유지). 111 통과.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 
 from . import date_parser, pii_detector
@@ -243,10 +243,18 @@ def make_title(msg: Message, base: datetime) -> str:
     return "(제목 없음)"
 
 
-def candidates_from_message(msg: Message, roster: set[str]) -> list[Candidate]:
+def candidates_from_message(msg: Message, roster: set[str],
+                            allow_past: bool = False) -> list[Candidate]:
+    """쪽지에서 일정 후보를 뽑는다.
+
+    allow_past=True면 지난 날짜도 남긴다 — 화면에서 직접 캡처한 쪽지는
+    한참 뒤에 열어볼 수 있어서(2026-08-02 사용자 지적), 지난 날짜라고
+    버리면 등록할 게 하나도 없어진다.
+    """
     events = date_parser.extract_events(msg.title + "\n" + msg.body, msg.received)
-    # 쪽지 수신일보다 과거인 일정은 제외 (본문에 인용된 과거 날짜 등)
-    events = [ev for ev in events if ev.start.date() >= msg.received.date()]
+    if not allow_past:
+        # 쪽지 수신일보다 과거인 일정은 제외 (본문에 인용된 과거 날짜 등)
+        events = [ev for ev in events if ev.start.date() >= msg.received.date()]
     if not events:
         return []
     title = make_title(msg, msg.received)
@@ -365,10 +373,31 @@ def quick_candidates(base_dir: str, title: str, body: str
             except Exception:
                 continue
         matched = matched or matched_row
-    msg = matched or Message(
-        key=-1, sender="(화면에서 가져옴)", received=datetime.now(),
-        title=title or body.splitlines()[0][:40], body=body)
-    return candidates_from_message(msg, roster), msg, matched is not None
+    if matched is not None:
+        return candidates_from_message(matched, roster), matched, True
+    # DB에서 못 찾은 경우: 언제 받은 쪽지인지 알 수 없다. 지금 시각을 기준으로
+    # 읽되 지난 날짜도 살리고(오래된 쪽지를 이제 열어볼 수 있으니),
+    # '6월 5일'이 내년으로 밀린 경우엔 올해로 당겨 준다.
+    msg = Message(key=-1, sender="(화면에서 가져옴)", received=datetime.now(),
+                  title=title or body.splitlines()[0][:40], body=body)
+    cands = candidates_from_message(msg, roster, allow_past=True)
+    return [_pull_back_year(c, msg.received) for c in cands], msg, False
+
+
+def _pull_back_year(c: Candidate, base: datetime) -> Candidate:
+    """연도 없는 날짜가 내년으로 밀렸으면 올해로 되돌린다.
+
+    '6월 5일' 쪽지를 8월에 열면 파서가 2027-06-05로 읽는데, 실제로는
+    올해 지나간 6월 5일을 말하는 것이다 (2026-08-02 사용자 지적).
+    """
+    if (c.start.date() - base.date()).days <= 180:
+        return c
+    try:
+        start = c.start.replace(year=c.start.year - 1)
+        end = c.end.replace(year=c.end.year - 1) if c.end else None
+    except ValueError:                     # 2월 29일 등
+        return c
+    return replace(c, start=start, end=end)
 
 
 def collect(base_dir: str, count: int | None = None) -> tuple[list[Candidate], list[Message], str]:
