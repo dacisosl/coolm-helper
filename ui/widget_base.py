@@ -195,12 +195,13 @@ class WidgetBase(QWidget):
         ProofDialog(self.config, parent=self).exec()
 
     def open_quick(self) -> None:
-        """⚡ 간편 등록 — 지금 쿨메신저에서 보고 있는 쪽지를 바로 등록."""
-        from ui.quick_dialog import QuickDialog
-        dlg = QuickDialog(self.base_dir, self.store,
-                          google_enabled=self.google_enabled(), parent=self)
-        dlg.exec()
-        self.on_events_changed()
+        """⚡ 간편 등록 — 보고 있는 쪽지를 곧바로 등록하고 포스트잇으로 붙인다.
+
+        수정 창을 띄우지 않는다(2026-07-26 사용자 결정). 등록은 자동으로 되고,
+        고칠 내용은 바탕화면에 붙은 포스트잇에서 그 자리에서 편집한다.
+        """
+        from ui.quick_capture import quick_pin
+        quick_pin(self)
 
     def _swap_style(self, style: str) -> None:
         """설정에서 위젯 스타일 변경 시 즉시 교체."""

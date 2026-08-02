@@ -126,7 +126,10 @@ class MiniWidget(WidgetBase):
         mood = "base"
         if self.config.get("character_mode", True):
             overdue, today, _up = self.store.sections(date.today())
-            if not overdue and not today:
+            # 완료 체크한 일은 '남은 할 일'이 아니다 — 다 끝내면 자야 한다
+            # (예전엔 완료해도 오늘 목록에 남아 계속 깨어 있었음, 2026-07-26)
+            todo_left = [e for e in today if not e.done]
+            if not overdue and not todo_left:
                 mood = "sleep"
         self.penguin.setPixmap(
             penguin_pixmap(self.base_dir, self.penguin_px(), mood))
@@ -226,6 +229,21 @@ class MiniWidget(WidgetBase):
         self.setWindowOpacity(int(pct) / 100)
         pipeline.save_config(self.base_dir, self.config)
 
+    def _show_capture_diagnosis(self) -> None:
+        """'보고 있는 쪽지'를 왜 못 읽는지 확인해서 보여준다 (복사 가능)."""
+        from PyQt6.QtWidgets import QMessageBox
+        try:
+            import capture
+            text = capture.diagnose()
+        except Exception as e:
+            text = f"진단을 실행하지 못했습니다: {e}"
+        box = QMessageBox(self)
+        box.setWindowTitle("쪽지 읽기 진단")
+        box.setText("쿨메신저에서 쪽지를 열어 둔 채로 확인한 결과입니다.")
+        box.setDetailedText(text)          # 길어서 '자세히'에 — 복사해서 보내기 쉬움
+        box.setStyleSheet(theme.BASE_QSS)
+        box.exec()
+
     def contextMenuEvent(self, ev):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
@@ -242,8 +260,12 @@ class MiniWidget(WidgetBase):
             a.setChecked(pct == cur)
             opacity_acts[a] = pct
         menu.addSeparator()
+        act_diag = menu.addAction("쪽지 읽기 진단…")
         act_quit = menu.addAction("종료")
         chosen = menu.exec(ev.globalPos())
+        if chosen == act_diag:
+            self._show_capture_diagnosis()
+            return
         if chosen in opacity_acts:
             self._set_opacity(opacity_acts[chosen])
         elif chosen == act_tray:

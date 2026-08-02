@@ -998,3 +998,19 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   setWindowOpacity 즉시 반영 + config["widget_opacity"] 저장(기존 키 재사용
   → WidgetBase.apply_config가 재시작 시에도 그대로 복원).
 - 100 테스트 통과 + 오프스크린으로 적용·저장·재시작 유지 확인.
+
+## 2026-07-26 (v1.8.0) — 간편등록 포스트잇 직행 + 캡처/무드 버그 4건
+- **캡처 실패(학교 PC)**: capture._cool_pid가 창 클래스 "CoolMsg50SingleInstance"
+  정확 일치만 봐서 다른 버전에선 못 찾음 → ①정확 일치 ②클래스 접두어(COOLMSG/
+  COOLMESSENGER) ③실행파일 이름(QueryFullProcessImageNameW) 3단계로 완화.
+  capture.diagnose() 추가 + 펭귄 우클릭 '쪽지 읽기 진단…'에서 단계별 결과 확인
+  (프로세스/창수/본문틀 개수/읽은 글자수) — 원인 파악용.
+- **간편등록 개편**: 수정 창(QuickDialog) 대신 ui/quick_capture.quick_pin() —
+  캡처(백그라운드) → 첫 후보 자동 등록(본문은 memo, 날짜 없으면 오늘) →
+  pin_note로 포스트잇 부착 → 포스트잇에서 인라인 편집(기존 자동저장 활용).
+  실패 시 클립보드 폴백 → 그것도 없으면 안내.
+- **알림 방식**: show_toast는 부모 위젯 내부에 그려져 70px 펭귄에서 안 보임 →
+  독립 창인 AlertBubble로 교체(_say).
+- **자는 무드**: sections()의 today가 완료 항목까지 포함해, 다 끝내도 안 자던
+  문제 → not e.done 필터 추가.
+- tests/test_quick_capture.py 8종 추가(등록·핀·메모·빈제목·무드 4케이스). 108 통과.
