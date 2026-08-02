@@ -180,6 +180,39 @@ class DeskWidgetBase(QWidget):
         self.resize(320, 300)
         self.move(screen.right() - self.width() - 80, screen.top() + 80)
 
+    # ── 잠깐만 맨 앞으로 (고정 아님) ─────────────────────────
+    FLASH_MS = 6000
+
+    def flash_to_front(self, ms: int | None = None) -> None:
+        """방금 켜진 위젯을 잠시 맨 앞에 띄운다 (2026-08-02 사용자 요청).
+
+        평소 바탕화면 위젯은 '항상 아래'라 raise_()만으로는 다른 창에 가린다.
+        그래서 잠깐 '항상 위'로 올렸다가 시간이 지나면 원래 설정으로 되돌린다.
+        '항상 위 고정'(always_on_top)은 건드리지 않는다 — 사용자가 켜지 않는 한
+        계속 떠 있지 않게 하려는 것.
+        """
+        self._flash_ms = int(ms if ms is not None else self.FLASH_MS)
+        flags = (Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
+                 | Qt.WindowType.WindowStaysOnTopHint)
+        if flags != self.windowFlags():
+            self.setWindowFlags(flags)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        QTimer.singleShot(self._flash_ms, self._end_flash)
+
+    def _end_flash(self) -> None:
+        try:
+            if self.isActiveWindow():        # 아직 쓰는 중이면 조금 더 앞에 둔다
+                QTimer.singleShot(self._flash_ms, self._end_flash)
+                return
+            visible = self.isVisible()
+            self.setWindowFlags(self.window_flags())
+            if visible:
+                self.show()
+        except RuntimeError:
+            pass          # 이미 닫힌 위젯
+
     def refresh(self) -> None:
         """서브클래스에서 재정의 — 일정 변경 시 다시 그림."""
 
@@ -604,12 +637,14 @@ def pin_note(event_id: str) -> bool:
     reg = _registry()
     cur = reg["notes"].get(event_id)
     if cur is not None:
-        cur.raise_()
-        cur.activateWindow()
+        cur.flash_to_front()
         return True
     notes = desk_conf(owner.config, "notes")
     notes.append({"event_id": event_id, "geometry": None,
                   "opacity": 95, "always_on_top": False, "font_scale": 100})
     pipeline.save_config(owner.base_dir, owner.config)
     ensure_desk_widgets(owner)
+    new = reg["notes"].get(event_id)
+    if new is not None:
+        new.flash_to_front()      # 처음 붙을 땐 잠깐 맨 앞으로 (고정 아님)
     return True

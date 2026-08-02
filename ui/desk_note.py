@@ -7,10 +7,12 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QTimer
+from datetime import datetime
+
+from PyQt6.QtCore import Qt, QDate, QTimer
 from PyQt6.QtWidgets import (
-    QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QVBoxLayout,
+    QApplication, QCalendarWidget, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from store.event_store import Event, EventStore
@@ -49,7 +51,12 @@ class PostItWidget(DeskWidgetBase):
         root.setSpacing(4)
 
         head = QHBoxLayout()
-        self.when_label = QLabel()
+        # 날짜·시간도 그 자리에서 고칠 수 있다 (2026-08-02 사용자 요청) —
+        # 라벨처럼 보이지만 누르면 달력·시간 고르기가 뜨는 버튼
+        self.when_label = QPushButton()
+        self.when_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.when_label.setToolTip("눌러서 날짜·시간 바꾸기")
+        self.when_label.clicked.connect(self._open_when_popup)
         head.addWidget(self.when_label)
         head.addStretch()
         head.addWidget(self.make_tray_button())   # – 트레이로 보내기 (v1.6)
@@ -86,8 +93,11 @@ class PostItWidget(DeskWidgetBase):
         """글씨 크기 설정(%)을 제목·메모·날짜에 적용."""
         fpx = self.font_px
         self.when_label.setStyleSheet(
-            f"color:{theme.POSTIT_HEADER};font-size:{fpx(10)}px;"
-            f"font-weight:bold;background:transparent")
+            f"QPushButton{{color:{theme.POSTIT_HEADER};font-size:{fpx(10)}px;"
+            f"font-weight:bold;background:transparent;border:none;"
+            f"padding:0;text-align:left}}"
+            f"QPushButton:hover{{color:{theme.SIGNATURE_DARK};"
+            f"text-decoration:underline}}")
         self.title_edit.setStyleSheet(
             f"QLineEdit{{background:transparent;border:none;padding:0;"
             f"font-size:{fpx(13)}px;font-weight:bold;color:{theme.TEXT}}}")
@@ -113,7 +123,79 @@ class PostItWidget(DeskWidgetBase):
         t = f"{d.month}/{d.day}({WEEKDAY_KO[d.weekday()]})"
         if not self.event.all_day:
             t += d.strftime(" %H:%M")
-        self.when_label.setText("📌 " + t)
+        self.when_label.setText("📌 " + t + "  ▾")
+
+    # ── 날짜·시간 인라인 편집 ────────────────────────────────
+    def _open_when_popup(self) -> None:
+        """📌 줄을 누르면 뜨는 작은 달력 + 시간 고르기."""
+        from ui.review_dialog import TimeCombo
+        pop = QWidget(None, Qt.WindowType.Popup
+                      | Qt.WindowType.FramelessWindowHint)
+        pop.setStyleSheet(theme.BASE_QSS + theme.CALENDAR_QSS)
+        lay = QVBoxLayout(pop)
+        lay.setContentsMargins(6, 6, 6, 6)
+        lay.setSpacing(6)
+
+        d = self.event.start_dt
+        cal = QCalendarWidget()
+        cal.setVerticalHeaderFormat(
+            QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        cal.setGridVisible(False)
+        cal.setSelectedDate(QDate(d.year, d.month, d.day))
+
+        row = QHBoxLayout()
+        row.setSpacing(6)
+        lbl = QLabel("시간")
+        lbl.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
+        row.addWidget(lbl)
+        time_combo = TimeCombo()
+        if self.event.all_day:
+            time_combo.set_all_day()
+        else:
+            time_combo.set_time(d.hour, d.minute)
+        time_combo.currentIndexChanged.connect(
+            lambda _: self._apply_when(cal.selectedDate(), time_combo))
+        row.addWidget(time_combo)
+        row.addStretch()
+        lay.addLayout(row)
+
+        cal.clicked.connect(
+            lambda qd: (self._apply_when(qd, time_combo), pop.close()))
+        lay.addWidget(cal)
+
+        pop.adjustSize()
+        pos = self.when_label.mapToGlobal(self.when_label.rect().bottomLeft())
+        pop.move(pos.x(), pos.y() + 4)
+        pop.show()
+
+    def _apply_when(self, qd: QDate, time_combo) -> None:
+        """고른 날짜·시간을 바로 일정에 저장 (다른 창도 곧바로 따라온다)."""
+        all_day = time_combo.is_all_day()
+        h, m = (0, 0) if all_day else time_combo.get_time()
+        new_start = datetime(qd.year(), qd.month(), qd.day(), h, m)
+        old_start = self.event.start_dt
+        if new_start == old_start and all_day == self.event.all_day:
+            return
+        fields = {"start": new_start.isoformat(), "all_day": all_day}
+        old_end = self.event.end_dt
+        new_end = None
+        if old_end:                       # 기간 일정은 길이를 유지한 채 옮긴다
+            new_end = old_end + (new_start - old_start)
+            fields["end"] = new_end.isoformat()
+        self.store.update(self.event.id, **fields)
+        self.event.start = fields["start"]
+        self.event.all_day = all_day
+        if new_end:
+            self.event.end = fields["end"]
+        self._update_when()
+        if self.event.google_id:
+            try:
+                from calendar_sync import google_sync
+                google_sync.update_event(self.event.google_id,
+                                         self.event.title, new_start,
+                                         new_end, all_day)
+            except Exception:
+                pass          # 구글 사본 갱신 실패는 조용히 (메모지에서 경고는 산만)
 
     # ── 저장 (디바운스 + 포커스 아웃 + 닫힐 때) ─────────────
     def _save_text(self) -> None:
