@@ -243,7 +243,10 @@ class DeskWidgetBase(QWidget):
         slider = QSlider(Qt.Orientation.Horizontal)
         slider.setRange(40, 100)
         slider.setValue(max(40, int(self.conf.get("opacity", 90))))
-        slider.setFixedSize(110, 18)   # 위젯 폭을 다 차지하지 않게 고정 폭
+        # 위젯 폭을 다 차지하지 않게 최대 폭을 두되, 좁은 메모지에서는 줄어든다
+        slider.setFixedHeight(18)
+        slider.setMinimumWidth(56)
+        slider.setMaximumWidth(110)
         slider.setToolTip("위젯 투명도")
         slider.valueChanged.connect(
             lambda v: self.setWindowOpacity(v / 100))          # 즉시 미리보기
@@ -272,6 +275,7 @@ class DeskWidgetBase(QWidget):
         self._font_label.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:10px;background:transparent")
         lay.addWidget(self._font_label)
+        self.add_edit_bar_extras(lay)  # 위젯별 추가 도구 (포스트잇 색 등)
         lay.addStretch()               # ✕는 오른쪽 끝으로
         # ✕ 위젯 끄기 (📌 고정은 v1.4부터 헤더의 make_pin_button으로 이동)
         from PyQt6.QtCore import QSize
@@ -292,6 +296,9 @@ class DeskWidgetBase(QWidget):
         bar.setVisible(False)
         self._edit_bar = bar
         return bar
+
+    def add_edit_bar_extras(self, lay) -> None:
+        """서브클래스에서 재정의 — 도구줄에 위젯별 버튼을 덧붙인다."""
 
     def make_header_toggle(self, icon_name: str, tip: str,
                            checked: bool = False) -> QPushButton:

@@ -40,11 +40,7 @@ class PostItWidget(DeskWidgetBase):
         outer.setContentsMargins(8, 8, 8, 8)
         card = QFrame()
         card.setObjectName("postit")
-        card.setStyleSheet(
-            theme.BASE_QSS
-            + f"#postit{{background:{theme.POSTIT_BG};"
-              f"border-radius:{theme.RADIUS_LG}px;"
-              f"border:1px solid {theme.POSTIT_BORDER}}}")
+        self.card = card
         outer.addWidget(card)
         root = QVBoxLayout(card)
         root.setContentsMargins(10, 6, 8, 8)
@@ -61,14 +57,10 @@ class PostItWidget(DeskWidgetBase):
         head.addStretch()
         head.addWidget(self.make_tray_button())   # – 트레이로 보내기 (v1.6)
         head.addWidget(self.make_edit_button())
-        close_btn = QPushButton("✕")
+        self.close_btn = QPushButton("✕")
+        close_btn = self.close_btn
         close_btn.setToolTip("포스트잇 내리기 (일정은 그대로 남아요)")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setStyleSheet(
-            f"QPushButton{{background:transparent;border:none;"
-            f"color:{theme.POSTIT_HEADER};font-size:12px;padding:0 4px}}"
-            f"QPushButton:hover{{color:{theme.DANGER}}}"
-            f"QPushButton:pressed{{color:{theme.DANGER_FG}}}")
         close_btn.clicked.connect(self.turn_off)
         head.addWidget(close_btn)
         root.addLayout(head)
@@ -86,14 +78,97 @@ class PostItWidget(DeskWidgetBase):
         self.memo_edit.textChanged.connect(self._on_memo_changed)
         root.addWidget(self.memo_edit, stretch=1)
 
+        self._apply_color()
         self._apply_font()
         self._update_when()
+
+    # ── 메모지 색 (편집 모드에서 고름) ───────────────────────
+    def color_key(self) -> str:
+        key = self.conf.get("color", "yellow")
+        return key if key in theme.POSTIT_PALETTE else "yellow"
+
+    def _apply_color(self) -> None:
+        """고른 색을 종이·테두리·머리글에 입힌다."""
+        bg, border, fg = theme.postit_colors(self.color_key())
+        self.card.setStyleSheet(
+            theme.BASE_QSS
+            + f"#postit{{background:{bg};"
+              f"border-radius:{theme.RADIUS_LG}px;"
+              f"border:1px solid {border}}}")
+        self.close_btn.setStyleSheet(
+            f"QPushButton{{background:transparent;border:none;"
+            f"color:{fg};font-size:12px;padding:0 4px}}"
+            f"QPushButton:hover{{color:{theme.DANGER}}}"
+            f"QPushButton:pressed{{color:{theme.DANGER_FG}}}")
+        self._sync_color_button()
+
+    def _set_color(self, key: str) -> None:
+        self.conf["color"] = key
+        self._save_config()
+        self._apply_color()
+        self._apply_font()          # 날짜 글자색도 새 색을 따라간다
+
+    def add_edit_bar_extras(self, lay) -> None:
+        """도구줄에 '메모지 색' 동그라미 하나 (누르면 색 6개가 뜬다).
+
+        메모지가 작아 점 6개를 늘어놓으면 도구줄이 넘쳐서, 지금 색만 보여주고
+        고를 때만 팔레트를 띄운다. (2026-08-02 사용자 요청)
+        """
+        self._color_btn = QPushButton()
+        self._color_btn.setFixedSize(18, 18)
+        self._color_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._color_btn.setToolTip("메모지 색 바꾸기")
+        self._color_btn.clicked.connect(self._open_color_popup)
+        lay.addWidget(self._color_btn)
+        self._sync_color_button()
+
+    @staticmethod
+    def _chip_qss(bg: str, border: str, width: int = 1) -> str:
+        return (f"QPushButton{{background:{bg};"
+                f"border:{width}px solid {border};border-radius:9px}}"
+                f"QPushButton:hover{{border:2px solid {theme.SIGNATURE}}}")
+
+    def _sync_color_button(self) -> None:
+        btn = getattr(self, "_color_btn", None)
+        if btn is None:
+            return
+        bg, border, _fg = theme.postit_colors(self.color_key())
+        btn.setStyleSheet(self._chip_qss(bg, border))
+
+    def _open_color_popup(self) -> None:
+        pop = QWidget(None, Qt.WindowType.Popup
+                      | Qt.WindowType.FramelessWindowHint)
+        pop.setStyleSheet(
+            f"background:{theme.CARD};border:1px solid {theme.BORDER};"
+            f"border-radius:{theme.RADIUS_MD}px")
+        row = QHBoxLayout(pop)
+        row.setContentsMargins(8, 8, 8, 8)
+        row.setSpacing(6)
+        cur = self.color_key()
+        for key in theme.POSTIT_COLOR_ORDER:
+            bg, border, _fg = theme.POSTIT_PALETTE[key]
+            b = QPushButton()
+            b.setFixedSize(22, 22)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setToolTip(theme.POSTIT_COLOR_NAMES[key])
+            b.setStyleSheet(self._chip_qss(
+                bg, theme.TEXT if key == cur else border,
+                2 if key == cur else 1))
+            b.clicked.connect(
+                lambda _, k=key: (self._set_color(k), pop.close()))
+            row.addWidget(b)
+        pop.adjustSize()
+        pos = self._color_btn.mapToGlobal(
+            self._color_btn.rect().bottomLeft())
+        pop.move(pos.x() - 40, pos.y() + 4)
+        pop.show()
 
     def _apply_font(self) -> None:
         """글씨 크기 설정(%)을 제목·메모·날짜에 적용."""
         fpx = self.font_px
+        _bg, _border, fg = theme.postit_colors(self.color_key())
         self.when_label.setStyleSheet(
-            f"QPushButton{{color:{theme.POSTIT_HEADER};font-size:{fpx(10)}px;"
+            f"QPushButton{{color:{fg};font-size:{fpx(10)}px;"
             f"font-weight:bold;background:transparent;border:none;"
             f"padding:0;text-align:left}}"
             f"QPushButton:hover{{color:{theme.SIGNATURE_DARK};"

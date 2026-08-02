@@ -235,6 +235,27 @@ POSTIT_BG = "#fff9e6"
 POSTIT_BORDER = "#f0e0b0"
 POSTIT_HEADER = "#8a7a45"
 
+# 포스트잇 색 팔레트 — 편집 모드(🔧)에서 고른다 (2026-08-02 사용자 요청).
+# 값: (배경, 테두리, 날짜·✕ 글자색). 모두 글씨가 잘 보이는 연한 파스텔톤.
+POSTIT_PALETTE = {
+    "yellow": ("#fff9e6", "#f0e0b0", "#8a7a45"),
+    "pink":   ("#fff0f2", "#f6d3d9", "#96586a"),
+    "orange": ("#fff1e2", "#f6dcc0", "#9a6427"),
+    "green":  ("#eef8ef", "#cfe6d2", "#4c7a52"),
+    "blue":   ("#eaf3fd", "#cbe0f5", "#3f6690"),
+    "purple": ("#f4eefc", "#ded2f0", "#6a5490"),
+}
+POSTIT_COLOR_ORDER = ["yellow", "pink", "orange", "green", "blue", "purple"]
+POSTIT_COLOR_NAMES = {
+    "yellow": "노랑", "pink": "분홍", "orange": "주황",
+    "green": "초록", "blue": "파랑", "purple": "보라",
+}
+
+
+def postit_colors(key: str | None):
+    """포스트잇 색 키 → (배경, 테두리, 글자색). 모르는 값이면 기본 노랑."""
+    return POSTIT_PALETTE.get(key or "yellow", POSTIT_PALETTE["yellow"])
+
 # 중요도 색상 (글자색, 연한 배경색)
 PRIORITY_COLORS = {
     "높음": (DANGER_FG, DANGER_BG),

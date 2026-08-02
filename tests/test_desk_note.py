@@ -17,12 +17,13 @@ from store.event_store import EventStore
 _app = QApplication.instance() or QApplication([])
 
 
-def _make_note(store, ev):
+def _make_note(store, ev, base_dir=None):
     from ui.desk_note import PostItWidget
     conf = {"event_id": ev.id, "geometry": None, "opacity": 95,
             "always_on_top": False, "font_scale": 100}
     config = {"desk_widgets": {"notes": [conf]}}
-    return PostItWidget(store, config, store.path, conf, ev)
+    base = base_dir or os.path.dirname(os.path.dirname(store.path))
+    return PostItWidget(store, config, base, conf, ev)
 
 
 class TestWhenEdit(unittest.TestCase):
@@ -81,6 +82,50 @@ class TestWhenEdit(unittest.TestCase):
 
     def test_popup_opens(self):
         self.note._open_when_popup()      # 예외 없이 떠야 한다
+
+
+class TestPostItColor(unittest.TestCase):
+    """편집 모드에서 메모지 색 바꾸기 (2026-08-02 사용자 요청)."""
+
+    def setUp(self):
+        from ui import theme
+        self.theme = theme
+        self.store = EventStore(tempfile.mkdtemp())
+        ev = self.store.add("가정통신문 배부", datetime(2026, 8, 5, 9, 0))
+        self.note = _make_note(self.store, ev)
+
+    def test_default_is_yellow(self):
+        self.assertEqual(self.note.color_key(), "yellow")
+
+    def test_chip_button_in_edit_bar(self):
+        self.assertIsNotNone(getattr(self.note, "_color_btn", None))
+
+    def test_change_color_saved_to_conf(self):
+        self.note._set_color("blue")
+        self.assertEqual(self.note.conf["color"], "blue")
+        self.assertEqual(self.note.color_key(), "blue")
+
+    def test_card_uses_chosen_background(self):
+        self.note._set_color("green")
+        bg = self.theme.POSTIT_PALETTE["green"][0]
+        self.assertIn(bg, self.note.card.styleSheet())
+
+    def test_header_text_color_follows(self):
+        self.note._set_color("purple")
+        fg = self.theme.POSTIT_PALETTE["purple"][2]
+        self.assertIn(fg, self.note.when_label.styleSheet())
+
+    def test_unknown_color_falls_back(self):
+        self.note.conf["color"] = "무지개"
+        self.assertEqual(self.note.color_key(), "yellow")
+
+    def test_palette_popup_opens(self):
+        self.note._open_color_popup()      # 예외 없이 떠야 한다
+
+    def test_every_palette_entry_is_triple(self):
+        for key in self.theme.POSTIT_COLOR_ORDER:
+            self.assertEqual(len(self.theme.POSTIT_PALETTE[key]), 3)
+            self.assertIn(key, self.theme.POSTIT_COLOR_NAMES)
 
 
 class TestFlashToFront(unittest.TestCase):
