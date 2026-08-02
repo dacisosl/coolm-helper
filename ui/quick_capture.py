@@ -14,8 +14,13 @@ from __future__ import annotations
 import threading
 from datetime import timedelta
 
-from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt, QObject, pyqtSignal
+from PyQt6.QtWidgets import (
+    QApplication, QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit,
+    QVBoxLayout,
+)
+
+from ui import theme
 
 
 class _Loader(QObject):
@@ -76,6 +81,86 @@ def _register_and_pin(owner, cands, msg, matched: bool) -> bool:
     return True
 
 
+class ClipboardConfirmDialog(QDialog):
+    """클립보드에서 가져올 때만 뜨는 확인 창 (2026-08-02 사용자 요청).
+
+    화면에서 읽은 쪽지는 '지금 보고 있는 것'이라 바로 등록해도 되지만,
+    클립보드는 언제 복사한 것인지 모른다 — 그래서 내용을 보여주고 묻는다.
+    """
+
+    PREVIEW_CHARS = 600
+
+    def __init__(self, title: str, when: str, body: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("클립보드에서 등록")
+        self.setStyleSheet(theme.BASE_QSS)
+        self.setMinimumWidth(420)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 16)
+        lay.setSpacing(10)
+
+        head = QLabel("클립보드에서 아래와 같은 내용을 등록하시겠습니까?")
+        head.setWordWrap(True)
+        head.setStyleSheet(
+            f"font-size:{theme.FONT_LG}px;font-weight:bold;color:{theme.TEXT}")
+        lay.addWidget(head)
+
+        summary = QLabel(f"📌 {when}    {title}" if when else f"📌 {title}")
+        summary.setWordWrap(True)
+        summary.setStyleSheet(
+            f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
+            f"border-radius:{theme.RADIUS_MD}px;padding:8px 10px;"
+            f"font-size:{theme.FONT_MD}px;font-weight:bold")
+        lay.addWidget(summary)
+
+        text = (body or "").strip()
+        if len(text) > self.PREVIEW_CHARS:
+            text = text[:self.PREVIEW_CHARS] + " …"
+        view = QTextEdit()
+        view.setPlainText(text)
+        view.setReadOnly(True)
+        view.setFixedHeight(150)
+        view.setStyleSheet(
+            f"QTextEdit{{background:{theme.CARD_TINT};border:1px solid "
+            f"{theme.BORDER_SUBTLE};border-radius:{theme.RADIUS_MD}px;"
+            f"padding:8px;font-size:{theme.FONT_MD}px;color:{theme.TEXT}}}")
+        lay.addWidget(view)
+
+        hint = QLabel("등록하면 바탕화면 포스트잇으로 붙어서 바로 고칠 수 있어요.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
+        lay.addWidget(hint)
+
+        row = QHBoxLayout()
+        row.addStretch()
+        cancel = QPushButton("취소")
+        cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel.setStyleSheet(theme.TEXT_BTN)
+        cancel.clicked.connect(self.reject)
+        row.addWidget(cancel)
+        ok = QPushButton("등록하기")
+        ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        ok.setStyleSheet(theme.PRIMARY_BTN)
+        ok.setDefault(True)
+        ok.clicked.connect(self.accept)
+        row.addWidget(ok)
+        lay.addLayout(row)
+
+
+def confirm_clipboard(owner, cands, msg) -> bool:
+    """클립보드 내용을 보여주고 등록할지 묻는다 (화면 캡처 경로에서는 안 뜬다)."""
+    from ui.review_dialog import kr_date
+    if cands:
+        c = cands[0]
+        title = (c.suggested_title or msg.title or "").strip()
+        when = kr_date(c.start) + ("" if c.all_day else c.start.strftime(" %H:%M"))
+    else:
+        title = (msg.title or "").strip()
+        when = "날짜를 못 찾아 오늘로 등록해요"
+    dlg = ClipboardConfirmDialog(title, when, msg.body or "", owner)
+    return dlg.exec() == QDialog.DialogCode.Accepted
+
+
 def _say(owner, text: str) -> None:
     """펭귄 옆 말풍선으로 알린다.
 
@@ -110,6 +195,9 @@ def quick_pin(owner) -> None:
                 owner.base_dir, title, text)
         except Exception:
             _say(owner, "쪽지를 읽지 못했어요")
+            return
+        # 클립보드에서 가져올 때만 내용을 보여주고 물어본다
+        if not confirm_clipboard(owner, cands, msg):
             return
         _finish(cands, msg, matched, from_clipboard=True)
 

@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+import time
 import unittest
 from datetime import date, datetime, timedelta
 
@@ -70,6 +71,95 @@ class TestQuickRegister(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(self.owner.store.all(), [])
         self.assertEqual(pinned, [])
+
+
+class TestClipboardConfirm(unittest.TestCase):
+    """클립보드에서 가져올 때만 '이 내용 등록할까요?'를 묻는다 (2026-08-02)."""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        from PyQt6.QtWidgets import QWidget
+
+        class _QOwner(QWidget):              # quick_pin은 QObject 부모를 쓴다
+            def __init__(self, tmp):
+                super().__init__()
+                self.base_dir = tmp
+                self.store = EventStore(tmp)
+                self.config = {"desk_widgets": {"notes": []}}
+                self.changed = 0
+
+            def on_events_changed(self):
+                self.changed += 1
+
+        self.tmp = tempfile.mkdtemp()
+        self.owner = _QOwner(self.tmp)
+        from ui import quick_capture
+        self.qc = quick_capture
+
+    def _run_fallback(self, clip_text, answer):
+        """quick_pin의 클립보드 경로만 흉내 — 물음에 answer로 답한다."""
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setText(clip_text)
+        asked = []
+        real_confirm = self.qc.confirm_clipboard
+        real_pin = None
+        import ui.desk_base as desk_base
+        real_pin, desk_base.pin_note = desk_base.pin_note, lambda eid: True
+        self.qc.confirm_clipboard = lambda owner, cands, msg: (
+            asked.append(msg), answer)[1]
+        try:
+            self.qc.quick_pin(self.owner)
+            for _ in range(200):            # 백그라운드 → 시그널 전달 대기
+                QApplication.processEvents()
+                if asked:
+                    break
+                time.sleep(0.01)
+        finally:
+            self.qc.confirm_clipboard = real_confirm
+            desk_base.pin_note = real_pin
+        return asked
+
+    def test_asks_before_registering(self):
+        asked = self._run_fallback(
+            "8월 7일 오후 2시 30분 강당에서 방학식이 있습니다.", True)
+        self.assertEqual(len(asked), 1)
+        self.assertEqual(len(self.owner.store.all()), 1)
+
+    def test_cancel_registers_nothing(self):
+        asked = self._run_fallback(
+            "8월 7일 오후 2시 30분 강당에서 방학식이 있습니다.", False)
+        self.assertEqual(len(asked), 1)
+        self.assertEqual(self.owner.store.all(), [])
+
+    def test_screen_path_does_not_ask(self):
+        # 화면에서 읽은 쪽지는 '지금 보고 있는 것'이라 바로 등록한다
+        src = open(os.path.join(os.path.dirname(__file__), "..", "ui",
+                                "quick_capture.py"), encoding="utf-8").read()
+        head, _, tail = src.partition("def _fallback")
+        body, _, rest = tail.partition("def _finish")
+        self.assertIn("confirm_clipboard", body)      # 클립보드 경로엔 있고
+        self.assertNotIn("confirm_clipboard", rest)   # 화면 경로엔 없다
+
+    def test_dialog_shows_content(self):
+        dlg = self.qc.ClipboardConfirmDialog(
+            "방학식", "8/7(금) 14:30", "강당에서 방학식이 있습니다.")
+        texts = [w.text() for w in dlg.findChildren(
+            __import__("PyQt6.QtWidgets", fromlist=["QLabel"]).QLabel)]
+        self.assertTrue(any("등록하시겠습니까" in t for t in texts))
+        self.assertTrue(any("8/7(금) 14:30" in t for t in texts))
+
+    def test_long_body_truncated(self):
+        long = "가" * 2000
+        dlg = self.qc.ClipboardConfirmDialog("긴 쪽지", "8/7(금)", long)
+        from PyQt6.QtWidgets import QTextEdit
+        view = dlg.findChild(QTextEdit)
+        self.assertLess(len(view.toPlainText()),
+                        dlg.PREVIEW_CHARS + 10)
 
 
 class TestSleepMood(unittest.TestCase):
