@@ -129,16 +129,32 @@ class WidgetBase(QWidget):
             self.show()
         self.raise_()
 
+    # 프리워밍 주기 — 쿨메신저를 나중에 켜거나 메시지 관리함 창을 새로
+    # 열어도(웹뷰가 새로 생김) 첫 ⚡가 느려지지 않게 주기적으로 깨워둔다.
+    # 이미 깨어 있는 창은 수십 ms면 끝나 부담이 없다.
+    PREWARM_SEC = 90
+
     def _warmup_capture(self) -> None:
         import os
+        import time
         if os.environ.get("COOLM_NO_CAPTURE"):
             return          # CI/테스트 — Windows 러너에서 UIA가 멈출 수 있음
+        base_dir = self.base_dir
         try:
             import capture
             capture.warmup()
-            pipeline.prefetch_quick(self.base_dir)   # 첫 ⚡ 클릭도 빠르게
+            capture.prewarm()                  # 쿨메신저 웹뷰 접근성 미리 깨움
+            pipeline.prefetch_quick(base_dir)  # 매칭용 쪽지 캐시도 미리
         except Exception:
             pass
+        while True:                            # 데몬 스레드 — 앱 종료와 함께 끝
+            time.sleep(self.PREWARM_SEC)
+            try:
+                import capture
+                capture.prewarm()
+                pipeline.prefetch_quick(base_dir)
+            except Exception:
+                pass
 
     def _show_startup_alerts(self) -> None:
         from ui.alerts import show_startup_alerts

@@ -231,3 +231,27 @@ class TestOldMessageDates(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPrewarm(unittest.TestCase):
+    """첫 ⚡ 지연 해소 — 프리워밍이 조용히, 안전하게 돌아야 한다."""
+
+    def test_prewarm_never_raises(self):
+        # 리눅스(CI)에는 Windows API가 없다 — 예외 없이 조용히 넘어가야 한다
+        import capture
+        capture.prewarm()
+
+    def test_warmup_loop_wired(self):
+        # 시작 워밍업이 prewarm + prefetch를 부르고 주기 루프를 갖는지
+        src = open(os.path.join(os.path.dirname(__file__), "..", "ui",
+                                "widget_base.py"), encoding="utf-8").read()
+        self.assertIn("capture.prewarm()", src)
+        self.assertIn("prefetch_quick", src)
+        self.assertIn("PREWARM_SEC", src)
+
+    def test_waiting_bubble_wired(self):
+        # 읽기가 길어지면 '읽는 중' 안내가 뜨도록 연결됐는지
+        src = open(os.path.join(os.path.dirname(__file__), "..", "ui",
+                                "quick_capture.py"), encoding="utf-8").read()
+        self.assertIn("읽는 중", src)
+        self.assertIn("waiting.stop()", src)

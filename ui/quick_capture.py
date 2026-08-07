@@ -169,6 +169,12 @@ def _say(owner, text: str) -> None:
     """
     try:
         from ui.alerts import AlertBubble
+        old = getattr(owner, "_quick_bubble", None)
+        if old is not None:                # "읽는 중…" 등 이전 말풍선 정리
+            try:
+                old.close()
+            except Exception:
+                pass
         bubble = AlertBubble([text], owner)
         owner._quick_bubble = bubble       # GC 방지
         bubble.show()
@@ -213,8 +219,17 @@ def quick_pin(owner) -> None:
         _say(owner, "일정으로 등록했어요!\n포스트잇에서 바로 고칠 수 있어요."
              + ("\n(클립보드에서 가져옴)" if from_clipboard else ""))
 
+    # 읽기가 오래 걸리면(예: 프리워밍 전 첫 시도) 조용히 있지 말고 알린다
+    from PyQt6.QtCore import QTimer
+    waiting = QTimer(owner)
+    waiting.setSingleShot(True)
+    waiting.setInterval(700)
+    waiting.timeout.connect(
+        lambda: _say(owner, "쪽지를 읽는 중이에요…\n잠깐만요!"))
+
     loader = _Loader(owner.base_dir, parent=owner)
-    loader.done.connect(lambda r: _finish(*r))
-    loader.failed.connect(_fallback)
+    loader.done.connect(lambda r: (waiting.stop(), _finish(*r)))
+    loader.failed.connect(lambda why: (waiting.stop(), _fallback(why)))
     owner._quick_loader = loader          # GC 방지
+    waiting.start()
     loader.start()

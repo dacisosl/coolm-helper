@@ -41,6 +41,30 @@ def warmup() -> None:
         _uia = IUIA()
 
 
+def prewarm() -> None:
+    """쿨메신저 웹뷰의 접근성 트리를 미리 깨운다 — 첫 ⚡ 지연의 주범 제거.
+
+    쿨메신저 본문을 그리는 내장 크롬(CEF)은 누군가 처음 UIA로 읽으려 할
+    때에야 접근성 트리를 만들기 시작한다. 그 첫 준비가 몇 초 걸리고,
+    한 번 만들어지면 프로세스가 살아 있는 동안 수십 ms로 빨라진다
+    (2026-08-04 사용자 보고: "맨 처음 간편등록만 오래 걸린다").
+    그래서 앱이 한가할 때 미리 한 번 읽어 두고 결과는 버린다.
+    읽기 전용 UIA 조회라 쿨메신저 상태는 바꾸지 않는다.
+    """
+    try:
+        pid = _cool_pid()
+        if pid is None:
+            return                     # 쿨메신저가 아직 안 켜졌으면 다음 기회에
+        warmup()
+        for hwnd in _cool_windows(pid):
+            try:
+                _window_body(hwnd)     # 결과는 버림 — 깨우는 것이 목적
+            except Exception:
+                continue
+    except Exception:
+        pass                           # 프리워밍 실패는 기능에 영향 없음
+
+
 def _pid_of(hwnd: int) -> int:
     pid = wintypes.DWORD()
     ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
