@@ -129,10 +129,11 @@ class WidgetBase(QWidget):
             self.show()
         self.raise_()
 
-    # 프리워밍 주기 — 쿨메신저를 나중에 켜거나 메시지 관리함 창을 새로
-    # 열어도(웹뷰가 새로 생김) 첫 ⚡가 느려지지 않게 주기적으로 깨워둔다.
-    # 이미 깨어 있는 창은 수십 ms면 끝나 부담이 없다.
-    PREWARM_SEC = 90
+    # 프리워밍 감시 주기 — 새로 뜬 쿨메신저 창을 몇 초 안에 깨워
+    # "앱/창을 켜자마자 첫 ⚡"도 바로 되게 한다 (2026-08-07 사용자 요청).
+    # 이미 깨운 창은 창 목록 확인(수 ms)만 하므로 짧은 주기여도 부담이 없다.
+    PREWARM_SCAN_SEC = 4      # 새 창 감시 (빠름·거의 공짜)
+    PREWARM_FULL_SEC = 90     # 전체 재워밍 + 쪽지 캐시 (웹뷰 재시작 대비)
 
     def _warmup_capture(self) -> None:
         import os
@@ -142,17 +143,21 @@ class WidgetBase(QWidget):
         base_dir = self.base_dir
         try:
             import capture
-            capture.warmup()
-            capture.prewarm()                  # 쿨메신저 웹뷰 접근성 미리 깨움
-            pipeline.prefetch_quick(base_dir)  # 매칭용 쪽지 캐시도 미리
+            capture.warmup()             # UIA COM — 켜자마자 가장 먼저
+            capture.prewarm(force=True)  # 지금 떠 있는 쿨메신저 창 전부 깨움
+            pipeline.prefetch_quick(base_dir)
         except Exception:
             pass
-        while True:                            # 데몬 스레드 — 앱 종료와 함께 끝
-            time.sleep(self.PREWARM_SEC)
+        last_full = time.time()
+        while True:                      # 데몬 스레드 — 앱 종료와 함께 끝
+            time.sleep(self.PREWARM_SCAN_SEC)
             try:
                 import capture
-                capture.prewarm()
-                pipeline.prefetch_quick(base_dir)
+                full = time.time() - last_full >= self.PREWARM_FULL_SEC
+                capture.prewarm(force=full)   # 새 창은 몇 초 안에 깨어난다
+                if full:
+                    pipeline.prefetch_quick(base_dir)
+                    last_full = time.time()
             except Exception:
                 pass
 

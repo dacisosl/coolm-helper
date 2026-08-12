@@ -144,11 +144,11 @@ class DeskWidgetBase(QWidget):
 
     # ── 설정 반영 ────────────────────────────────────────────
     def window_flags(self) -> Qt.WindowType:
+        # 일반 창과 같은 층 규칙 — 클릭하면 위로, 다른 창을 켜면 그 창이 위로.
+        # (예전의 '항상 아래' 고정은 위젯이 늘 뒤에 깔려 불편 — 2026-08-07 제거)
         flags = Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint
-        if self.conf.get("always_on_top"):
+        if self.conf.get("always_on_top"):    # 🔧의 '항상 위 고정'만 예외
             flags |= Qt.WindowType.WindowStaysOnTopHint
-        else:
-            flags |= Qt.WindowType.WindowStaysOnBottomHint
         return flags
 
     def apply_window_conf(self, first: bool = False) -> None:
@@ -465,6 +465,8 @@ class DeskWidgetBase(QWidget):
         return None
 
     def mousePressEvent(self, ev):
+        self.raise_()                 # 일반 창처럼 — 잡으면 맨 위로
+        self.activateWindow()
         if ev.button() != Qt.MouseButton.LeftButton:
             return
         pos = ev.position().toPoint()

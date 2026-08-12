@@ -163,3 +163,31 @@ class TestFlashToFront(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNormalLayering(unittest.TestCase):
+    """위젯은 일반 창처럼 층이 움직인다 — '항상 아래' 고정 제거 (2026-08-07)."""
+
+    def setUp(self):
+        self.store = EventStore(tempfile.mkdtemp())
+        ev = self.store.add("알림장 쓰기", datetime(2026, 8, 7, 9, 0))
+        self.note = _make_note(self.store, ev)
+        self.note.apply_window_conf(first=True)
+
+    def test_no_bottom_pin(self):
+        flags = self.note.windowFlags()
+        self.assertFalse(flags & Qt.WindowType.WindowStaysOnBottomHint)
+        self.assertFalse(flags & Qt.WindowType.WindowStaysOnTopHint)
+
+    def test_always_on_top_still_works(self):
+        self.note.conf["always_on_top"] = True
+        self.note.apply_window_conf()
+        self.assertTrue(self.note.windowFlags()
+                        & Qt.WindowType.WindowStaysOnTopHint)
+
+    def test_click_raises(self):
+        # 클릭하면 일반 창처럼 위로 — mousePressEvent가 raise_를 부른다
+        import inspect
+        from ui.desk_base import DeskWidgetBase
+        src = inspect.getsource(DeskWidgetBase.mousePressEvent)
+        self.assertIn("raise_", src)

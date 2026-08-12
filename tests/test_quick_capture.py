@@ -245,9 +245,10 @@ class TestPrewarm(unittest.TestCase):
         # 시작 워밍업이 prewarm + prefetch를 부르고 주기 루프를 갖는지
         src = open(os.path.join(os.path.dirname(__file__), "..", "ui",
                                 "widget_base.py"), encoding="utf-8").read()
-        self.assertIn("capture.prewarm()", src)
+        self.assertIn("capture.prewarm(", src)
         self.assertIn("prefetch_quick", src)
-        self.assertIn("PREWARM_SEC", src)
+        self.assertIn("PREWARM_SCAN_SEC", src)
+        self.assertIn("PREWARM_FULL_SEC", src)
 
     def test_waiting_bubble_wired(self):
         # 읽기가 길어지면 '읽는 중' 안내가 뜨도록 연결됐는지
