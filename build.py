@@ -54,8 +54,51 @@ def main() -> int:
         shutil.copytree(assets_src, os.path.join(dist, "assets"),
                         dirs_exist_ok=True)
 
+    make_portable_zip(dist)
     print(f"\n빌드 완료: {os.path.join(dist, 'CoolmHelper.exe')}")
     return 0
+
+
+PORTABLE_README = """\
+COOL-비서 무설치판 — 먼저 읽어 주세요
+
+1) 이 폴더(CoolmHelper)를 통째로 원하는 곳에 옮겨 놓으세요.
+   예) 문서\\CoolmHelper  또는  바탕화면\\CoolmHelper
+   ※ 압축 프로그램 창 안에서 바로 실행하면 안 됩니다.
+      일정이 임시 폴더에 저장돼서 컴퓨터를 끄면 사라져요.
+      반드시 '압축 풀기'를 먼저 해 주세요.
+
+2) 폴더 안의 CoolmHelper.exe 를 실행하면 펭귄이 나타납니다.
+   자주 쓰려면 CoolmHelper.exe 에 오른쪽 클릭 →
+   '바로 가기 만들기' 로 바탕화면에 놓아 두세요.
+
+3) 일정·설정은 이 폴더 안에 저장됩니다(store 폴더, config.json).
+   폴더를 옮기면 일정도 같이 따라갑니다.
+
+4) 새 버전이 나오면 앱이 알려줍니다. 새 ZIP을 받아 압축을 푼 뒤
+   이 폴더에 덮어쓰면 됩니다 — 일정은 그대로 남습니다.
+
+설치판(CoolmHelper-Setup.exe)이 실행되는 컴퓨터라면 설치판을 쓰는 편이
+편합니다. 새 버전이 나올 때 자동으로 업데이트되거든요.
+"""
+
+
+def make_portable_zip(dist: str) -> str:
+    """설치 없이 압축만 풀어 쓰는 배포본 — 설치파일이 차단되는 PC 대비.
+
+    학교 PC에서 설치파일이 백신·SmartScreen에 막히는 경우가 있어
+    보조 배포본으로 함께 낸다 (2026-08-14 사용자 요청).
+    """
+    with open(os.path.join(dist, "먼저 읽어주세요.txt"), "w",
+              encoding="utf-8") as f:
+        f.write(PORTABLE_README)
+    out = os.path.join(BASE, "dist", "CoolmHelper-Portable")
+    path = shutil.make_archive(out, "zip",
+                               root_dir=os.path.join(BASE, "dist"),
+                               base_dir="CoolmHelper")
+    mb = os.path.getsize(path) / 1048576
+    print(f"무설치판 압축 완료: {path} ({mb:.1f} MB)")
+    return path
 
 
 if __name__ == "__main__":

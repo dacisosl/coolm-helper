@@ -125,6 +125,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v$env:VER" "Output/CoolmHelper-Setup.exe" `
+            "dist/CoolmHelper-Portable.zip" `
             --title "v$env:VER — $env:TITLE" --notes "$env:NOTES"
 
       - name: version.json 갱신 (자동 업데이트 신호)
@@ -132,9 +133,12 @@ jobs:
         run: |
           import json, os
           ver = os.environ["VER"]
+          dl = ("https://github.com/${{ github.repository }}/"
+                f"releases/download/v{ver}/")
           data = {"version": ver,
-                  "url": ("https://github.com/${{ github.repository }}/"
-                          f"releases/download/v{ver}/CoolmHelper-Setup.exe"),
+                  "url": dl + "CoolmHelper-Setup.exe",
+                  # 무설치판(ZIP) — 설치파일이 막히는 PC용 보조 배포본
+                  "zip_url": dl + "CoolmHelper-Portable.zip",
                   "notes": os.environ["NOTES"]}
           with open("version.json", "w", encoding="utf-8") as f:
               json.dump(data, f, ensure_ascii=False, indent=2)

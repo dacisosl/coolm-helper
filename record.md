@@ -1115,3 +1115,19 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   🔧의 '항상 위 고정' 옵션만 예외로 유지. flash_to_front(새 포스트잇 잠깐 앞)는
   그대로 동작.
 - 테스트 3종 추가(층 규칙)·배선 검증 갱신. 140 통과.
+
+## 2026-08-14 — 무설치판(ZIP) 보조 배포본
+- 사용자 질문: 설치파일이 차단되는 PC가 있는데 ZIP 배포가 필요하지 않을까?
+  점검 결과 우리는 NSIS가 아니라 **Inno Setup**이고 이미 **onedir**(폴더형)
+  빌드라 차단에 가장 취약한 조건(onefile 자기추출)은 피해 있음. 다만 국내
+  압축 프로그램(반디집·알집)이 MOTW('인터넷에서 받음' 표시)를 대개 안 붙여
+  ZIP 경로가 실제로 조용히 실행되는 것은 사실 → **설치판 유지 + ZIP 보조**로 결정.
+- build.py: make_portable_zip() — dist/CoolmHelper를 통째로 담은
+  CoolmHelper-Portable.zip 생성(+ '먼저 읽어주세요.txt': 압축을 꼭 풀 것,
+  뷰어에서 바로 실행하면 일정이 임시폴더에 저장돼 유실됨을 경고).
+  installer.iss는 이 안내문을 Excludes로 제외(설치판엔 불필요).
+- release.yml: 릴리스에 ZIP을 두 번째 자산으로 첨부, version.json에 zip_url 추가.
+- updater.is_portable(): Inno가 남기는 unins*.exe 유무로 판별(마커 파일 불필요).
+  무설치판이면 UpdateDialog가 조용한 설치 대신 [새 파일 받기]로 ZIP을 열고,
+  "압축 풀어 덮어쓰기 / 일정은 그대로" 안내를 띄운다.
+- docs/설치안내.md에 무설치판 절차 추가. 테스트 10종 추가, 150 통과.

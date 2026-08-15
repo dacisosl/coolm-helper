@@ -64,6 +64,10 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
     def __init__(self, info: dict, parent=None):
         super().__init__(parent)
         self.info = info
+        # 무설치판(ZIP)이면 조용한 설치가 불가능하니 안내 방식이 달라진다
+        import updater
+        base = getattr(parent, "base_dir", "") or ""
+        self._portable = updater.is_portable(base) if base else False
         self.setWindowTitle("업데이트")
         self.setFixedWidth(460)
         self.setStyleSheet(
@@ -136,6 +140,18 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         lay.addWidget(scroll)
         lay.addSpacing(18)
 
+        if self._portable:
+            hint = QLabel("무설치판을 쓰고 계세요. 새 파일(ZIP)을 받아 "
+                          "압축을 푼 뒤, 지금 폴더에 덮어쓰면 됩니다.\n"
+                          "일정과 설정은 폴더 안에 그대로 남아 있어요.")
+            hint.setWordWrap(True)
+            hint.setStyleSheet(
+                f"background:{PILL_BG};color:{INK};font-size:12px;"
+                f"border-radius:{theme.RADIUS_MD}px;padding:10px 12px;"
+                f"line-height:150%")
+            lay.addWidget(hint)
+            lay.addSpacing(14)
+
         btns = QHBoxLayout()
         later = QPushButton("나중에")
         later.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -146,7 +162,7 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         later.clicked.connect(self.reject)
         btns.addWidget(later)
         btns.addStretch()
-        go = QPushButton("지금 업데이트")
+        go = QPushButton("새 파일 받기" if self._portable else "지금 업데이트")
         go.setCursor(Qt.CursorShape.PointingHandCursor)
         go.setStyleSheet(
             f"QPushButton{{background:{ACCENT};color:white;border:none;"
@@ -155,10 +171,20 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
             f"QPushButton:hover{{background:{ACCENT_HOVER}}}"
             f"QPushButton:pressed{{background:{ACCENT_PRESSED};"
             f"padding:12px 22px 10px 22px}}")
-        go.clicked.connect(self._start_download)
+        go.clicked.connect(self._open_portable_zip if self._portable
+                           else self._start_download)
         btns.addWidget(go)
         lay.addLayout(btns)
         return page
+
+    def _open_portable_zip(self) -> None:
+        """무설치판: 자동 설치 대신 새 ZIP을 브라우저로 받게 한다."""
+        import updater
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        self._remember_notes()
+        QDesktopServices.openUrl(QUrl(updater.portable_zip_url(self.info)))
+        self.accept()
 
     # ── ② 진행 화면 ─────────────────────────────────────────
     def _progress_page(self) -> QWidget:
