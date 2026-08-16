@@ -1,6 +1,6 @@
 {
-  "version": "1.9.5",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.5/CoolmHelper-Setup.exe",
-  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.5/CoolmHelper-Portable.zip",
-  "notes": "- 새로 설치할 때 기본 모습이 펭귄(미니)으로 바뀌었어요. 오른쪽 벽에 붙은 작은 펭귄을 클릭하면 메뉴가 열립니다.\r\n- 이미 쓰고 계신 분은 지금 쓰던 모양 그대로예요. 바꾸고 싶으면 설정 → 위젯 모양에서 고르시면 됩니다."
+  "version": "1.9.6",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.6/CoolmHelper-Setup.exe",
+  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.6/CoolmHelper-Portable.zip",
+  "notes": "- 메모지에 글을 쓰는 동안 자꾸 다른 창 뒤로 밀리던 문제를 고쳤어요. 제목칸·메모칸 어디를 눌러도 바로 앞으로 나옵니다.\r\n- 📌 버튼이 생겼어요. 누르면 그 메모지만 항상 맨 위에 고정되고, 켜진 동안 주황색으로 표시됩니다. 다시 누르면 해제돼요.\r\n- 바탕화면 위젯 4종에도 같은 📌 버튼을 넣었습니다."
 }
