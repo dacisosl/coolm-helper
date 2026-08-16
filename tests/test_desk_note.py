@@ -191,3 +191,46 @@ class TestNormalLayering(unittest.TestCase):
         from ui.desk_base import DeskWidgetBase
         src = inspect.getsource(DeskWidgetBase.mousePressEvent)
         self.assertIn("raise_", src)
+
+
+class TestPinButton(unittest.TestCase):
+    """📌 버튼으로 '항상 맨 위' 고정 (2026-08-16 사용자 요청)."""
+
+    def setUp(self):
+        self.store = EventStore(tempfile.mkdtemp())
+        ev = self.store.add("가정통신문 배부", datetime(2026, 8, 7, 9, 0))
+        self.note = _make_note(self.store, ev)
+        self.note.apply_window_conf(first=True)
+
+    def _top(self):
+        return bool(self.note.windowFlags()
+                    & Qt.WindowType.WindowStaysOnTopHint)
+
+    def test_button_exists_and_off_by_default(self):
+        self.assertIsNotNone(getattr(self.note, "_pin_btn", None))
+        self.assertFalse(self.note._pin_btn.isChecked())
+        self.assertFalse(self._top())
+
+    def test_press_pins_on_top(self):
+        self.note._pin_btn.click()
+        self.assertTrue(self.note.conf["always_on_top"])
+        self.assertTrue(self._top())
+
+    def test_press_again_unpins(self):
+        self.note._pin_btn.click()
+        self.note._pin_btn.click()
+        self.assertFalse(self.note.conf["always_on_top"])
+        self.assertFalse(self._top())
+
+    def test_menu_change_syncs_button(self):
+        # 우클릭 메뉴로 바꿔도 버튼 상태가 따라와야 한다
+        self.note._set_always_on_top(True)
+        self.assertTrue(self.note._pin_btn.isChecked())
+
+    def test_activation_raises(self):
+        # 자식 위젯(제목칸)을 눌러도 창이 앞으로 나오도록 활성화를 잡는다
+        import inspect
+        from ui.desk_base import DeskWidgetBase
+        src = inspect.getsource(DeskWidgetBase.event)
+        self.assertIn("WindowActivate", src)
+        self.assertIn("raise_", src)

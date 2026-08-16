@@ -12,7 +12,7 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QRect, QTimer
+from PyQt6.QtCore import Qt, QEvent, QRect, QTimer
 from PyQt6.QtGui import QAction, QColor, QPainter
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QMenu, QPushButton, QSlider, QWidget,
@@ -322,6 +322,52 @@ class DeskWidgetBase(QWidget):
             f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
         return b
 
+    def make_pin_button(self) -> QPushButton:
+        """헤더의 📌 버튼 — 누르면 이 위젯만 '항상 맨 위'로 고정/해제.
+
+        평소엔 일반 창처럼 다른 창에 가려지지만, 계속 보이게 두고 싶은
+        메모지는 이 버튼으로 고정한다 (2026-08-16 사용자 요청).
+        """
+        from PyQt6.QtCore import QSize
+        from ui.icons import icon
+        b = QPushButton()
+        b.setIcon(icon("pin", 14))
+        b.setIconSize(QSize(14, 14))
+        b.setCheckable(True)
+        b.setChecked(bool(self.conf.get("always_on_top")))
+        b.setFixedSize(26, 22)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setStyleSheet(
+            f"QPushButton{{background:transparent;border:1px solid "
+            f"{theme.BORDER};border-radius:{theme.RADIUS_SM}px}}"
+            f"QPushButton:checked{{background:{theme.SIGNATURE_SOFT};"
+            f"border-color:{theme.SIGNATURE}}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
+        b.toggled.connect(self._toggle_pin)
+        self._pin_btn = b
+        self._sync_pin_button()
+        return b
+
+    def _toggle_pin(self, on: bool) -> None:
+        self._set_always_on_top(on)
+        self._sync_pin_button()
+        if on:
+            self.raise_()
+
+    def _sync_pin_button(self) -> None:
+        """버튼 상태·설명을 현재 설정에 맞춘다 (우클릭 메뉴로 바꿔도 반영)."""
+        b = getattr(self, "_pin_btn", None)
+        if b is None:
+            return
+        on = bool(self.conf.get("always_on_top"))
+        if b.isChecked() != on:
+            b.blockSignals(True)
+            b.setChecked(on)
+            b.blockSignals(False)
+        b.setToolTip("항상 맨 위 고정 — 켜짐 (눌러서 끄기)" if on
+                     else "항상 맨 위로 고정하기")
+
     def make_tray_button(self) -> QPushButton:
         """헤더의 – 버튼 — 이 위젯 하나만 트레이로 최소화한다."""
         from PyQt6.QtCore import QSize
@@ -464,6 +510,18 @@ class DeskWidgetBase(QWidget):
             return Qt.CursorShape.SizeVerCursor
         return None
 
+    def event(self, ev):
+        """이 위젯이 활성화되면 맨 위로 — 일반 창과 같은 층 동작.
+
+        mousePressEvent만으로는 부족하다. 제목칸·메모칸·버튼을 누르면
+        그 자식 위젯이 클릭을 먹어 창 본체까지 오지 않아서, 뒤에 깔린 채로
+        타이핑하게 되는 일이 있었다 (2026-08-16 사용자 보고).
+        창이 활성화되는 순간을 잡으면 어디를 눌러도 앞으로 나온다.
+        """
+        if ev.type() == QEvent.Type.WindowActivate:
+            self.raise_()
+        return super().event(ev)
+
     def mousePressEvent(self, ev):
         self.raise_()                 # 일반 창처럼 — 잡으면 맨 위로
         self.activateWindow()
@@ -542,6 +600,7 @@ class DeskWidgetBase(QWidget):
         self.conf["always_on_top"] = bool(on)
         self._save_config()
         self.apply_window_conf()
+        self._sync_pin_button()      # 우클릭 메뉴로 바꿔도 📌 버튼이 따라온다
 
     def _set_opacity(self, v: int) -> None:
         self.conf["opacity"] = int(v)

@@ -55,6 +55,7 @@ class PostItWidget(DeskWidgetBase):
         self.when_label.clicked.connect(self._open_when_popup)
         head.addWidget(self.when_label)
         head.addStretch()
+        head.addWidget(self.make_pin_button())    # 📌 항상 맨 위 고정
         head.addWidget(self.make_tray_button())   # – 트레이로 보내기 (v1.6)
         head.addWidget(self.make_edit_button())
         self.close_btn = QPushButton("✕")
@@ -198,7 +199,8 @@ class PostItWidget(DeskWidgetBase):
         t = f"{d.month}/{d.day}({WEEKDAY_KO[d.weekday()]})"
         if not self.event.all_day:
             t += d.strftime(" %H:%M")
-        self.when_label.setText("📌 " + t + "  ▾")
+        # 📌는 헤더의 고정 버튼으로 옮겼다 — 여기는 날짜·시간만 (2026-08-16)
+        self.when_label.setText("🗓 " + t + "  ▾")
 
     # ── 날짜·시간 인라인 편집 ────────────────────────────────
     def _open_when_popup(self) -> None:
@@ -304,6 +306,7 @@ class PostItWidget(DeskWidgetBase):
         self.event = cur
         self._apply_font()
         self._update_when()
+        self._sync_pin_button()
         # 사용자가 그 필드를 편집 중이면 덮어쓰지 않는다 (재진입 가드)
         if not self.title_edit.hasFocus() and self.title_edit.text() != cur.title:
             self.title_edit.setText(cur.title)

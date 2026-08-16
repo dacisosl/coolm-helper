@@ -244,6 +244,7 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
         f"background:transparent")
     head.addWidget(title)
     head.addStretch()
+    head.addWidget(widget.make_pin_button())    # 📌 항상 맨 위 고정 (v1.9.6)
     head.addWidget(widget.make_tray_button())   # – 트레이로 보내기 (v1.6)
     head.addWidget(widget.make_edit_button())
     root.addLayout(head)
