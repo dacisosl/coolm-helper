@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
     "store_dir": "store",
     "recent_count": 10,          # 가장 최근 쪽지 N개 (날짜 기준 아님)
     "google_sync_enabled": False,   # 저장 모드: False=로컬(기본) / True=구글 연동
-    "widget_style": "detail",       # mini(펭귄 도킹) | detail(카드형) — 기본 상세(2026-07-23)
+    "widget_style": "mini",         # mini(펭귄 도킹) | detail(카드형) — 기본 펭귄(2026-08-16)
     "menu_scale": 100,              # 펭귄 메뉴 아이콘 크기 (100=보통, 135=크게)
     "penguin_scale": 140,           # 펭귄 자체 크기 % (70/100/140/190) — 기본 '크게'
     "character_mode": True,         # 쿨쿠리 무드(잠·받아적기·놀람) 켜기

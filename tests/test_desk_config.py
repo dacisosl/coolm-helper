@@ -5,8 +5,8 @@ from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from parser.pipeline import (clamp_geometry, desk_conf, drop_monthly,
-                             ensure_planner, migrate_desk_config, prune_notes,
-                             DEFAULT_CONFIG)
+                             ensure_planner, load_config, migrate_desk_config,
+                             prune_notes, DEFAULT_CONFIG)
 from store.event_store import EventStore
 
 TODAY = date(2026, 7, 20)
@@ -106,6 +106,19 @@ class TestDeskConf(unittest.TestCase):
         self.assertTrue(DEFAULT_CONFIG["desk_widgets"]["weekly"]["enabled"])
         self.assertFalse(DEFAULT_CONFIG["desk_widgets"]["simple"]["enabled"])
         self.assertFalse(DEFAULT_CONFIG["desk_widgets"]["planner"]["enabled"])
+
+    def test_default_widget_style_is_penguin(self):
+        # 처음 설치하면 펭귄(미니)으로 시작한다 (2026-08-16 사용자 결정)
+        self.assertEqual(DEFAULT_CONFIG["widget_style"], "mini")
+        self.assertEqual(load_config(tempfile.mkdtemp())["widget_style"], "mini")
+
+    def test_main_picks_penguin_by_default(self):
+        # main.py·설정 창의 기본값도 같은 'mini'여야 한다 (엇갈리면 혼란)
+        import os
+        root = os.path.join(os.path.dirname(__file__), "..")
+        for name in ("main.py", "ui/widget_base.py"):
+            src = open(os.path.join(root, name), encoding="utf-8").read()
+            self.assertIn('"widget_style", "mini"', src, name)
 
 
 class TestPruneNotes(unittest.TestCase):
