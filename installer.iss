@@ -37,9 +37,7 @@ Type: filesandordirs; Name: "{autoprograms}\쿨메신저 일정 도우미"
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 
 [Files]
-; 무설치판(ZIP) 전용 안내문은 설치판에 넣지 않는다 — 설치한 분에겐 혼란만 준다
-Source: "dist\CoolmHelper\*"; DestDir: "{app}"; Flags: recursesubdirs; \
-  Excludes: "먼저 읽어주세요.txt"
+Source: "dist\CoolmHelper\*"; DestDir: "{app}"; Flags: recursesubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"

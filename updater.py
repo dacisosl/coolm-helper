@@ -52,13 +52,13 @@ def check_for_update(update_url: str) -> dict | None:
 
 
 def is_portable(base_dir: str) -> bool:
-    """무설치판(ZIP)으로 실행 중인가?
+    """설치 과정을 거치지 않은 복사본으로 실행 중인가?
 
     설치판은 Inno Setup이 제거 프로그램(unins000.exe)을 프로그램 폴더에
-    같이 넣는다. 그게 없으면 압축을 풀어 쓰는 무설치판이다 — 이 경우
-    설치파일을 조용히 실행하는 자동 업데이트가 통하지 않으므로
-    "새 ZIP 받기"로 안내한다 (2026-08-14).
-    개발 중(소스 실행)에는 무설치판으로 보지 않는다.
+    같이 넣는다. 그게 없다면 프로그램 폴더를 USB 등으로 복사해 온 경우다.
+    이때는 조용한 자동 설치가 위험하므로(설치 정보가 없어 경로·바로가기가
+    어긋난다) 새 설치파일을 받아 직접 설치하도록 안내한다.
+    개발 중(소스 실행)에는 해당하지 않는다.
     """
     import sys
     if not getattr(sys, "frozen", False):
@@ -71,12 +71,9 @@ def is_portable(base_dir: str) -> bool:
 
 
 def portable_zip_url(info: dict) -> str:
-    """무설치판 ZIP 주소 — version.json의 zip_url, 없으면 설치파일 주소에서 유추."""
+    """ZIP으로 감싼 설치파일 주소 — 없으면 설치파일(exe) 주소를 그대로 쓴다."""
     url = str(info.get("zip_url") or "").strip()
-    if url:
-        return url
-    setup = str(info.get("url") or "")
-    return setup.replace("CoolmHelper-Setup.exe", "CoolmHelper-Portable.zip")
+    return url or str(info.get("url") or "")
 
 
 def download_installer(url: str, progress=None) -> str:

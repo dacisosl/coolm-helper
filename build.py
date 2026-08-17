@@ -54,50 +54,46 @@ def main() -> int:
         shutil.copytree(assets_src, os.path.join(dist, "assets"),
                         dirs_exist_ok=True)
 
-    make_portable_zip(dist)
     print(f"\n빌드 완료: {os.path.join(dist, 'CoolmHelper.exe')}")
     return 0
 
 
-PORTABLE_README = """\
-COOL-비서 무설치판 — 먼저 읽어 주세요
+SETUP_ZIP_README = """\
+COOL-비서 설치 방법 — 압축을 풀고 CoolmHelper-Setup.exe 를 실행하세요
 
-1) 이 폴더(CoolmHelper)를 통째로 원하는 곳에 옮겨 놓으세요.
-   예) 문서\\CoolmHelper  또는  바탕화면\\CoolmHelper
-   ※ 압축 프로그램 창 안에서 바로 실행하면 안 됩니다.
-      일정이 임시 폴더에 저장돼서 컴퓨터를 끄면 사라져요.
-      반드시 '압축 풀기'를 먼저 해 주세요.
+학교 컴퓨터에서는 설치파일(.exe)을 인터넷에서 바로 받으면 백신이나
+Windows SmartScreen이 실행을 막는 경우가 있습니다. 그래서 같은 설치파일을
+압축(ZIP) 형태로도 함께 올립니다. 압축을 풀어서 실행하면 대부분 그냥 됩니다.
 
-2) 폴더 안의 CoolmHelper.exe 를 실행하면 펭귄이 나타납니다.
-   자주 쓰려면 CoolmHelper.exe 에 오른쪽 클릭 →
-   '바로 가기 만들기' 로 바탕화면에 놓아 두세요.
+1) 이 ZIP의 압축을 풀어 주세요. (반디집·알집·탐색기 아무거나 괜찮습니다)
+2) 나온 CoolmHelper-Setup.exe 를 실행하고 안내를 따르세요.
+   관리자 권한은 필요 없습니다.
+3) "Windows가 PC를 보호했습니다" 창이 뜨면
+   [추가 정보] → [실행] 을 눌러 주세요.
+   서명 인증서가 없는 개인 제작 프로그램이라 나타나는 정상적인 안내입니다.
 
-3) 일정·설정은 이 폴더 안에 저장됩니다(store 폴더, config.json).
-   폴더를 옮기면 일정도 같이 따라갑니다.
-
-4) 새 버전이 나오면 앱이 알려줍니다. 새 ZIP을 받아 압축을 푼 뒤
-   이 폴더에 덮어쓰면 됩니다 — 일정은 그대로 남습니다.
-
-설치판(CoolmHelper-Setup.exe)이 실행되는 컴퓨터라면 설치판을 쓰는 편이
-편합니다. 새 버전이 나올 때 자동으로 업데이트되거든요.
+설치가 끝나면 바탕화면에 펭귄 아이콘이 생깁니다.
+이후 새 버전은 앱이 알려주고, [예]만 누르면 자동으로 업데이트됩니다.
 """
 
 
-def make_portable_zip(dist: str) -> str:
-    """설치 없이 압축만 풀어 쓰는 배포본 — 설치파일이 차단되는 PC 대비.
+def make_setup_zip(setup_exe: str, out_dir: str | None = None) -> str:
+    """설치파일을 ZIP으로 감싼 배포본 — 다운로드 차단을 피하기 위한 것.
 
-    학교 PC에서 설치파일이 백신·SmartScreen에 막히는 경우가 있어
-    보조 배포본으로 함께 낸다 (2026-08-14 사용자 요청).
+    ZIP은 '무설치판'이 아니다. 안에 설치파일이 그대로 들어 있고, 압축을
+    풀어 설치하면 평소와 똑같은 설치판이 된다(자동 업데이트도 그대로).
+    exe를 그냥 받으면 '인터넷에서 받음' 표시가 붙어 SmartScreen이 막지만,
+    압축을 풀어 나온 파일에는 그 표시가 안 붙는 경우가 많다 (2026-08-16).
     """
-    with open(os.path.join(dist, "먼저 읽어주세요.txt"), "w",
-              encoding="utf-8") as f:
-        f.write(PORTABLE_README)
-    out = os.path.join(BASE, "dist", "CoolmHelper-Portable")
-    path = shutil.make_archive(out, "zip",
-                               root_dir=os.path.join(BASE, "dist"),
-                               base_dir="CoolmHelper")
+    import zipfile
+    out_dir = out_dir or os.path.dirname(setup_exe)
+    path = os.path.join(out_dir, "CoolmHelper-Setup.zip")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(setup_exe, "CoolmHelper-Setup.exe")
+        z.writestr("먼저 읽어주세요.txt",
+                   SETUP_ZIP_README.encode("utf-8-sig"))
     mb = os.path.getsize(path) / 1048576
-    print(f"무설치판 압축 완료: {path} ({mb:.1f} MB)")
+    print(f"설치파일 압축 완료: {path} ({mb:.1f} MB)")
     return path
 
 

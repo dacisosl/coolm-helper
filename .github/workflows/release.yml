@@ -119,13 +119,19 @@ jobs:
         shell: pwsh
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
 
+      - name: 설치파일 ZIP 감싸기 (다운로드 차단 회피용)
+        shell: python
+        run: |
+          import build
+          build.make_setup_zip("Output/CoolmHelper-Setup.exe")
+
       - name: GitHub 릴리스 올리기
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v$env:VER" "Output/CoolmHelper-Setup.exe" `
-            "dist/CoolmHelper-Portable.zip" `
+            "Output/CoolmHelper-Setup.zip" `
             --title "v$env:VER — $env:TITLE" --notes "$env:NOTES"
 
       - name: version.json 갱신 (자동 업데이트 신호)
@@ -137,8 +143,8 @@ jobs:
                 f"releases/download/v{ver}/")
           data = {"version": ver,
                   "url": dl + "CoolmHelper-Setup.exe",
-                  # 무설치판(ZIP) — 설치파일이 막히는 PC용 보조 배포본
-                  "zip_url": dl + "CoolmHelper-Portable.zip",
+                  # 같은 설치파일을 ZIP으로 감싼 것 — 다운로드가 막히는 PC용
+                  "zip_url": dl + "CoolmHelper-Setup.zip",
                   "notes": os.environ["NOTES"]}
           with open("version.json", "w", encoding="utf-8") as f:
               json.dump(data, f, ensure_ascii=False, indent=2)

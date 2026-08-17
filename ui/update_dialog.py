@@ -141,9 +141,9 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         lay.addSpacing(18)
 
         if self._portable:
-            hint = QLabel("무설치판을 쓰고 계세요. 새 파일(ZIP)을 받아 "
-                          "압축을 푼 뒤, 지금 폴더에 덮어쓰면 됩니다.\n"
-                          "일정과 설정은 폴더 안에 그대로 남아 있어요.")
+            hint = QLabel("설치하지 않고 복사해서 쓰고 계세요. 새 설치파일을 "
+                          "받아 설치하면 다음부터는 자동으로 업데이트됩니다.\n"
+                          "지금 폴더의 일정(store)과 설정은 그대로 남아 있어요.")
             hint.setWordWrap(True)
             hint.setStyleSheet(
                 f"background:{PILL_BG};color:{INK};font-size:12px;"
@@ -162,7 +162,7 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         later.clicked.connect(self.reject)
         btns.addWidget(later)
         btns.addStretch()
-        go = QPushButton("새 파일 받기" if self._portable else "지금 업데이트")
+        go = QPushButton("설치파일 받기" if self._portable else "지금 업데이트")
         go.setCursor(Qt.CursorShape.PointingHandCursor)
         go.setStyleSheet(
             f"QPushButton{{background:{ACCENT};color:white;border:none;"
@@ -178,7 +178,7 @@ class UpdateDialog(motion.FadeInMixin, QDialog):
         return page
 
     def _open_portable_zip(self) -> None:
-        """무설치판: 자동 설치 대신 새 ZIP을 브라우저로 받게 한다."""
+        """복사본으로 쓰는 경우: 조용한 설치 대신 설치파일을 받게 한다."""
         import updater
         from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtCore import QUrl
