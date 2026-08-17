@@ -1,6 +1,6 @@
 {
-  "version": "1.9.6",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.6/CoolmHelper-Setup.exe",
-  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.6/CoolmHelper-Portable.zip",
-  "notes": "- 메모지에 글을 쓰는 동안 자꾸 다른 창 뒤로 밀리던 문제를 고쳤어요. 제목칸·메모칸 어디를 눌러도 바로 앞으로 나옵니다.\r\n- 📌 버튼이 생겼어요. 누르면 그 메모지만 항상 맨 위에 고정되고, 켜진 동안 주황색으로 표시됩니다. 다시 누르면 해제돼요.\r\n- 바탕화면 위젯 4종에도 같은 📌 버튼을 넣었습니다."
+  "version": "1.9.7",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.7/CoolmHelper-Setup.exe",
+  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.7/CoolmHelper-Setup.zip",
+  "notes": "- 학교 컴퓨터에서 설치파일이 백신에 막힐 때를 위해, 같은 설치파일을 압축한 CoolmHelper-Setup.zip을 함께 올립니다. 압축을 풀고 실행하면 대부분 그냥 됩니다.\r\n- 압축본으로 설치해도 평소와 똑같은 설치판이라, 이후 자동 업데이트도 그대로 동작합니다.\r\n- 무설치판(프로그램 폴더 압축)은 자동 업데이트가 안 되고 일정이 사라질 위험이 있어 더 내지 않습니다."
 }
