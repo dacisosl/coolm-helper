@@ -1167,3 +1167,12 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
 - updater.is_portable은 남겨 둠 — 의미를 '설치를 거치지 않은 복사본'(USB로
   프로그램 폴더만 옮긴 경우)으로 바꿔, 그때만 [설치파일 받기]로 안내한다.
 - docs/설치안내.md·테스트(test_setup_zip.py) 갱신. 157 통과.
+
+## 2026-08-17 — v1.9.7 빌드 실패 원인과 수정
+- 실패: 새로 넣은 "설치파일 ZIP 감싸기" 단계에서 `ModuleNotFoundError: build`.
+  GitHub Actions의 `shell: python` 단계는 **임시 폴더의 스크립트**로 실행돼
+  저장소 루트가 sys.path에 없다(cwd는 루트라 open()은 되지만 import는 안 됨).
+  → 단계 안에서 `sys.path.insert(0, ".")` 후 import.
+- Inno Setup 컴파일까지는 성공했고 릴리스 업로드 전에 멈춰서, 태그·자산이
+  만들어지지 않았다(반쪽 릴리스 없음). 같은 v1.9.7로 재시도.
+- 교훈: 워크플로에서 우리 모듈을 import하는 단계는 sys.path를 명시할 것.

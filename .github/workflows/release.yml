@@ -122,6 +122,10 @@ jobs:
       - name: 설치파일 ZIP 감싸기 (다운로드 차단 회피용)
         shell: python
         run: |
+          # shell: python 단계는 임시 폴더의 스크립트로 실행되므로
+          # 저장소 폴더를 직접 import 경로에 넣어야 한다 (cwd는 저장소 루트)
+          import sys
+          sys.path.insert(0, ".")
           import build
           build.make_setup_zip("Output/CoolmHelper-Setup.exe")
 
