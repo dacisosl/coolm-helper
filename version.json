@@ -1,6 +1,6 @@
 {
-  "version": "1.9.7",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.7/CoolmHelper-Setup.exe",
-  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v1.9.7/CoolmHelper-Setup.zip",
-  "notes": "- 학교 컴퓨터에서 설치파일이 백신에 막힐 때를 위해, 같은 설치파일을 압축한 CoolmHelper-Setup.zip을 함께 올립니다. 압축을 풀고 실행하면 대부분 그냥 됩니다.\r\n- 압축본으로 설치해도 평소와 똑같은 설치판이라, 이후 자동 업데이트도 그대로 동작합니다.\r\n- 무설치판(프로그램 폴더 압축)은 자동 업데이트가 안 되고 일정이 사라질 위험이 있어 더 내지 않습니다."
+  "version": "2.0.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.0.0/CoolmHelper-Setup.exe",
+  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.0.0/CoolmHelper-Setup.zip",
+  "notes": "- 주간 일정 위젯의 요일 칸마다 ＋ 가 생겼어요. 누르면 그 날짜가 채워진 채로 등록 창이 뜹니다. 캘린더 위젯은 달력에서 고른 날짜, 오늘 할 일은 오늘 날짜가 채워져요.\r\n- 여러 날에 걸치는 기간 일정을 넣을 수 있어요. 등록 창에서 '여러 날에 걸쳐요'를 체크하고 끝나는 날을 고르면, 시작일부터 끝나는 날까지 매일 표시됩니다.\r\n- 편집 모드(🔧)에서 일정을 끌어 옮기고 지울 수 있어요. 주간 위젯은 다른 요일 칸으로, 할 일 보드는 '오늘'·'앞으로' 칸으로 끌면 날짜가 바뀝니다. 각 일정의 ✕ 를 누르면 삭제돼요."
 }
