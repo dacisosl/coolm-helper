@@ -52,10 +52,7 @@ class DayDetailDialog(motion.FadeInMixin, QDialog):
         self._fill()
 
     def _fill(self) -> None:
-        while self.items_lay.count():
-            item = self.items_lay.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        _clear_layout(self.items_lay)
         events = self.store.on_date(self.d)
         events.sort(key=day_sort_key)
         if not events:
@@ -135,7 +132,7 @@ class AddEventDialog(motion.FadeInMixin, QDialog):
     """
 
     def __init__(self, store: EventStore, default_deadline: bool = False,
-                 parent=None):
+                 parent=None, default_date=None):
         super().__init__(parent)
         self.store = store
         self.setWindowFlags(Qt.WindowType.Dialog
@@ -159,10 +156,34 @@ class AddEventDialog(motion.FadeInMixin, QDialog):
         self.title_edit.setStyleSheet(theme.TITLE_EDIT)
         bar.addWidget(self.title_edit, stretch=1)
         self.date_btn = DatePickerButton()
+        if default_date is not None:      # 위젯의 그 날짜 칸에서 눌렀을 때
+            self.date_btn.set_date(default_date)
         bar.addWidget(self.date_btn)
         self.time_combo = TimeCombo()
         bar.addWidget(self.time_combo)
         lay.addLayout(bar)
+
+        # 기간 일정 — 여러 날에 걸치는 일정(수련회·시험기간 등)
+        span = QHBoxLayout()
+        span.setSpacing(6)
+        self.range_cb = QCheckBox("여러 날에 걸쳐요 (기간)")
+        self.range_cb.setToolTip("체크하면 끝나는 날을 정할 수 있어요 — "
+                                 "시작일부터 끝나는 날까지 매일 표시됩니다")
+        span.addWidget(self.range_cb)
+        self.end_label = QLabel("~ 끝나는 날")
+        self.end_label.setStyleSheet(
+            f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
+        span.addWidget(self.end_label)
+        self.end_btn = DatePickerButton()
+        if default_date is not None:
+            self.end_btn.set_date(default_date)
+        span.addWidget(self.end_btn)
+        span.addStretch()
+        lay.addLayout(span)
+        self.end_label.setVisible(False)
+        self.end_btn.setVisible(False)
+        self.range_cb.toggled.connect(self._toggle_range)
+        self.date_btn.dateChanged.connect(self._sync_end_date)
 
         opts = QHBoxLayout()
         self.priority_combo = QComboBox()
@@ -199,6 +220,18 @@ class AddEventDialog(motion.FadeInMixin, QDialog):
         lay.addLayout(btns)
         self.title_edit.setFocus()
 
+    def _toggle_range(self, on: bool) -> None:
+        self.end_label.setVisible(on)
+        self.end_btn.setVisible(on)
+        if on and self.end_btn.get_date() < self.date_btn.get_date():
+            self.end_btn.set_date(self.date_btn.get_date())
+        self.adjustSize()
+
+    def _sync_end_date(self, d) -> None:
+        """시작일을 뒤로 옮기면 끝나는 날도 따라간다 (거꾸로 된 기간 방지)."""
+        if self.end_btn.get_date() < d:
+            self.end_btn.set_date(d)
+
     def _save(self) -> None:
         from datetime import datetime
         title = self.title_edit.text().strip()
@@ -209,12 +242,40 @@ class AddEventDialog(motion.FadeInMixin, QDialog):
         all_day = self.time_combo.is_all_day()
         d = self.date_btn.get_date()
         h, m = (0, 0) if all_day else self.time_combo.get_time()
-        self.store.add(title=title, start=datetime(d.year, d.month, d.day, h, m),
+        start = datetime(d.year, d.month, d.day, h, m)
+        end = None
+        if self.range_cb.isChecked():
+            e = self.end_btn.get_date()
+            if e < d:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "확인",
+                                    "끝나는 날이 시작하는 날보다 빠릅니다.")
+                return
+            # 기간 일정: 끝나는 날 늦은 시각까지 — 그날까지 매일 표시된다
+            end = datetime(e.year, e.month, e.day, 23, 59)
+        self.store.add(title=title, start=start, end=end,
                        all_day=all_day,
                        is_deadline=self.deadline_cb.isChecked(),
                        priority=self.priority_combo.currentText(),
                        memo=self.memo_edit.toPlainText().strip())
         self.accept()
+
+
+def _clear_layout(lay) -> None:
+    """레이아웃을 비운다 — 숨기고 부모를 떼어 즉시 사라지게 한다.
+
+    deleteLater만 쓰면 실제 삭제가 다음 이벤트 루프까지 미뤄져, 새로 그린
+    내용 위에 옛 위젯이 잠깐 겹쳐 보일 수 있다.
+    """
+    while lay.count():
+        item = lay.takeAt(0)
+        w = item.widget()
+        if w is not None:
+            w.hide()
+            w.setParent(None)
+            w.deleteLater()
+        elif item.layout() is not None:
+            _clear_layout(item.layout())
 
 
 def _make_card(widget: DeskWidgetBase, title_text: str,
@@ -253,16 +314,51 @@ def _make_card(widget: DeskWidgetBase, title_text: str,
 
 
 def _add_event_button(widget: DeskWidgetBase,
-                      default_deadline: bool = False) -> QPushButton:
-    """위젯 헤더의 ＋ 버튼 — 그 자리에서 일정 추가 모달을 띄운다."""
+                      default_deadline: bool = False,
+                      date_fn=None, tip: str = "여기서 바로 일정 추가"
+                      ) -> QPushButton:
+    """위젯 헤더의 ＋ 버튼 — 그 자리에서 일정 추가 모달을 띄운다.
+
+    date_fn을 주면 그 날짜가 미리 채워진다(주간의 요일 칸, 달력의 선택 날짜).
+    """
     b = QPushButton("＋")
-    b.setToolTip("여기서 바로 일정 추가")
+    b.setToolTip(tip)
     b.setStyleSheet(
         theme.TEXT_BTN
         + "QPushButton{font-size:15px;font-weight:bold;padding:1px 8px}")
     b.setCursor(Qt.CursorShape.PointingHandCursor)
     b.clicked.connect(
-        lambda: AddEventDialog(widget.store, default_deadline).exec())
+        lambda: AddEventDialog(widget.store, default_deadline, parent=widget,
+                               default_date=date_fn() if date_fn else None
+                               ).exec())
+    return b
+
+
+def _confirm_delete(parent, event: Event, store: EventStore) -> bool:
+    """편집 모드의 ✕ — 되돌릴 수 없으니 한 번 물어본다."""
+    from PyQt6.QtWidgets import QMessageBox
+    ret = QMessageBox.question(
+        parent, "일정 삭제",
+        f"'{event.title}' 일정을 삭제할까요?\n삭제하면 되돌릴 수 없어요.")
+    if ret != QMessageBox.StandardButton.Yes:
+        return False
+    store.remove(event.id)
+    return True
+
+
+def _delete_button(parent, event: Event, store: EventStore,
+                   size_px: int) -> QPushButton:
+    """편집 모드에서만 필드에 붙는 작은 ✕ 삭제 버튼."""
+    b = QPushButton("✕")
+    b.setToolTip("이 일정 삭제")
+    b.setCursor(Qt.CursorShape.PointingHandCursor)
+    b.setFixedSize(size_px + 8, size_px + 8)
+    b.setStyleSheet(
+        f"QPushButton{{background:transparent;border:none;color:{theme.SUBTLE};"
+        f"font-size:{size_px}px;padding:0}}"
+        f"QPushButton:hover{{color:{theme.DANGER}}}"
+        f"QPushButton:pressed{{color:{theme.DANGER_FG}}}")
+    b.clicked.connect(lambda: _confirm_delete(parent, event, store))
     return b
 
 
@@ -363,6 +459,25 @@ class _DragField(QFrame):
         self.store.set_orders(orders)   # 저장 → 모든 위젯이 새 순서로 갱신
 
 
+class _DropColumn(QFrame):
+    """편집 모드에서 일정을 끌어다 놓을 수 있는 칸 (할 일 보드의 열).
+
+    drop_date가 있으면 그 날짜로 옮겨진다 — '지난 일'을 오늘로 당길 때 쓴다.
+    """
+
+    drop_date = None
+    _base_qss = ""
+
+    def set_drop_target(self, on: bool) -> None:
+        if on:
+            self.setStyleSheet(
+                f"_DropColumn{{background:{theme.SIGNATURE_SOFT};"
+                f"border:2px dashed {theme.SIGNATURE};"
+                f"border-radius:{theme.RADIUS_MD}px}}")
+        else:
+            self.setStyleSheet(self._base_qss)
+
+
 # ── ① 할일 간단판 ────────────────────────────────────────────
 class _TodoRow(_DragField):
     """할 일 보드의 필드 한 줄: ⠿ + 체크박스 + '시간 ↵ 제목'.
@@ -428,6 +543,65 @@ class _TodoRow(_DragField):
                 f"background:transparent" + done_style)
             text_col.addWidget(title)
         lay.addLayout(text_col, stretch=1)
+        if owner.edit_mode:
+            lay.addWidget(_delete_button(self, event, store, fpx(9)))
+
+    # ── 편집 모드: 다른 칸으로 끌면 그 칸의 날짜로 옮긴다 ──
+    def _cross_col_drag(self) -> bool:
+        return bool(self._dragging and self.owner is not None
+                    and self.owner.edit_mode
+                    and getattr(self.owner, "day_columns", None))
+
+    def _target_column(self, gp):
+        for col in getattr(self.owner, "day_columns", []):
+            try:
+                if col.rect().contains(col.mapFromGlobal(gp)):
+                    return col
+            except RuntimeError:
+                continue
+        return None
+
+    def _highlight(self, col) -> None:
+        cur = getattr(self, "_hi_col", None)
+        if cur is col:
+            return
+        for c, on in ((cur, False), (col, True)):
+            if c is None or getattr(c, "drop_date", None) is None:
+                continue
+            try:
+                c.set_drop_target(on)
+            except RuntimeError:
+                pass
+        self._hi_col = col
+
+    def _move_to(self, new_d) -> None:
+        from datetime import datetime
+        old = self.event.start_dt
+        if old.date() == new_d:
+            return
+        start = datetime.combine(new_d, old.time())
+        fields = {"start": start.isoformat()}
+        if self.event.end:                 # 기간 일정은 길이를 유지한 채 이동
+            fields["end"] = (start + (self.event.end_dt - old)).isoformat()
+        self.store.update(self.event.id, **fields)
+
+    def mouseMoveEvent(self, ev):
+        if self._cross_col_drag():
+            self._highlight(self._target_column(ev.globalPosition().toPoint()))
+            return
+        super().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        if self._cross_col_drag():
+            col = self._target_column(ev.globalPosition().toPoint())
+            self._highlight(None)
+            self._dragging = False
+            self._drop()
+            d = getattr(col, "drop_date", None) if col is not None else None
+            if d is not None:
+                self._move_to(d)
+            return
+        super().mouseReleaseEvent(ev)
 
     def _save_title(self) -> None:
         new = self.title_edit.text().strip()
@@ -457,7 +631,9 @@ class SimpleTodoWidget(DeskWidgetBase):
         super().__init__(store, config, base_dir, conf)
         root, head = _make_card(self, "✓ 할 일")
         head.insertWidget(head.count() - 1,
-                          _add_event_button(self, default_deadline=True))
+                          _add_event_button(self, default_deadline=True,
+                                            date_fn=date.today,
+                                            tip="오늘 할 일 추가"))
         self.cols = QHBoxLayout()
         self.cols.setSpacing(6)
         root.addLayout(self.cols, stretch=1)
@@ -469,14 +645,16 @@ class SimpleTodoWidget(DeskWidgetBase):
         self.move(screen.right() - self.width() - 40, screen.top() + 60)
 
     def _column(self, label: str, color: str, events,
-                today_col: bool) -> QFrame:
+                today_col: bool, drop_date=None) -> QFrame:
         # 주간 위젯의 하루 열(_DayColumn)과 같은 골격·여백·크기
         fpx = self.font_px
-        col = QFrame()
+        col = _DropColumn()
         # '오늘'은 시그니처 쿨쿠리 오렌지로 — 앱의 포인트 색
         bg = theme.SIGNATURE_BG if today_col else theme.CARD
-        col.setStyleSheet(
-            f"QFrame{{background:{bg};border-radius:{theme.RADIUS_MD}px}}")
+        col.drop_date = drop_date        # 편집 모드에서 여기로 끌면 이 날짜로
+        col._base_qss = (f"_DropColumn{{background:{bg};"
+                         f"border-radius:{theme.RADIUS_MD}px}}")
+        col.setStyleSheet(col._base_qss)
         lay = QVBoxLayout(col)
         lay.setContentsMargins(8, 6, 8, 6)
         lay.setSpacing(3)
@@ -522,17 +700,19 @@ class SimpleTodoWidget(DeskWidgetBase):
         return col
 
     def refresh(self) -> None:
-        while self.cols.count():
-            item = self.cols.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        overdue, today, upcoming = self.store.sections(date.today())
-        self.cols.addWidget(
-            self._column("지난 일", theme.DANGER_FG, overdue, False), 1)
-        self.cols.addWidget(
-            self._column("오늘 할 일", theme.SIGNATURE_DARK, today, True), 1)
-        self.cols.addWidget(
-            self._column("앞으로 할 일", theme.LOW_FG, upcoming, False), 1)
+        _clear_layout(self.cols)
+        td = date.today()
+        overdue, today, upcoming = self.store.sections(td)
+        # 편집 모드에서 필드를 끌어다 놓을 수 있는 칸: 오늘 / 내일(앞으로)
+        self.day_columns = [
+            self._column("지난 일", theme.DANGER_FG, overdue, False),
+            self._column("오늘 할 일", theme.SIGNATURE_DARK, today, True,
+                         drop_date=td),
+            self._column("앞으로 할 일", theme.LOW_FG, upcoming, False,
+                         drop_date=td + timedelta(days=1)),
+        ]
+        for col in self.day_columns:
+            self.cols.addWidget(col, 1)
 
 
 # ── ①-b 오늘 할 일 (단일 목록 투두) ──────────────────────────
@@ -555,7 +735,9 @@ class TodayTodoWidget(DeskWidgetBase):
             f"font-size:13px;font-weight:bold;color:{theme.SIGNATURE_DARK};"
             f"background:transparent")
         head.insertWidget(head.count() - 2,
-                          _add_event_button(self, default_deadline=True))
+                          _add_event_button(self, default_deadline=True,
+                                            date_fn=date.today,
+                                            tip="오늘 할 일 추가"))
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(
@@ -577,10 +759,7 @@ class TodayTodoWidget(DeskWidgetBase):
                   screen.center().y() - 150)
 
     def refresh(self) -> None:
-        while self.rows_lay.count():
-            item = self.rows_lay.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        _clear_layout(self.rows_lay)
         events = self.store.on_date(date.today())
         events.sort(key=day_sort_key)
         if not events:
@@ -617,9 +796,9 @@ class _DayColumn(QFrame):
         # '오늘'은 시그니처 오렌지, 주말+일정은 연네이비(보라 폐기)
         bg = (theme.SIGNATURE_BG if today
               else theme.PRIMARY_LIGHT if weekend_accent else theme.CARD)
-        self.setStyleSheet(
-            f"_DayColumn{{background:{bg};border:none;"
-            f"border-radius:{theme.RADIUS_MD}px}}")
+        self._base_qss = (f"_DayColumn{{background:{bg};border:none;"
+                          f"border-radius:{theme.RADIUS_MD}px}}")
+        self.setStyleSheet(self._base_qss)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(8, 6, 8, 6)
@@ -629,10 +808,28 @@ class _DayColumn(QFrame):
         color = (theme.SIGNATURE_DARK if today else
                  theme.SUNDAY if d.weekday() == 6 else
                  theme.PRIMARY if d.weekday() == 5 else theme.SUBTLE)
+        head_row = QHBoxLayout()
+        head_row.setContentsMargins(0, 0, 0, 0)
+        head_row.setSpacing(2)
         head = QLabel(f"{d.day} ({wd})")
         head.setStyleSheet(f"color:{color};font-size:{fpx(10)}px;"
                            f"font-weight:bold;background:transparent")
-        lay.addWidget(head)
+        head_row.addWidget(head)
+        head_row.addStretch()
+        # 이 날짜로 바로 등록 (2026-08-17 사용자 요청)
+        plus = QPushButton("＋")
+        plus.setToolTip(f"{d.month}/{d.day}에 일정 추가")
+        plus.setCursor(Qt.CursorShape.PointingHandCursor)
+        plus.setFixedSize(fpx(10) + 8, fpx(10) + 8)
+        plus.setStyleSheet(
+            f"QPushButton{{background:transparent;border:none;"
+            f"color:{color};font-size:{fpx(11)}px;font-weight:bold;padding:0}}"
+            f"QPushButton:hover{{color:{theme.SIGNATURE}}}")
+        plus.clicked.connect(
+            lambda _=False, day=d: AddEventDialog(
+                owner.store, parent=owner, default_date=day).exec())
+        head_row.addWidget(plus)
+        lay.addLayout(head_row)
         events = owner.store.on_date(d)
         events.sort(key=day_sort_key)
         limit = 3 if slim else 6
@@ -651,6 +848,16 @@ class _DayColumn(QFrame):
                                f"background:transparent")
             lay.addWidget(more)
         lay.addStretch()
+
+    def set_drop_target(self, on: bool) -> None:
+        """편집 모드에서 일정을 끌어올 때 '여기 놓으면 돼요' 표시."""
+        if on:
+            self.setStyleSheet(
+                f"_DayColumn{{background:{theme.SIGNATURE_SOFT};"
+                f"border:2px dashed {theme.SIGNATURE};"
+                f"border-radius:{theme.RADIUS_MD}px}}")
+        else:
+            self.setStyleSheet(self._base_qss)
 
     def mousePressEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
@@ -675,7 +882,10 @@ class _WeekField(_DragField):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(3, 2, 6, 2)
         lay.setSpacing(3)
-        lay.addWidget(self.make_grip(fg, fpx(11)))
+        grip = self.make_grip(fg, fpx(11))
+        if owner is not None and owner.edit_mode:
+            grip.setToolTip("잡고 다른 요일로 끌면 그 날짜로 옮겨져요")
+        lay.addWidget(grip)
         col = QVBoxLayout()
         col.setSpacing(0)
         col.setContentsMargins(0, 0, 0, 0)
@@ -702,6 +912,67 @@ class _WeekField(_DragField):
                                 f"background:transparent")
             col.addWidget(title)
         lay.addLayout(col, stretch=1)
+        if owner is not None and owner.edit_mode:
+            lay.addWidget(_delete_button(self, event, store, fpx(9)))
+
+    # ── 편집 모드: 다른 요일 칸으로 끌어다 놓으면 날짜가 바뀐다 ──
+    def _target_column(self, gp):
+        for col in getattr(self.owner, "day_columns", []):
+            try:
+                if col.rect().contains(col.mapFromGlobal(gp)):
+                    return col
+            except RuntimeError:
+                continue          # 새로 그려지며 사라진 열
+        return None
+
+    def _highlight(self, col) -> None:
+        cur = getattr(self, "_hi_col", None)
+        if cur is col:
+            return
+        for c, on in ((cur, False), (col, True)):
+            if c is None or c is self._home_column():
+                continue
+            try:
+                c.set_drop_target(on)
+            except RuntimeError:
+                pass
+        self._hi_col = col
+
+    def _home_column(self):
+        for c in getattr(self.owner, "day_columns", []):
+            if getattr(c, "d", None) == self.d:
+                return c
+        return None
+
+    def _move_to(self, new_d) -> None:
+        from datetime import datetime
+        old = self.event.start_dt
+        start = datetime.combine(new_d, old.time())
+        fields = {"start": start.isoformat()}
+        if self.event.end:                 # 기간 일정은 길이를 유지한 채 이동
+            fields["end"] = (start + (self.event.end_dt - old)).isoformat()
+        self.store.update(self.event.id, **fields)
+
+    def _cross_day_drag(self) -> bool:
+        return bool(self._dragging and self.owner is not None
+                    and self.owner.edit_mode)
+
+    def mouseMoveEvent(self, ev):
+        if self._cross_day_drag():
+            self._highlight(self._target_column(ev.globalPosition().toPoint()))
+            return                          # 열 간 이동 중엔 순서 바꾸기 없음
+        super().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        if self._cross_day_drag():
+            col = self._target_column(ev.globalPosition().toPoint())
+            self._highlight(None)
+            self._dragging = False
+            self._drop()
+            if col is not None and col.d != self.d:
+                self._move_to(col.d)        # 저장 → 위젯들이 자동 갱신
+            return
+        super().mouseReleaseEvent(ev)
 
     def _save_title(self) -> None:
         new = self.title_edit.text().strip()
@@ -762,25 +1033,18 @@ class WeeklyWidget(DeskWidgetBase):
         self.week_label.setStyleSheet(
             f"color:{theme.SUBTLE};font-size:{self.font_px(12)}px;"
             f"background:transparent")
-        while self.week_row.count():
-            item = self.week_row.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                sub = item.layout()
-                while sub.count():
-                    s = sub.takeAt(0)
-                    if s.widget():
-                        s.widget().deleteLater()
+        _clear_layout(self.week_row)
+        self.day_columns = []                    # 편집 모드 드롭 대상 찾기용
         for i in range(5):                       # 월~금
-            self.week_row.addWidget(
-                _DayColumn(self, self._monday + timedelta(days=i)), stretch=3)
+            col = _DayColumn(self, self._monday + timedelta(days=i))
+            self.day_columns.append(col)
+            self.week_row.addWidget(col, stretch=3)
         weekend = QVBoxLayout()                  # 토·일 접이식 (얇게)
         weekend.setSpacing(6)
-        weekend.addWidget(_DayColumn(self, self._monday + timedelta(days=5),
-                                     slim=True))
-        weekend.addWidget(_DayColumn(self, self._monday + timedelta(days=6),
-                                     slim=True))
+        for i in (5, 6):
+            col = _DayColumn(self, self._monday + timedelta(days=i), slim=True)
+            self.day_columns.append(col)
+            weekend.addWidget(col)
         self.week_row.addLayout(weekend, stretch=2)
 
 
@@ -806,6 +1070,10 @@ class PlannerWidget(DeskWidgetBase):
             checked=bool(conf.get("show_detail", True)))
         self.detail_btn.toggled.connect(self._set_show_detail)
         head.insertWidget(head.count() - 1, self.detail_btn)
+        # ＋ — 달력에서 고른 날짜로 바로 등록 (2026-08-17 사용자 요청)
+        head.insertWidget(head.count() - 1, _add_event_button(
+            self, date_fn=lambda: self._selected,
+            tip="달력에서 고른 날짜에 일정 추가"))
         self.cal = EventCalendar()
         self.cal.clicked.connect(
             lambda qd: self._pick(date(qd.year(), qd.month(), qd.day())))
@@ -873,10 +1141,7 @@ class PlannerWidget(DeskWidgetBase):
         self.day_label.setStyleSheet(
             f"font-size:{self.font_px(12)}px;font-weight:bold;"
             f"color:{theme.PRIMARY_DARK};background:transparent;padding-top:2px")
-        while self.items_lay.count():
-            item = self.items_lay.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        _clear_layout(self.items_lay)
         today = date.today()
         shown = 0
         for i in range(self.RANGE_DAYS + 1):

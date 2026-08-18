@@ -426,8 +426,8 @@ class DeskWidgetBase(QWidget):
         if self.edit_mode and not DeskWidgetBase._edit_hint_shown:
             DeskWidgetBase._edit_hint_shown = True
             from ui.toast import show_toast
-            show_toast(self, "파란 점을 끌면 크기, 제목을 누르면 바로 수정",
-                       msec=6000)
+            show_toast(self, "제목은 바로 수정, ✕는 삭제, ⠿를 끌면 이동 "
+                             "(주간은 다른 요일로도)", msec=6000)
 
     def _bump_font(self, delta: int) -> None:
         self.conf["font_scale"] = max(70, min(150,
