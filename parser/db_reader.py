@@ -4,6 +4,8 @@
 접근 규칙(고정): 원본은 절대 쓰기 모드로 열지 않는다.
 udb + -wal + -shm 세 파일을 임시 폴더에 복사한 뒤 복사본을 읽기 전용으로 연다.
 """
+# Copyright (c) 2026 dacisosl · MIT License
+# https://github.com/dacisosl/coolm-helper
 from __future__ import annotations
 
 import glob

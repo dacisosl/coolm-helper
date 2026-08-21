@@ -1196,3 +1196,21 @@ emilkowalski/skills 설치 후 그 기준으로 전 UI 감사·리디자인. 4�
   다음 이벤트 루프까지 남는다 → 공용 `_clear_layout()`(hide+setParent(None))로
   5곳 중복 정리 코드를 통일.
 - tests/test_widget_edit.py 18종 추가. 175 통과.
+
+## 2026-08-18 — MIT 라이선스 채택 (외부 협업 문의)
+- 쌤핀(ssampin.com, Electron+TS 교사용 앱) 개발자 박준일 님이 date_parser.py와
+  db_reader.py를 참고하고 싶다며 문의. 저장소에 LICENSE가 없어 기본값이
+  '모든 권리 보유'라 제3자가 쓸 수 없는 상태였음을 알려줌 — 의도한 바가 아니어서
+  **MIT**를 붙이기로 결정(사용자 판단).
+- LICENSE 신규(표준 MIT 원문, Copyright (c) 2026 dacisosl).
+  README '라이선스' 절 재작성 — MIT 명시 + 재사용하기 좋은 두 파일 안내 +
+  **PyQt6는 GPLv3라 exe 배포에는 GPL 조건이 따라붙는다**는 주의(현재도 같은 상태,
+  소스 공개로 충족). parser/의 두 파일은 표준 라이브러리만 써 이 제약과 무관.
+- date_parser.py·db_reader.py 상단에 저작권·라이선스 2줄 — 파일만 떼어 가도
+  출처가 따라가게.
+- docs/reply_ssampin.md — 답장 초안(허락 + 출처 표기 부탁 + 읽기 전용 DB 접근
+  원칙·파서 기준일 설계 같은 실무 정보).
+- 릴리스는 하지 않음: 워크플로가 release_notes.txt 변경 시에만 돌아 빌드 없이
+  main 반영만 된다. 앱 버전 그대로.
+- (작업 중 컨테이너 초기화로 PyQt6·Qt 시스템 라이브러리가 사라져 테스트가
+  깨졌음 — 재설치 후 175 통과. 코드 문제 아님.)

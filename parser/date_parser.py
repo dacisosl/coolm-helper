@@ -4,6 +4,8 @@
 기준일(base)은 오늘이 아니라 쪽지의 ReceiveDate다 —
 지난주에 받은 쪽지의 "내일"은 지난주 기준이어야 하므로.
 """
+# Copyright (c) 2026 dacisosl · MIT License
+# https://github.com/dacisosl/coolm-helper
 from __future__ import annotations
 
 import re
