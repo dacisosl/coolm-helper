@@ -12,6 +12,20 @@ import sys
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
+# 설치 폴더에 함께 넣는 파일 (원본 경로, 설치 폴더에서의 이름)
+BUNDLE_FILES = [
+    ("students.txt.example", "students.txt.example"),
+    (os.path.join("docs", "사용설명서.html"), "사용설명서.html"),
+    (os.path.join("docs", "설치안내.md"), "설치안내.md"),
+    (os.path.join("docs", "개인정보고지.md"), "개인정보고지.md"),
+    (os.path.join("calendar_sync", "SETUP.md"), "구글연동설정.md"),
+    # MIT 라이선스 — 배포본에도 저작권 문구를 함께 둔다.
+    # 확장자를 붙이는 건 윈도우에서 더블클릭으로 바로 열리게 하기 위함.
+    ("LICENSE", "LICENSE.txt"),
+    # 업데이트 직후 쿨비서가 "이번에 바뀐 점"을 읽어 알려준다
+    ("release_notes.txt", "release_notes.txt"),
+]
+
 
 def main() -> int:
     os.chdir(BASE)
@@ -38,16 +52,7 @@ def main() -> int:
         return 1
 
     dist = os.path.join(BASE, "dist", "CoolmHelper")
-    bundle = [
-        ("students.txt.example", "students.txt.example"),
-        (os.path.join("docs", "사용설명서.html"), "사용설명서.html"),
-        (os.path.join("docs", "설치안내.md"), "설치안내.md"),
-        (os.path.join("docs", "개인정보고지.md"), "개인정보고지.md"),
-        (os.path.join("calendar_sync", "SETUP.md"), "구글연동설정.md"),
-        # 업데이트 직후 쿨비서가 "이번에 바뀐 점"을 읽어 알려준다
-        ("release_notes.txt", "release_notes.txt"),
-    ]
-    for src, dst in bundle:
+    for src, dst in BUNDLE_FILES:
         shutil.copyfile(os.path.join(BASE, src), os.path.join(dist, dst))
     assets_src = os.path.join(BASE, "assets")
     if os.path.isdir(assets_src):

@@ -91,6 +91,12 @@ class TestSetupZip(unittest.TestCase):
         names = zipfile.ZipFile(self._make()).namelist()
         self.assertFalse(any(n.startswith("CoolmHelper/") for n in names), names)
 
+    def test_license_bundled(self):
+        # 설치 폴더에 라이선스 문구가 함께 들어가야 한다 (MIT 요구사항)
+        import build
+        dsts = [dst for _src, dst in build.BUNDLE_FILES]
+        self.assertIn("LICENSE.txt", dsts)
+
     def test_readme_tells_to_run_installer(self):
         import build
         self.assertIn("CoolmHelper-Setup.exe", build.SETUP_ZIP_README)
