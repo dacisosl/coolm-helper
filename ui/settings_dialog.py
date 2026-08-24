@@ -440,6 +440,16 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         school_row.addWidget(pick)
         c.addLayout(school_row)
         self._sync_school_label()
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("나이스 인증키"))
+        key_row.addWidget(_help_dot(
+            "비워두면 앱이 알아서 처리합니다. 조회 한도를 넘었다는 안내가 뜨면 "
+            "나이스(open.neis.go.kr)에서 무료로 발급받은 본인 키를 넣으세요.\n"
+            "이 키는 이 PC의 config.json에만 저장됩니다."))
+        self.neis_key_edit = QLineEdit(str(self.config.get("neis_api_key", "")))
+        self.neis_key_edit.setPlaceholderText("비워두면 기본값 사용")
+        key_row.addWidget(self.neis_key_edit, stretch=1)
+        c.addLayout(key_row)
         diag = QPushButton("연결 진단")
         diag.setToolTip("학사일정을 못 가져올 때 어디서 막혔는지 확인합니다")
         diag.clicked.connect(self._neis_diagnose)
@@ -616,6 +626,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
         self.config["neis_enabled"] = self.neis_cb.isChecked()
+        self.config["neis_api_key"] = self.neis_key_edit.text().strip()
         self.config["alert_days"] = [3, 1]   # 알림은 기본값 고정
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         # 바탕화면 위젯은 체크 즉시 반영·저장되므로 여기서는 건드리지 않는다
