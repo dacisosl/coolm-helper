@@ -422,6 +422,30 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
     def _data_page(self) -> QWidget:
         w, lay = self._page()
 
+        card, c = _card("학사일정 (나이스)",
+                        "나이스에 올라온 우리 학교 학사일정을 골라서 "
+                        "일정에 넣을 수 있어요.\n"
+                        "학교 이름과 조회 기간만 나이스로 보냅니다.")
+        self.neis_cb, row = _check(
+            "펭귄 메뉴에 '학사일정' 넣기",
+            bool(self.config.get("neis_enabled", True)))
+        c.addWidget(row)
+        school_row = QHBoxLayout()
+        self.neis_school_label = QLabel()
+        school_row.addWidget(self.neis_school_label)
+        school_row.addStretch()
+        pick = QPushButton("학교 정하기")
+        pick.setCursor(Qt.CursorShape.PointingHandCursor)
+        pick.clicked.connect(self._pick_school)
+        school_row.addWidget(pick)
+        c.addLayout(school_row)
+        self._sync_school_label()
+        diag = QPushButton("연결 진단")
+        diag.setToolTip("학사일정을 못 가져올 때 어디서 막혔는지 확인합니다")
+        diag.clicked.connect(self._neis_diagnose)
+        c.addWidget(diag, alignment=Qt.AlignmentFlag.AlignLeft)
+        lay.addWidget(card)
+
         card, c = _card("쪽지 가져오기",
                         "일정 등록 창을 열 때 기본으로 불러올 최근 쪽지 개수.")
         row = QHBoxLayout()
@@ -514,6 +538,26 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         except Exception as e:
             QMessageBox.warning(self, "오류", str(e))
 
+    def _sync_school_label(self) -> None:
+        import neis
+        school = neis.School.from_conf(self.config.get("neis_school"))
+        self.neis_school_label.setText(
+            f"우리 학교: {school.label()}" if school
+            else "우리 학교: 아직 정하지 않음")
+
+    def _pick_school(self) -> None:
+        from ui.neis_dialog import SchoolPickerDialog
+        dlg = SchoolPickerDialog(self.config, self)
+        if dlg.exec() and dlg.picked is not None:
+            self.config["neis_school"] = dlg.picked.to_conf()
+            pipeline.save_config(self.base_dir, self.config)
+            self._sync_school_label()
+
+    def _neis_diagnose(self) -> None:
+        import neis
+        QMessageBox.information(self, "학사일정 연결 진단",
+                                neis.diagnose(self.config))
+
     def _delete_demo_events(self) -> None:
         n = self.store.demo_count()
         if QMessageBox.question(
@@ -571,6 +615,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         self.config["character_mode"] = self.char_cb.isChecked()
         self.config["favorites_enabled"] = self.fav_cb.isChecked()
         self.config["proof_enabled"] = self.proof_cb.isChecked()
+        self.config["neis_enabled"] = self.neis_cb.isChecked()
         self.config["alert_days"] = [3, 1]   # 알림은 기본값 고정
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         # 바탕화면 위젯은 체크 즉시 반영·저장되므로 여기서는 건드리지 않는다

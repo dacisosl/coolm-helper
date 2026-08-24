@@ -49,6 +49,10 @@ DEFAULT_CONFIG = {
     "proof_provider": "gemini",
     "proof_model": "gemini-3.5-flash",
     "proof_api_key": "",            # 로컬에만 저장 (gitignore 대상 config.json)
+    # 학사일정 가져오기 (나이스) — 학교는 처음 쓸 때 검색해서 정한다
+    "neis_enabled": True,
+    "neis_school": None,            # {name, code, office, office_name, kind, address}
+    "neis_api_key": "",             # 직접 발급한 키를 넣으면 내장 키 대신 씀
     "desk_widgets": {               # 바탕화면 위젯 (v0.10.0~)
         # planner(캘린더·할일)는 달력 위젯의 단일 창구 — 기본 켬.
         # show_detail: 아래 '그날 일정 목록'을 펼칠지 (끄면 순수 달력)

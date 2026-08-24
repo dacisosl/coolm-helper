@@ -43,6 +43,9 @@ class _IconBar(QWidget):
         buttons.append(("mail", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
                         owner.open_review))
         # 캘린더·할일은 v0.11.0부터 바탕화면 위젯으로 이동 (관리는 설정에서)
+        if owner.config.get("neis_enabled", True):
+            buttons.append(("school", "학사일정 — 나이스에서 우리 학교 일정 가져오기",
+                            owner.open_neis))
         if owner.config.get("proof_enabled"):
             buttons.append(("chat", "문구 보정 (공개용 글)", owner.open_proof))
         buttons.append(("gear", "설정", owner.open_settings))

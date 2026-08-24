@@ -18,3 +18,4 @@ dist/
 
 # 빌드 때만 주입되는 공용 AI 키 (커밋 금지)
 assets/proof.key
+assets/neis.key

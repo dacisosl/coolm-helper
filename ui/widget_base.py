@@ -215,6 +215,11 @@ class WidgetBase(QWidget):
         from ui.proof_dialog import ProofDialog
         ProofDialog(self.config, parent=self).exec()
 
+    def open_neis(self) -> None:
+        """🏫 학사일정 — 나이스에서 우리 학교 일정을 골라 등록한다."""
+        from ui.neis_dialog import open_neis_schedule
+        open_neis_schedule(self)
+
     def open_quick(self) -> None:
         """⚡ 간편 등록 — 보고 있는 쪽지를 곧바로 등록하고 포스트잇으로 붙인다.
 
