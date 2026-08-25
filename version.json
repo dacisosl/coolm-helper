@@ -1,6 +1,6 @@
 {
-  "version": "2.0.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.0.0/CoolmHelper-Setup.exe",
-  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.0.0/CoolmHelper-Setup.zip",
-  "notes": "- 주간 일정 위젯의 요일 칸마다 ＋ 가 생겼어요. 누르면 그 날짜가 채워진 채로 등록 창이 뜹니다. 캘린더 위젯은 달력에서 고른 날짜, 오늘 할 일은 오늘 날짜가 채워져요.\r\n- 여러 날에 걸치는 기간 일정을 넣을 수 있어요. 등록 창에서 '여러 날에 걸쳐요'를 체크하고 끝나는 날을 고르면, 시작일부터 끝나는 날까지 매일 표시됩니다.\r\n- 편집 모드(🔧)에서 일정을 끌어 옮기고 지울 수 있어요. 주간 위젯은 다른 요일 칸으로, 할 일 보드는 '오늘'·'앞으로' 칸으로 끌면 날짜가 바뀝니다. 각 일정의 ✕ 를 누르면 삭제돼요."
+  "version": "2.1.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.1.0/CoolmHelper-Setup.exe",
+  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.1.0/CoolmHelper-Setup.zip",
+  "notes": "- 펭귄 메뉴에 🏫 학사일정이 생겼어요. 우리 학교를 한 번 정해두면, 나이스에 올라온 학사일정을 기간별로 불러와 필요한 것만 체크해서 등록할 수 있습니다.\r\n- 수련회처럼 여러 날에 걸친 행사는 기간 일정 한 건으로 합쳐서 들어가요. 이미 등록한 일정은 '✓ 등록됨'으로 표시돼 두 번 들어가지 않습니다.\r\n- 처음 한 번 나이스 인증키를 넣어야 합니다. 학사일정 창 위 안내줄의 [인증키 넣기] → [발급 받으러 가기]에서 무료로 받을 수 있어요. 키는 이 PC에만 저장되고 어디에도 전송되지 않습니다.\r\n- 나이스로 나가는 정보는 학교 이름·학교 코드와 조회 기간뿐입니다. 잘 안 될 때는 설정 → 데이터 → [연결 진단]을 눌러 보세요."
 }
