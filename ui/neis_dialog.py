@@ -12,7 +12,8 @@ from __future__ import annotations
 import threading
 from datetime import date, datetime, timedelta
 
-from PyQt6.QtCore import Qt, QObject, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMessageBox, QPushButton, QScrollArea,
@@ -49,9 +50,10 @@ class _Worker(QObject):
 class SchoolPickerDialog(motion.FadeInMixin, QDialog):
     """학교 이름으로 검색해 우리 학교를 고른다. 고른 학교는 설정에 저장."""
 
-    def __init__(self, config: dict, parent=None):
+    def __init__(self, config: dict, base_dir: str = "", parent=None):
         super().__init__(parent)
         self.config = config
+        self.base_dir = base_dir
         self.picked: neis.School | None = None
         self._schools: list[neis.School] = []
         self.setWindowTitle("학교 찾기")
@@ -71,6 +73,9 @@ class SchoolPickerDialog(motion.FadeInMixin, QDialog):
         tip.setWordWrap(True)
         tip.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
         lay.addWidget(tip)
+
+        self.key_banner = KeyBanner(self.config, self.base_dir, self)
+        lay.addWidget(self.key_banner)
 
         bar = QHBoxLayout()
         self.name_edit = QLineEdit()
@@ -136,8 +141,12 @@ class SchoolPickerDialog(motion.FadeInMixin, QDialog):
             self.status.setText("그런 이름의 학교를 못 찾았어요. "
                                 "이름을 조금 다르게 넣어 보세요.")
             return
-        self.status.setText(f"{len(self._schools)}곳을 찾았어요. "
-                            f"우리 학교를 고르세요.")
+        cut = (not neis.has_key(self.config)
+               and len(self._schools) >= neis.KEYLESS_ROWS)
+        self.status.setText(
+            f"{len(self._schools)}곳을 찾았어요. 우리 학교를 고르세요."
+            + ("  (인증키가 없어 앞의 몇 곳만 보여요 — "
+               "안 보이면 이름을 더 자세히 넣어 보세요)" if cut else ""))
         for s in self._schools:
             item = QListWidgetItem(
                 f"{s.label()}\n{s.office_name}  {s.address}".strip())
@@ -155,6 +164,111 @@ class SchoolPickerDialog(motion.FadeInMixin, QDialog):
             return
         self.picked = self._schools[idx]
         self.accept()
+
+
+class KeyDialog(motion.FadeInMixin, QDialog):
+    """나이스 인증키 넣기 — 발급 방법을 함께 안내한다.
+
+    키는 이 PC의 config.json에만 저장된다. 앱이 공용 키를 들고 다니지 않는
+    이유는 한 사람 키를 다 같이 쓰면 하루 조회 한도가 금방 차기 때문이다.
+    """
+
+    HOWTO = ("1. 아래 [발급 받으러 가기]를 누르면 나이스 포털이 열려요.\n"
+             "2. 회원가입(무료) 후 '인증키 신청'을 하면 바로 나옵니다.\n"
+             "3. 받은 키(영문·숫자 32자리)를 여기에 붙여 넣으세요.")
+
+    def __init__(self, config: dict, base_dir: str, parent=None):
+        super().__init__(parent)
+        self.config, self.base_dir = config, base_dir
+        self.setWindowTitle("나이스 인증키")
+        self.setWindowFlags(self.windowFlags()
+                            | Qt.WindowType.WindowStaysOnTopHint)
+        self.setStyleSheet(theme.BASE_QSS + f"QDialog{{background:{theme.BG}}}")
+        self.resize(440, 260)
+
+        lay = QVBoxLayout(self)
+        lay.setSpacing(8)
+        head = QLabel("🔑 나이스 인증키 넣기")
+        head.setStyleSheet(theme.DIALOG_HEADER)
+        lay.addWidget(head)
+
+        why = QLabel(neis.KEYLESS_NOTICE)
+        why.setWordWrap(True)
+        why.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
+        lay.addWidget(why)
+
+        howto = QLabel(self.HOWTO)
+        howto.setWordWrap(True)
+        howto.setStyleSheet(
+            f"background:{theme.CARD};border:1px solid {theme.BORDER};"
+            f"border-radius:{theme.RADIUS_LG}px;padding:10px;"
+            f"font-size:{theme.FONT_SM}px")
+        lay.addWidget(howto)
+
+        self.edit = QLineEdit(str(self.config.get("neis_api_key", "")))
+        self.edit.setPlaceholderText("발급받은 인증키를 붙여 넣으세요")
+        self.edit.setStyleSheet(theme.TITLE_EDIT)
+        self.edit.returnPressed.connect(self._save)
+        lay.addWidget(self.edit)
+
+        btns = QHBoxLayout()
+        go = QPushButton("발급 받으러 가기")
+        go.setStyleSheet(theme.TEXT_BTN)
+        go.setCursor(Qt.CursorShape.PointingHandCursor)
+        go.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(neis.KEY_ISSUE_URL)))
+        btns.addWidget(go)
+        btns.addStretch()
+        later = QPushButton("나중에")
+        later.setStyleSheet(theme.TEXT_BTN)
+        later.setCursor(Qt.CursorShape.PointingHandCursor)
+        later.clicked.connect(self.reject)
+        btns.addWidget(later)
+        save = QPushButton("저장")
+        save.setStyleSheet(theme.PRIMARY_BTN)
+        save.setCursor(Qt.CursorShape.PointingHandCursor)
+        save.clicked.connect(self._save)
+        btns.addWidget(save)
+        lay.addLayout(btns)
+        self.edit.setFocus()
+
+    def _save(self) -> None:
+        neis.set_key(self.config, self.edit.text())
+        pipeline.save_config(self.base_dir, self.config)
+        self.accept()
+
+
+class KeyBanner(QFrame):
+    """키가 없을 때만 보이는 안내 줄 — 넣고 나면 스스로 사라진다."""
+
+    def __init__(self, config: dict, base_dir: str, parent=None):
+        super().__init__(parent)
+        self.config, self.base_dir = config, base_dir
+        self.setStyleSheet(
+            f"QFrame{{background:{theme.SIGNATURE_BG};border-radius:"
+            f"{theme.RADIUS_MD}px}}")
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 6, 6, 6)
+        lay.setSpacing(6)
+        text = QLabel(neis.KEYLESS_NOTICE.replace("\n", " "))
+        text.setWordWrap(True)
+        text.setStyleSheet(
+            f"background:transparent;color:{theme.SIGNATURE_DARK};"
+            f"font-size:{theme.FONT_SM}px")
+        lay.addWidget(text, stretch=1)
+        btn = QPushButton("인증키 넣기")
+        btn.setStyleSheet(theme.PRIMARY_BTN)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(self._open)
+        lay.addWidget(btn)
+        self.sync()
+
+    def sync(self) -> None:
+        self.setVisible(not neis.has_key(self.config))
+
+    def _open(self) -> None:
+        KeyDialog(self.config, self.base_dir, self).exec()
+        self.sync()
 
 
 class _EventRow(QFrame):
@@ -252,6 +366,9 @@ class NeisScheduleDialog(motion.FadeInMixin, QDialog):
         tip.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
         lay.addWidget(tip)
 
+        self.key_banner = KeyBanner(self.config, self.base_dir, self)
+        lay.addWidget(self.key_banner)
+
         bar = QHBoxLayout()
         bar.setSpacing(6)
         self.school_label = QLabel()
@@ -339,8 +456,10 @@ class NeisScheduleDialog(motion.FadeInMixin, QDialog):
         self.load_btn.setEnabled(s is not None)
 
     def pick_school(self) -> bool:
-        dlg = SchoolPickerDialog(self.config, self)
-        if not dlg.exec() or dlg.picked is None:
+        dlg = SchoolPickerDialog(self.config, self.base_dir, self)
+        ok = dlg.exec()
+        self.key_banner.sync()          # 검색 창에서 키를 넣었을 수도 있다
+        if not ok or dlg.picked is None:
             return False
         self.config["neis_school"] = dlg.picked.to_conf()
         pipeline.save_config(self.base_dir, self.config)
@@ -391,9 +510,11 @@ class NeisScheduleDialog(motion.FadeInMixin, QDialog):
             self.rows_lay.addWidget(row)
             new_count += 0 if registered else 1
         self.rows_lay.addStretch()
+        cut = not neis.has_key(self.config)
         self.status.setText(
             f"{len(events)}건을 불러왔어요 — 새 일정 {new_count}건. "
-            f"체크한 것만 등록됩니다.")
+            f"체크한 것만 등록됩니다."
+            + ("  (인증키가 없어 일부만 왔어요)" if cut else ""))
         self.save_btn.setEnabled(new_count > 0)
 
     def _show_error(self, msg: str) -> None:

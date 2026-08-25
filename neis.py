@@ -7,7 +7,9 @@
 - 받아오는 것은 학교가 공개한 학사일정(행사명·날짜)이라 개인정보가 아니다.
 
 API 문서: https://open.neis.go.kr  (schoolInfo / SchoolSchedule)
-인증키는 없어도 호출되지만 한 번에 5건만 온다 — 그래서 키를 함께 쓴다.
+인증키는 없어도 호출되지만 한 번에 5건만 온다. 키는 앱에 심지 않고
+**쓰는 사람이 각자 발급받아 설정에 넣는다** — 한 키를 다 같이 쓰면
+하루 조회 한도가 금방 차서 모두가 못 쓰게 되기 때문 (2026-08-25 사용자 결정).
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 BASE_URL = "https://open.neis.go.kr/hub"
+KEY_ISSUE_URL = "https://open.neis.go.kr/portal/guide/actAuthKeyGuidePage.do"
 TIMEOUT = 15
 MAX_ROWS = 1000            # 한 번에 받아올 최대 행 수 (API 상한)
 KEYLESS_ROWS = 5           # 인증키 없이 부를 때 API가 주는 행 수
@@ -114,6 +117,22 @@ def api_key(config: dict | None = None) -> str:
     """쓸 인증키: 사용자가 직접 넣은 키 → 내장 키 → 빈 값(키 없이 5건만)."""
     own = str((config or {}).get("neis_api_key", "")).strip()
     return own or embedded_key()
+
+
+def has_key(config: dict | None = None) -> bool:
+    """쓸 수 있는 인증키가 있는지. 없으면 화면에서 안내를 띄운다."""
+    return bool(api_key(config))
+
+
+def set_key(config: dict, key: str) -> None:
+    """사용자가 넣은 키를 설정에 저장 (공백·따옴표는 털어낸다)."""
+    config["neis_api_key"] = str(key or "").strip().strip('"\'')
+
+
+KEYLESS_NOTICE = (
+    f"나이스 인증키가 없어 한 번에 {KEYLESS_ROWS}건만 옵니다.\n"
+    "나이스에서 무료로 발급받아 넣으면 전체를 불러올 수 있어요."
+)
 
 
 # ── 호출 ──────────────────────────────────────────────────────
@@ -279,7 +298,8 @@ def diagnose(config: dict | None = None) -> str:
     lines: list[str] = []
     key = api_key(config)
     if not key:
-        lines.append("① 인증키: 없음 — 키 없이도 되지만 한 번에 5건만 옵니다.")
+        lines.append("① 인증키: 없음 — 한 번에 5건만 옵니다.\n"
+                     "   설정 → 데이터 → 나이스 인증키에 넣으면 전체가 옵니다.")
     else:
         own = bool(str((config or {}).get("neis_api_key", "")).strip())
         lines.append(f"① 인증키: 있음 ({'직접 넣은 키' if own else '앱 내장 키'},"

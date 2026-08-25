@@ -236,6 +236,48 @@ class TestApiKey(unittest.TestCase):
             neis.embedded_key = real
 
 
+class TestKeyHelpers(unittest.TestCase):
+    """키는 앱에 심지 않고 각자 넣는다 — 그 흐름을 지키는 테스트."""
+
+    def setUp(self):
+        self._real = neis.embedded_key
+        neis.embedded_key = lambda: ""
+
+    def tearDown(self):
+        neis.embedded_key = self._real
+
+    def test_has_key_false_when_empty(self):
+        self.assertFalse(neis.has_key({}))
+        self.assertFalse(neis.has_key(None))
+        self.assertFalse(neis.has_key({"neis_api_key": "   "}))
+
+    def test_has_key_true_with_own_key(self):
+        self.assertTrue(neis.has_key({"neis_api_key": "MINE"}))
+
+    def test_set_key_trims_spaces_and_quotes(self):
+        conf = {}
+        neis.set_key(conf, '  "ABC123"  ')
+        self.assertEqual(conf["neis_api_key"], "ABC123")
+
+    def test_set_key_can_clear(self):
+        conf = {"neis_api_key": "OLD"}
+        neis.set_key(conf, "")
+        self.assertEqual(conf["neis_api_key"], "")
+        self.assertFalse(neis.has_key(conf))
+
+    def test_notice_mentions_row_limit(self):
+        self.assertIn(str(neis.KEYLESS_ROWS), neis.KEYLESS_NOTICE)
+
+    def test_issue_url_is_neis(self):
+        self.assertTrue(neis.KEY_ISSUE_URL.startswith("https://open.neis.go.kr"))
+
+    def test_diagnose_guides_to_settings(self):
+        with _Patch(_ok("schoolInfo", [])):
+            text = neis.diagnose({})
+        self.assertIn("인증키: 없음", text)
+        self.assertIn("설정", text)
+
+
 class TestRangePicker(unittest.TestCase):
     """기간 선택지 → 실제 날짜 (창을 띄우지 않고 순수 함수로 검증)."""
 
