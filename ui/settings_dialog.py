@@ -443,12 +443,12 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         key_row = QHBoxLayout()
         key_row.addWidget(QLabel("나이스 인증키"))
         key_row.addWidget(_help_dot(
-            "나이스(open.neis.go.kr)에서 무료로 발급받는 본인 키입니다. "
-            "선생님마다 하루 조회 한도가 따로 있어서 각자 넣어 씁니다.\n"
-            "비워두면 한 번에 5건만 옵니다.\n"
+            "비워두면 프로그램에 들어 있는 키를 씁니다 — 보통 그대로 두면 됩니다.\n"
+            "'오늘 조회 한도를 넘었습니다'가 뜨면 나이스(open.neis.go.kr)에서 "
+            "무료로 본인 키를 발급받아 넣으세요. 그 뒤로는 한도를 따로 씁니다.\n"
             "이 키는 이 PC의 config.json에만 저장되고 어디에도 전송되지 않습니다."))
         self.neis_key_edit = QLineEdit(str(self.config.get("neis_api_key", "")))
-        self.neis_key_edit.setPlaceholderText("비워두면 5건만 옵니다")
+        self.neis_key_edit.setPlaceholderText("비워두면 기본 키 사용")
         key_row.addWidget(self.neis_key_edit, stretch=1)
         issue = QPushButton("발급받기")
         issue.setToolTip("나이스 인증키 발급 안내 페이지를 엽니다")
