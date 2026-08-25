@@ -307,14 +307,17 @@ class TestRangePicker(unittest.TestCase):
 class TestNoSecretInRepo(unittest.TestCase):
     """공개 저장소에 나이스 키가 섞여 들어가지 않도록 지키는 안전장치."""
 
+    @staticmethod
+    def _read(name):
+        path = os.path.join(os.path.dirname(__file__), "..", name)
+        with open(path, encoding="utf-8") as f:      # 빌드 로그에 경고가 남지 않게
+            return f.read()
+
     def test_key_file_is_gitignored(self):
-        root = os.path.join(os.path.dirname(__file__), "..")
-        ignored = open(os.path.join(root, ".gitignore"), encoding="utf-8").read()
-        self.assertIn("assets/neis.key", ignored)
+        self.assertIn("assets/neis.key", self._read(".gitignore"))
 
     def test_source_has_no_hardcoded_key(self):
-        src = open(os.path.join(os.path.dirname(__file__), "..", "neis.py"),
-                   encoding="utf-8").read()
+        src = self._read("neis.py")
         import re
         self.assertIsNone(re.search(r"[0-9a-f]{32}", src),
                           "neis.py에 32자리 키처럼 보이는 문자열이 있습니다")
