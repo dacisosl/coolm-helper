@@ -86,7 +86,7 @@ def main() -> None:
     else:
         from ui.floating_widget import FloatingWidget
         w = FloatingWidget(BASE_DIR)
-    w.place_default()
+    w.restore_position()
     w.show()
     app._coolm_widget = w                   # 스타일 전환 시 참조 유지
 

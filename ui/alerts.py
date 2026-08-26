@@ -101,12 +101,18 @@ class AlertBubble(QWidget):
         self.reposition()
 
     def reposition(self) -> None:
-        """앵커 위에 오른쪽 정렬로 배치 (펭귄 머리 위 / 위젯 위)."""
+        """앵커 위에 오른쪽 정렬로 배치 (펭귄 머리 위 / 위젯 위).
+
+        화면 밖으로 나가면 앵커가 놓인 화면 안으로 민다. 예전엔 0으로 잘라
+        보조 모니터(좌표가 음수일 수 있다)에서 말풍선이 주 화면으로 튀었다.
+        """
         if self.anchor is None or not self.anchor.isVisible():
             return
+        from PyQt6.QtCore import QPoint
+        from ui.widget_base import clamp_to_screens
         x = self.anchor.x() + self.anchor.width() - self.width()
         y = self.anchor.y() - self.height() - 2
-        self.move(max(0, x), max(0, y))
+        self.move(clamp_to_screens(QPoint(x, y), self.size()))
 
     def showEvent(self, ev):
         super().showEvent(ev)

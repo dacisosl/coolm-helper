@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import threading
 
-from PyQt6.QtCore import Qt, QPoint, QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 
 from parser import pipeline
@@ -15,6 +15,50 @@ from store.event_store import EventStore
 from store.favorites import FavStore
 from ui.calendar_view import CalendarWindow
 from ui.review_dialog import ReviewDialog
+
+
+# ── 여러 모니터 다루기 (2026-08-25) ──────────────────────────
+# 예전에는 어디서나 primaryScreen()만 봤다. 듀얼 모니터에서 보조 화면은
+# 좌표가 음수이거나 주 화면 밖이라, 그 기준으로 자르면 펭귄이 주 화면으로
+# 튕겨 돌아왔다. 아래 도우미들은 "그 지점이 속한 화면"을 찾아서 쓴다.
+def screen_at(point: QPoint):
+    """그 점이 놓인 화면. 화면 사이 틈이면 가장 가까운 화면."""
+    app = QApplication.instance()
+    scr = app.screenAt(point) if app else None
+    if scr is not None:
+        return scr
+    best, best_d = None, None
+    for s in (app.screens() if app else []):
+        c = s.availableGeometry().center()
+        d = (c.x() - point.x()) ** 2 + (c.y() - point.y()) ** 2
+        if best_d is None or d < best_d:
+            best, best_d = s, d
+    return best or (app.primaryScreen() if app else None)
+
+
+def clamp_to_screens(pos: QPoint, size, anchor: QPoint | None = None) -> QPoint:
+    """창이 화면 밖으로 나가지 않게 자른다.
+
+    기준 화면은 기본적으로 '창 한가운데가 놓인 화면'. 드래그 중에는
+    anchor로 **커서 위치**를 넘긴다 — 그래야 듀얼 모니터 경계에서 창이
+    반쯤 걸린 채 끈적이지 않고 커서를 따라 옆 화면으로 넘어간다.
+    """
+    center = anchor if anchor is not None else QPoint(
+        pos.x() + size.width() // 2, pos.y() + size.height() // 2)
+    scr = screen_at(center)
+    if scr is None:
+        return pos
+    g = scr.availableGeometry()
+    x = min(max(pos.x(), g.left()), max(g.left(), g.right() - size.width() + 1))
+    y = min(max(pos.y(), g.top()), max(g.top(), g.bottom() - size.height() + 1))
+    return QPoint(x, y)
+
+
+def on_any_screen(rect) -> bool:
+    """어느 화면에든 걸쳐 있으면 True (보조 모니터도 화면이다)."""
+    app = QApplication.instance()
+    return any(s.availableGeometry().intersects(rect)
+               for s in (app.screens() if app else []))
 
 
 def _desk_widgets_flat(app) -> list:
@@ -117,11 +161,14 @@ class WidgetBase(QWidget):
                 pass                      # 이미 연결됨
 
     def _ensure_on_screen(self) -> None:
-        """화면 밖으로 밀려났으면 기본 위치로 되돌린다 (펭귄 실종 방지)."""
-        scr = QApplication.primaryScreen()
-        if scr is None:
+        """어느 화면에도 안 걸치면 기본 위치로 (펭귄 실종 방지).
+
+        보조 모니터에 둔 창을 주 화면으로 끌고 오지 않는다 — 모니터를
+        뽑아서 정말 갈 곳이 없을 때만 되돌린다.
+        """
+        if not QApplication.instance().screens():
             return
-        if not scr.availableGeometry().intersects(self.frameGeometry()):
+        if not on_any_screen(self.frameGeometry()):
             self.place_default()
         if getattr(self, "_in_tray", False):
             return               # 사용자가 트레이로 보낸 상태는 존중
@@ -247,6 +294,31 @@ class WidgetBase(QWidget):
         self.move(screen.right() - self.width() - 24,
                   screen.bottom() - self.height() - 24)
 
+    # ── 위치 기억 ───────────────────────────────────────────
+    POS_KEY = ""          # 설정에 위치를 남길 키. 빈 값이면 기억하지 않는다.
+
+    def restore_position(self) -> None:
+        """지난번 놓아둔 자리로. 없거나 그 화면이 사라졌으면 기본 자리."""
+        saved = self.config.get(self.POS_KEY) if self.POS_KEY else None
+        if isinstance(saved, (list, tuple)) and len(saved) == 2:
+            try:
+                pt = QPoint(int(saved[0]), int(saved[1]))
+            except (TypeError, ValueError):
+                pt = None
+            if pt is not None:
+                rect = QRect(pt, self.size())
+                if on_any_screen(rect):       # 모니터를 뽑았으면 무시된다
+                    self.move(pt)
+                    return
+        self.place_default()
+
+    def save_position(self) -> None:
+        """지금 자리를 설정에 남긴다 (드래그를 놓을 때)."""
+        if not self.POS_KEY:
+            return
+        self.config[self.POS_KEY] = [self.x(), self.y()]
+        pipeline.save_config(self.base_dir, self.config)
+
     # ── 동작 ────────────────────────────────────────────────
     def google_enabled(self) -> bool:
         if not self.config.get("google_sync_enabled"):
@@ -327,8 +399,13 @@ class WidgetBase(QWidget):
             self._drag = ev.globalPosition().toPoint() - self.pos()
 
     def mouseMoveEvent(self, ev):
-        if self._drag and ev.buttons() & Qt.MouseButton.LeftButton:
-            self.move(ev.globalPosition().toPoint() - self._drag)
+        # QPoint(0,0)은 거짓 — 'if self._drag'면 모서리를 정확히 집었을 때
+        # 드래그가 안 먹는다 (mini_widget과 같은 이유, 2026-08-25)
+        if self._drag is not None and ev.buttons() & Qt.MouseButton.LeftButton:
+            cursor = ev.globalPosition().toPoint()
+            self.move(clamp_to_screens(cursor - self._drag, self.size(), cursor))
 
     def mouseReleaseEvent(self, ev):
+        if self._drag is not None:
+            self.save_position()
         self._drag = None

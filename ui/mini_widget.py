@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
-"""미니 위젯 — 바탕화면 오른쪽 벽에 붙는 펭귄.
+"""미니 위젯 — 바탕화면 어디에나 놓는 펭귄.
 
-펭귄 클릭 → 세로 아이콘 바(➕ 일정등록 / 🗓 캘린더 / 💬 안내보정(옵션) / ⚙ 설정).
-바깥을 클릭하면 자동으로 접힌다. 펭귄은 오른쪽 벽에 붙은 채 위아래로만 이동.
+펭귄 클릭 → 세로 아이콘 바(📌 고정 / ⚡ 바로등록 / … / ⚙ 설정).
+바깥을 클릭하면 자동으로 접힌다.
+
+이동 규칙 (2026-08-25 사용자 요청):
+- 예전엔 오른쪽 벽에 붙은 채 위아래로만 움직였다 → **어디로든 자유롭게** 이동.
+- 듀얼 모니터면 **다른 모니터로도** 끌고 갈 수 있다.
+- 자꾸 건드려 움직이는 게 싫은 사람을 위해 **📌 위치 고정**을 아이콘 바에 뒀다.
+- 놓은 자리는 config의 penguin_pos에 기억돼 다음 실행에도 그대로다.
 """
 from __future__ import annotations
 
@@ -15,7 +21,7 @@ from PyQt6.QtWidgets import (
 from ui import theme
 from ui.icons import icon, ICON_SIZE
 from ui.penguin_icon import penguin_pixmap
-from ui.widget_base import WidgetBase
+from ui.widget_base import WidgetBase, clamp_to_screens, screen_at
 
 
 class _IconBar(QWidget):
@@ -38,8 +44,13 @@ class _IconBar(QWidget):
         lay.setContentsMargins(6, 8, 6, 8)
         lay.setSpacing(4)
 
-        buttons = [("bolt", "바로 등록 — 지금 보고 있는 쪽지를 즉시 등록 "
-                    "(펭귄 더블클릭으로도 열려요)", owner.open_quick)]
+        locked = owner.is_locked()
+        buttons = [("pin",
+                    "위치 고정 해제 — 다시 끌어서 옮길 수 있어요" if locked
+                    else "위치 고정 — 펭귄이 지금 자리에서 움직이지 않아요",
+                    owner.toggle_lock)]
+        buttons.append(("bolt", "바로 등록 — 지금 보고 있는 쪽지를 즉시 등록 "
+                        "(펭귄 더블클릭으로도 열려요)", owner.open_quick))
         buttons.append(("mail", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
                         owner.open_review))
         # 캘린더·할일은 v0.11.0부터 바탕화면 위젯으로 이동 (관리는 설정에서)
@@ -62,18 +73,27 @@ class _IconBar(QWidget):
             b.setToolTip(tip)
             b.setFixedSize(btn_px, btn_px)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
+            # 고정 중인 📌는 켜져 있다는 게 한눈에 보이도록 배경을 남긴다
+            on = name == "pin" and locked
             b.setStyleSheet(
-                f"QPushButton{{background:transparent;border:none;"
+                f"QPushButton{{background:"
+                f"{theme.SIGNATURE_SOFT if on else 'transparent'};border:none;"
                 f"border-radius:{theme.RADIUS_MD}px}}"
                 f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
                 f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
             b.clicked.connect(lambda _, h=handler: (self.close(), h()))
             lay.addWidget(b)
+            if name == "pin":                 # 📌 아래로 얇은 구분선
+                line = QFrame()
+                line.setFixedHeight(1)
+                line.setStyleSheet(f"background:{theme.BORDER_SUBTLE};border:none")
+                lay.addWidget(line)
 
 
 class MiniWidget(WidgetBase):
     WIDTH = 52
     BASE_PX = 46          # 펭귄 기본 크기(보통=100%)
+    POS_KEY = "penguin_pos"   # 놓아둔 자리를 기억한다
 
     def penguin_px(self) -> int:
         """설정 → 일반 → 펭귄 크기(%)를 반영한 실제 픽셀 (2026-07-24)."""
@@ -89,8 +109,7 @@ class MiniWidget(WidgetBase):
         self.penguin = QLabel()
         self.penguin.setPixmap(penguin_pixmap(self.base_dir, self.penguin_px()))
         self.penguin.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.penguin.setToolTip("COOL-비서\n클릭: 메뉴 / 더블클릭: 바로 등록 / "
-                                "드래그: 이동 / 우클릭: 옵션")
+        self._mood = "base"
         lay.addWidget(self.penguin)
         # 데모 모드 표시 뱃지
         self.demo_chip = QLabel("D", self)
@@ -112,13 +131,18 @@ class MiniWidget(WidgetBase):
         self._update_mood()
 
     def _resize_to_penguin(self) -> None:
-        """펭귄 크기에 맞춰 창 크기를 맞추고 오른쪽 벽에 계속 붙여 둔다."""
+        """펭귄 크기에 맞춰 창 크기만 바꾼다 — 놓아둔 자리는 그대로.
+
+        커지다 화면 밖으로 삐져나오는 경우에만 안쪽으로 밀어 넣는다.
+        (예전엔 크기가 바뀔 때마다 오른쪽 벽으로 되돌아갔다.)
+        """
         px = self.penguin_px()
         self.WIDTH = px + 6
         right = self.geometry().right()      # 커져도 오른쪽 모서리는 그대로
         self.resize(self.WIDTH, px + 8)
         if self.isVisible():
-            self.move(right - self.width() + 1, self.y())
+            self.move(clamp_to_screens(
+                QPoint(right - self.width() + 1, self.y()), self.size()))
 
     def closeEvent(self, ev):
         self.store.unsubscribe(self._store_cb)
@@ -134,13 +158,11 @@ class MiniWidget(WidgetBase):
             todo_left = [e for e in today if not e.done]
             if not overdue and not todo_left:
                 mood = "sleep"
+        self._mood = mood
         self.penguin.setPixmap(
             penguin_pixmap(self.base_dir, self.penguin_px(), mood))
         self._resize_to_penguin()
-        self.penguin.setToolTip(
-            ("쿨쿠리가 자고 있어요 — 오늘은 일정이 없어요 💤\n" if mood == "sleep"
-             else "COOL-비서\n")
-            + "클릭: 메뉴 / 더블클릭: 바로 등록 / 드래그: 이동 / 우클릭: 옵션")
+        self._sync_tooltip()
 
     def apply_config(self) -> None:
         super().apply_config()
@@ -150,18 +172,21 @@ class MiniWidget(WidgetBase):
             self._update_mood()      # 설정에서 캐릭터 모드 토글 즉시 반영
 
     def place_default(self) -> None:
-        """오른쪽 벽 중앙에 도킹."""
-        screen = QApplication.primaryScreen().availableGeometry()
-        self.move(screen.right() - self.WIDTH, screen.center().y() - 27)
+        """처음 켤 때 자리 — 지금 있는 화면의 오른쪽 벽 중앙."""
+        scr = screen_at(self.frameGeometry().center()) \
+            or QApplication.primaryScreen()
+        g = scr.availableGeometry()
+        self.move(g.right() - self.WIDTH, g.center().y() - 27)
 
     def _ensure_on_screen(self) -> None:
-        """해상도가 바뀌면 새 화면의 오른쪽 벽에 다시 도킹 (실종 방지)."""
-        scr = QApplication.primaryScreen()
-        if scr is None:
+        """해상도·모니터가 바뀌어도 실종되지 않게 — 있던 화면 안으로만 민다.
+
+        보조 모니터에 둔 펭귄을 주 화면으로 끌고 오지 않는다. 모니터를
+        아예 뽑아서 갈 곳이 없을 때만 가까운 화면으로 옮겨진다.
+        """
+        if not QApplication.instance().screens():
             return
-        g = scr.availableGeometry()
-        y = min(max(g.top(), self.y()), g.bottom() - self.height())
-        self.move(g.right() - self.WIDTH, y)
+        self.move(clamp_to_screens(self.pos(), self.size()))
         if getattr(self, "_in_tray", False):
             return               # 사용자가 트레이로 보낸 상태는 존중
         if not self.isVisible():
@@ -186,32 +211,72 @@ class MiniWidget(WidgetBase):
                          args=(self.base_dir,), daemon=True).start()
         self._bar = _IconBar(self)
         self._bar.adjustSize()
+        # 기본은 펭귄 왼쪽. 왼쪽에 자리가 없으면(화면 왼쪽 끝에 뒀을 때)
+        # 오른쪽으로 펼친다 — 자유 이동이 되면서 생긴 경우 (2026-08-25)
+        scr = screen_at(self.frameGeometry().center())
+        g = scr.availableGeometry() if scr else None
         x = self.x() - self._bar.width() + 6
-        y = min(self.y(), QApplication.primaryScreen().availableGeometry().bottom()
-                - self._bar.height())
+        if g is not None and x < g.left():
+            x = self.x() + self.width() - 6
+        y = self.y()
+        if g is not None:
+            y = min(max(g.top(), y), g.bottom() - self._bar.height())
+            x = min(max(g.left(), x), g.right() - self._bar.width())
         self._bar.move(QPoint(x, y))
         self._bar.show()
 
-    # ── 마우스: 클릭=메뉴, 드래그=상하 이동(벽에 고정), 우클릭=스타일 전환 ──
+    # ── 위치 고정 (📌) ──────────────────────────────────────
+    def is_locked(self) -> bool:
+        return bool(self.config.get("penguin_locked"))
+
+    def toggle_lock(self) -> None:
+        """📌 — 켜면 그 자리에 붙박이, 끄면 다시 자유롭게 끌 수 있다."""
+        from parser import pipeline
+        locked = not self.is_locked()
+        self.config["penguin_locked"] = locked
+        pipeline.save_config(self.base_dir, self.config)
+        if locked:
+            self.save_position()          # 고정한 자리를 확실히 남긴다
+        self._sync_tooltip()
+        from ui.quick_capture import _say
+        _say(self, "이 자리에 고정했어요 — 📌 다시 누르면 풀려요" if locked
+             else "이제 펭귄을 자유롭게 옮길 수 있어요")
+
+    def _sync_tooltip(self) -> None:
+        head = ("쿨쿠리가 자고 있어요 — 오늘은 일정이 없어요 💤\n"
+                if self._mood == "sleep" else "COOL-비서\n")
+        move = "이동: 📌 고정 중 (메뉴에서 해제)" if self.is_locked() \
+            else "드래그: 이동 (다른 모니터로도)"
+        self.penguin.setToolTip(
+            f"{head}클릭: 메뉴 / 더블클릭: 바로 등록 / {move} / 우클릭: 옵션")
+
+    # ── 마우스: 클릭=메뉴, 드래그=자유 이동, 우클릭=옵션 ──────
     def mousePressEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
             self._drag = ev.globalPosition().toPoint() - self.pos()
             self._moved = False
 
     def mouseMoveEvent(self, ev):
-        if self._drag and ev.buttons() & Qt.MouseButton.LeftButton:
-            target = ev.globalPosition().toPoint() - self._drag
-            screen = QApplication.primaryScreen().availableGeometry()
-            y = max(screen.top(), min(target.y(), screen.bottom() - self.height()))
-            self.move(screen.right() - self.WIDTH, y)   # x는 벽에 고정
-            self._moved = True
-            bubble = getattr(self, "_alert_bubble", None)
-            if bubble is not None and bubble.isVisible():
-                bubble.reposition()                      # 말풍선도 따라온다
+        # QPoint(0,0)은 거짓이라 'if self._drag'로 쓰면 펭귄 좌상단 모서리를
+        # 정확히 집었을 때 드래그가 통째로 무시된다 (2026-08-25 발견)
+        if self._drag is None or not (ev.buttons() & Qt.MouseButton.LeftButton):
+            return
+        if self.is_locked():
+            return                       # 📌 고정 중엔 끌어도 꿈쩍 않는다
+        # 화면 경계로 자르되 **커서가 있는 모니터**를 기준으로 — 그래야
+        # 듀얼 모니터에서 경계에 걸리지 않고 옆 화면으로 넘어간다 (2026-08-25)
+        cursor = ev.globalPosition().toPoint()
+        self.move(clamp_to_screens(cursor - self._drag, self.size(), cursor))
+        self._moved = True
+        bubble = getattr(self, "_alert_bubble", None)
+        if bubble is not None and bubble.isVisible():
+            bubble.reposition()                      # 말풍선도 따라온다
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton and not self._moved:
             self._open_bar()                  # 딜레이 없이 즉시 메뉴
+        elif self._moved:
+            self.save_position()              # 놓은 자리를 기억한다
         self._drag = None
 
     def mouseDoubleClickEvent(self, ev):
