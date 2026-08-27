@@ -22,10 +22,11 @@ from parser import pipeline
 from parser.pipeline import DESK_KINDS, clamp_geometry, desk_conf, prune_notes
 from store.event_store import EventStore
 from ui import theme
+from ui.screens import best_screen_rect, clamp_to_screens, on_any_screen
 
 _EDGE_L, _EDGE_R, _EDGE_T, _EDGE_B = 1, 2, 4, 8
 _MARGIN = 8          # 가장자리 리사이즈 감지 폭 (투명 여백과 동일)
-_HEADER_H = 40       # 상단 이동 드래그 영역 높이
+_HEADER_H = 40       # 상단 제목줄 높이 (이동은 여기 말고 아무 데서나 된다)
 _OPACITIES = (60, 75, 90, 100)
 
 _FONT_STEPS = (0.85, 1.0, 1.15, 1.3)   # 크기 연동 글씨 배율 (계단식)
@@ -133,11 +134,11 @@ class DeskWidgetBase(QWidget):
         QTimer.singleShot(600, self._ensure_on_screen)
 
     def _ensure_on_screen(self) -> None:
+        """어느 화면에도 안 걸칠 때만 기본 자리로 — 보조 모니터는 그대로 둔다."""
         try:
-            scr = QApplication.primaryScreen()
-            if scr is None:
+            if not QApplication.instance().screens():
                 return
-            if not scr.availableGeometry().intersects(self.frameGeometry()):
+            if not on_any_screen(self.frameGeometry()):
                 self.place_default()
         except RuntimeError:
             pass          # 이미 닫힌 위젯의 지연 호출은 무시
@@ -163,11 +164,18 @@ class DeskWidgetBase(QWidget):
                 self.show()
 
     def show_at_saved(self) -> None:
-        """저장된 위치·크기로 표시. 화면 밖(해상도 변경 등)이면 기본 배치."""
-        screen = QApplication.primaryScreen().availableGeometry()
-        geo = clamp_geometry(self.conf.get("geometry"),
-                             [screen.x(), screen.y(),
-                              screen.width(), screen.height()])
+        """저장된 위치·크기로 표시. 갈 곳이 없으면(모니터 뽑힘 등) 기본 배치.
+
+        검증 기준은 **그 자리가 걸쳐 있던 모니터**다. 주 화면 기준으로
+        자르면 보조 모니터에 둔 위젯이 켤 때마다 주 화면으로 끌려온다
+        (2026-08-26).
+        """
+        saved = self.conf.get("geometry")
+        scr_rect = best_screen_rect(saved)
+        if scr_rect is None:
+            g = QApplication.primaryScreen().availableGeometry()
+            scr_rect = [g.x(), g.y(), g.width(), g.height()]
+        geo = clamp_geometry(saved, scr_rect)
         if geo:
             self.setGeometry(*geo)
         else:
@@ -533,13 +541,18 @@ class DeskWidgetBase(QWidget):
         edges = self._hit_edges(pos)
         if edges:
             self._mode, self._edges = "resize", edges
-        elif pos.y() <= _HEADER_H:
+        else:
+            # 예전엔 제목줄(위 40px)을 정확히 잡아야만 움직였다 — 어디를
+            # 잡아도 옮겨지게 (2026-08-26 사용자 요청). 버튼·체크박스 같은
+            # 자식 위젯은 자기가 클릭을 먹으므로 여기까지 오지 않는다.
             self._mode = "move"
 
     def mouseMoveEvent(self, ev):
         if self._mode == "move":
-            delta = ev.globalPosition().toPoint() - self._start_pos
-            self.move(self._start_geo.topLeft() + delta)
+            cursor = ev.globalPosition().toPoint()
+            delta = cursor - self._start_pos
+            self.move(clamp_to_screens(self._start_geo.topLeft() + delta,
+                                       self.size(), cursor))
             return
         if self._mode == "resize":
             delta = ev.globalPosition().toPoint() - self._start_pos
@@ -567,8 +580,11 @@ class DeskWidgetBase(QWidget):
 
     def mouseReleaseEvent(self, ev):
         if self._mode:
+            moved = self._start_geo is None or \
+                self.geometry() != self._start_geo
             self._mode = None
-            self._save_geometry()
+            if moved:          # 그냥 클릭한 것뿐이면 저장하지 않는다
+                self._save_geometry()
 
     def leaveEvent(self, ev):
         self.unsetCursor()

@@ -1075,8 +1075,14 @@ class PlannerWidget(DeskWidgetBase):
             self, date_fn=lambda: self._selected,
             tip="달력에서 고른 날짜에 일정 추가"))
         self.cal = EventCalendar()
+        self.cal.setToolTip("날짜를 클릭하면 그 날 일정이 아래에 보이고,\n"
+                            "더블클릭하면 그 날짜로 일정 추가 창이 열려요.")
         self.cal.clicked.connect(
             lambda qd: self._pick(date(qd.year(), qd.month(), qd.day())))
+        # 더블클릭 = 그 날짜로 바로 등록 (2026-08-26 사용자 요청).
+        # QCalendarWidget의 activated는 더블클릭·Enter에서 온다.
+        self.cal.activated.connect(
+            lambda qd: self.add_on(date(qd.year(), qd.month(), qd.day())))
         root.addWidget(self.cal, stretch=5)
         self.day_label = QLabel()
         root.addWidget(self.day_label)
@@ -1121,6 +1127,11 @@ class PlannerWidget(DeskWidgetBase):
     def _pick(self, d: date) -> None:
         self._selected = d
         self.refresh_day()
+
+    def add_on(self, d: date) -> None:
+        """그 날짜로 '일정 추가' 모달을 연다 (달력 더블클릭·＋ 버튼 공용)."""
+        self._pick(d)
+        AddEventDialog(self.store, parent=self, default_date=d).exec()
 
     def refresh(self) -> None:
         self._apply_cal_font()

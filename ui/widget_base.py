@@ -14,51 +14,10 @@ from parser import pipeline
 from store.event_store import EventStore
 from store.favorites import FavStore
 from ui.calendar_view import CalendarWindow
+# 화면 계산은 ui/screens.py에 있다 — desk_base와 공유하려고 뺐다.
+# 예전 이름으로 부르던 곳(테스트 포함)이 그대로 동작하도록 다시 내보낸다.
+from ui.screens import clamp_to_screens, on_any_screen, screen_at
 from ui.review_dialog import ReviewDialog
-
-
-# ── 여러 모니터 다루기 (2026-08-25) ──────────────────────────
-# 예전에는 어디서나 primaryScreen()만 봤다. 듀얼 모니터에서 보조 화면은
-# 좌표가 음수이거나 주 화면 밖이라, 그 기준으로 자르면 펭귄이 주 화면으로
-# 튕겨 돌아왔다. 아래 도우미들은 "그 지점이 속한 화면"을 찾아서 쓴다.
-def screen_at(point: QPoint):
-    """그 점이 놓인 화면. 화면 사이 틈이면 가장 가까운 화면."""
-    app = QApplication.instance()
-    scr = app.screenAt(point) if app else None
-    if scr is not None:
-        return scr
-    best, best_d = None, None
-    for s in (app.screens() if app else []):
-        c = s.availableGeometry().center()
-        d = (c.x() - point.x()) ** 2 + (c.y() - point.y()) ** 2
-        if best_d is None or d < best_d:
-            best, best_d = s, d
-    return best or (app.primaryScreen() if app else None)
-
-
-def clamp_to_screens(pos: QPoint, size, anchor: QPoint | None = None) -> QPoint:
-    """창이 화면 밖으로 나가지 않게 자른다.
-
-    기준 화면은 기본적으로 '창 한가운데가 놓인 화면'. 드래그 중에는
-    anchor로 **커서 위치**를 넘긴다 — 그래야 듀얼 모니터 경계에서 창이
-    반쯤 걸린 채 끈적이지 않고 커서를 따라 옆 화면으로 넘어간다.
-    """
-    center = anchor if anchor is not None else QPoint(
-        pos.x() + size.width() // 2, pos.y() + size.height() // 2)
-    scr = screen_at(center)
-    if scr is None:
-        return pos
-    g = scr.availableGeometry()
-    x = min(max(pos.x(), g.left()), max(g.left(), g.right() - size.width() + 1))
-    y = min(max(pos.y(), g.top()), max(g.top(), g.bottom() - size.height() + 1))
-    return QPoint(x, y)
-
-
-def on_any_screen(rect) -> bool:
-    """어느 화면에든 걸쳐 있으면 True (보조 모니터도 화면이다)."""
-    app = QApplication.instance()
-    return any(s.availableGeometry().intersects(rect)
-               for s in (app.screens() if app else []))
 
 
 def _desk_widgets_flat(app) -> list:

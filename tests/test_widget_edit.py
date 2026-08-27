@@ -245,3 +245,52 @@ class TestEditModeDelete(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCalendarDoubleClick(unittest.TestCase):
+    """캘린더·할 일 위젯: 날짜를 더블클릭하면 그 날짜로 추가 모달
+    (2026-08-26 사용자 요청). 모달이 뜨면 테스트가 멈추므로 대역으로 바꿔 확인."""
+
+    def setUp(self):
+        from PyQt6.QtCore import QDate
+        from ui import desk_widgets
+        self.QDate = QDate
+        self.mod = desk_widgets
+        self.tmp = tempfile.mkdtemp()
+        self.store = EventStore(self.tmp)
+        self.w = _widget(desk_widgets.PlannerWidget, self.store, self.tmp)
+        self.opened = []
+        self._real = desk_widgets.AddEventDialog
+
+        class _Fake:
+            def __init__(inner, store, default_deadline=False, parent=None,
+                         default_date=None):
+                self.opened.append(default_date)
+
+            def exec(inner):
+                return 0
+
+        desk_widgets.AddEventDialog = _Fake
+
+    def tearDown(self):
+        self.mod.AddEventDialog = self._real
+        self.w.close()
+
+    def test_double_click_opens_dialog_for_that_date(self):
+        d = date(2026, 9, 12)
+        self.w.cal.activated.emit(self.QDate(d.year, d.month, d.day))
+        self.assertEqual(self.opened, [d])
+
+    def test_double_click_also_selects_the_day(self):
+        d = date(2026, 9, 12)
+        self.w.cal.activated.emit(self.QDate(d.year, d.month, d.day))
+        self.assertEqual(self.w._selected, d)
+
+    def test_single_click_does_not_open_dialog(self):
+        d = date(2026, 9, 12)
+        self.w.cal.clicked.emit(self.QDate(d.year, d.month, d.day))
+        self.assertEqual(self.opened, [])
+        self.assertEqual(self.w._selected, d)
+
+    def test_calendar_tooltip_mentions_double_click(self):
+        self.assertIn("더블클릭", self.w.cal.toolTip())

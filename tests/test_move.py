@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""펭귄 자유 이동 + 📌 위치 고정 (2026-08-25 사용자 요청).
+"""창을 옮기는 규칙 — 펭귄과 바탕화면 위젯 (2026-08-25~26 사용자 요청).
 
-예전엔 오른쪽 벽에 붙은 채 위아래로만 움직였다. 이제 어디로든(다른
-모니터로도) 끌 수 있고, 놓은 자리를 기억하며, 📌로 붙박이도 된다.
+- 펭귄: 오른쪽 벽 도킹을 풀고 어디로든(다른 모니터로도). 📌로 고정도 된다.
+- 위젯: 제목줄만 잡히던 것을 몸통 아무 데나 잡아도 옮겨지게.
+- 공통: 놓은 자리를 기억하고, 보조 모니터 자리를 주 화면으로 끌고 오지 않는다.
 """
 import os
 import shutil
@@ -179,6 +180,116 @@ class TestPenguinMove(unittest.TestCase):
         self.assertGreaterEqual(bar.x(), g.left())
         self.assertLessEqual(bar.x() + bar.width(), g.right() + 1)
         bar.close()
+
+
+class _FakePress:
+    """mousePressEvent/ReleaseEvent에 넘길 가짜 이벤트 (지역·전역 좌표)."""
+
+    def __init__(self, local: QPoint, glob: QPoint):
+        self._l, self._g = local, glob
+
+    def button(self):
+        from PyQt6.QtCore import Qt
+        return Qt.MouseButton.LeftButton
+
+    def buttons(self):
+        from PyQt6.QtCore import Qt
+        return Qt.MouseButton.LeftButton
+
+    def position(self):
+        return _FakePointF(self._l)
+
+    def globalPosition(self):
+        return _FakePointF(self._g)
+
+
+class TestDeskWidgetMove(unittest.TestCase):
+    """바탕화면 위젯도 아무 데나 잡아 옮긴다 (2026-08-26 사용자 요청).
+
+    예전엔 제목줄(위 40px)을 정확히 집어야만 움직였다.
+    """
+
+    def setUp(self):
+        from parser.pipeline import desk_conf, load_config
+        from store.event_store import EventStore
+        from ui.desk_widgets import TodayTodoWidget
+        self.tmp = tempfile.mkdtemp()
+        conf = load_config(self.tmp)
+        self.w = TodayTodoWidget(EventStore(self.tmp), conf, self.tmp,
+                                 desk_conf(conf, "today"))
+        self.w.show()
+
+    def tearDown(self):
+        self.w.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _grab(self, local):
+        return _FakePress(local, self.w.mapToGlobal(local))
+
+    def test_body_center_starts_a_move(self):
+        mid = QPoint(self.w.width() // 2, self.w.height() // 2)
+        self.w.mousePressEvent(self._grab(mid))
+        self.assertEqual(self.w._mode, "move")
+
+    def test_drag_moves_widget(self):
+        g = _screen()
+        self.w.move(g.left() + 120, g.top() + 120)
+        mid = QPoint(self.w.width() // 2, self.w.height() // 2)
+        self.w.mousePressEvent(self._grab(mid))
+        self.w.mouseMoveEvent(_FakePress(
+            mid, self.w.mapToGlobal(mid) + QPoint(90, 60)))
+        self.assertEqual(self.w.pos(), QPoint(g.left() + 210, g.top() + 180))
+
+    def test_drag_stays_on_screen(self):
+        mid = QPoint(self.w.width() // 2, self.w.height() // 2)
+        self.w.mousePressEvent(self._grab(mid))
+        self.w.mouseMoveEvent(_FakePress(
+            mid, self.w.mapToGlobal(mid) + QPoint(9000, 9000)))
+        self.assertTrue(widget_base.on_any_screen(self.w.frameGeometry()))
+
+    def test_release_saves_only_when_moved(self):
+        mid = QPoint(self.w.width() // 2, self.w.height() // 2)
+        self.w.conf.pop("geometry", None)
+        self.w.mousePressEvent(self._grab(mid))       # 클릭만 (이동 없음)
+        self.w.mouseReleaseEvent(self._grab(mid))
+        self.assertIsNone(self.w.conf.get("geometry"))
+
+        self.w.mousePressEvent(self._grab(mid))
+        self.w.mouseMoveEvent(_FakePress(
+            mid, self.w.mapToGlobal(mid) + QPoint(30, 20)))
+        self.w.mouseReleaseEvent(self._grab(mid))
+        self.assertIsNotNone(self.w.conf.get("geometry"))
+
+    def test_saved_spot_on_second_monitor_is_kept(self):
+        """보조 모니터 자리를 주 화면 기준으로 자르면 안 된다."""
+        from ui import screens
+        g = _screen()
+        self.w.conf["geometry"] = [g.left() + 60, g.top() + 60, 240, 180]
+        self.w.show_at_saved()
+        self.assertEqual(self.w.pos(), QPoint(g.left() + 60, g.top() + 60))
+        # 어느 화면에도 없는 자리는 기본 배치로 구조된다
+        self.w.conf["geometry"] = [50000, 50000, 240, 180]
+        self.w.show_at_saved()
+        self.assertTrue(screens.on_any_screen(self.w.frameGeometry()))
+
+    def test_ensure_on_screen_leaves_valid_spot(self):
+        g = _screen()
+        self.w.move(g.left() + 200, g.top() + 200)
+        self.w._ensure_on_screen()
+        self.assertEqual(self.w.pos(), QPoint(g.left() + 200, g.top() + 200))
+
+
+class TestBestScreenRect(unittest.TestCase):
+    def test_picks_overlapping_screen(self):
+        from ui import screens
+        g = _screen()
+        rect = screens.best_screen_rect([g.left() + 10, g.top() + 10, 100, 100])
+        self.assertEqual(rect, [g.x(), g.y(), g.width(), g.height()])
+
+    def test_broken_value_is_none(self):
+        from ui import screens
+        for bad in (None, [], [1, 2, 3], ["a", "b", "c", "d"], "문자열"):
+            self.assertIsNone(screens.best_screen_rect(bad))
 
 
 class _FakeMove:
