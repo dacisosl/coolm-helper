@@ -1,6 +1,6 @@
 {
-  "version": "2.2.0",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.2.0/CoolmHelper-Setup.exe",
-  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.2.0/CoolmHelper-Setup.zip",
-  "notes": "- 펭귄이 오른쪽 벽에서 풀려났어요. 이제 끌어서 화면 어디로든 옮길 수 있습니다. 놓아둔 자리는 기억해서 다음에 켤 때도 그대로예요.\r\n- 모니터가 두 대라면 다른 모니터로도 그대로 끌고 갈 수 있어요. 보조 모니터에 둔 펭귄이 주 화면으로 돌아오지 않습니다.\r\n- 자꾸 건드려 움직이는 게 불편하면 펭귄을 클릭 → 📌 를 누르세요. 그 자리에 고정돼 끌어도 움직이지 않고, 📌 를 다시 누르면 풀립니다.\r\n- 펭귄을 화면 왼쪽 끝에 두면 메뉴가 오른쪽으로 펼쳐지고, 말풍선도 그 화면 안에서 뜹니다."
+  "version": "2.3.0",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.3.0/CoolmHelper-Setup.exe",
+  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.3.0/CoolmHelper-Setup.zip",
+  "notes": "- 바탕화면 위젯을 몸통 아무 데나 잡아 끌면 옮겨집니다. 예전에는 제목줄(맨 위 얇은 부분)을 정확히 집어야만 움직여서 \"안 옮겨진다\"고 느끼기 쉬웠어요.\r\n- 캘린더·할 일 위젯에서 날짜를 더블클릭하면 그 날짜가 채워진 채로 일정 추가 창이 열립니다. 한 번 클릭은 지금처럼 그 날 일정 보기예요.\r\n- 모니터가 두 대일 때, 보조 모니터에 둔 위젯이 다시 켤 때 주 화면으로 끌려오지 않습니다. 옮긴 자리를 그대로 기억해요.\r\n- 위젯을 화면 밖으로 끌어 놓쳐도 화면 안에서 멈춥니다."
 }
