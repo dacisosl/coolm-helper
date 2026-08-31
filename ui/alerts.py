@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-"""시작 알림 — 말풍선 하나로 차례대로 보여주고 클릭하면 넘어간다.
+"""시작 알림 — 켤 때 마감이 다가온 일정을 포스트잇(ui/alert_note.py)에 붙인다.
 
 프로그램을 켤 때 딱 한 번만 뜬다 (앱 수준 플래그로 보장).
+설정 → 일반 → '알림'에서 끄고 켜며, 며칠 전부터 알릴지도 거기서 고른다.
+말풍선(AlertBubble)은 첫 실행 기능 안내와 ⚡ 간편 등록 안내에 계속 쓰인다.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
 from PyQt6.QtCore import Qt
@@ -17,20 +20,116 @@ from ui import theme
 from version import APP_VERSION
 
 
+@dataclass
+class Alert:
+    """알림 한 줄. key가 있으면 ✕로 뗀 사실을 config에 기억한다.
+
+    days_left: 마감까지 남은 날 (마감 알림만, 0=오늘 마감). 마감 알림이
+    아니면 None — '오늘 일정 N건'이나 안내 문구가 그렇다.
+    """
+    text: str
+    key: str = ""              # "" = 기억하지 않는다 (안내 문구 등)
+    days_left: int | None = None
+
+
 def build_alerts(store: EventStore, today: date | None = None,
-                 days: tuple = (3, 1)) -> list[str]:
-    """마감 알림(N일 전, 설정 가능) → 오늘 할일 순서로 알림 문구를 만든다."""
+                 days_before: int = 3) -> list[Alert]:
+    """마감 알림(N일 전부터 당일까지) → 오늘 할일 순서로 알림을 만든다.
+
+    days_before는 사용자가 설정에서 고른다(기본 3). 예전에는 딱 3일 전·1일 전
+    이틀만 알려서 그 사이에 프로그램을 안 켜면 알림을 통째로 놓쳤다.
+    급한 것(마감이 가까운 것)부터 위로 온다.
+    """
     today = today or date.today()
-    alerts: list[str] = []
+    days_before = max(0, int(days_before))
+    items: list[Alert] = []
     for e in store.all():
         if e.is_deadline and not e.done:
             days_left = (e.start_dt.date() - today).days
-            if days_left in days:
-                alerts.append(f"⏰ 마감 {days_left}일 전\n{e.title}")
+            if 0 <= days_left <= days_before:
+                label = "오늘 마감" if days_left == 0 else f"마감 {days_left}일 전"
+                items.append(Alert(f"⏰ {label}\n{e.title}",
+                                   key=f"ev:{e.id}", days_left=days_left))
+    items.sort(key=lambda a: a.days_left)
     n = len(store.on_date(today))
     if n:
-        alerts.append(f"📋 오늘 일정 {n}건")
-    return alerts
+        items.append(Alert(f"📋 오늘 일정 {n}건",
+                           key=f"today:{today.isoformat()}"))
+    return items
+
+
+# ── ✕로 뗀 알림 기억하기 ────────────────────────────────────
+# config["alert_dismissed"] = {열쇠: 뗄 때 남아 있던 날수}
+# 값이 필요한 이유: 미리 떼어 두었어도 '마감 당일'에는 한 번 더 알리기 위해
+# (2026-08-31 사용자 결정). 당일에 뗀 것(값 0)은 다시 뜨지 않는다.
+DISMISS_KEY = "alert_dismissed"
+
+
+def _dismissed(config: dict) -> dict:
+    d = config.get(DISMISS_KEY)
+    return d if isinstance(d, dict) else {}
+
+
+def is_dismissed(alert: Alert, config: dict) -> bool:
+    """이미 ✕로 뗀 알림인지. 단, 마감 당일 알림은 한 번 더 통과시킨다."""
+    if not alert.key:
+        return False
+    marks = _dismissed(config)
+    if alert.key not in marks:
+        return False
+    try:
+        when = int(marks[alert.key])
+    except (TypeError, ValueError):
+        when = 0
+    return not (alert.days_left == 0 and when > 0)
+
+
+def mark_dismissed(alert: Alert, config: dict) -> bool:
+    """✕로 뗀 사실을 config에 적는다. 바뀌었으면 True (저장은 호출한 쪽에서)."""
+    if not alert.key:
+        return False
+    marks = dict(_dismissed(config))
+    value = alert.days_left if alert.days_left is not None else 0
+    if marks.get(alert.key) == value:
+        return False
+    marks[alert.key] = value
+    config[DISMISS_KEY] = marks
+    return True
+
+
+def prune_dismissed(config: dict, store: EventStore,
+                    today: date | None = None) -> bool:
+    """사라진 일정·지난 날짜의 기록을 지운다. 변경 시 True.
+
+    안 지우면 config가 뗀 알림 기록으로 계속 불어난다.
+    """
+    marks = _dismissed(config)
+    if not marks:
+        return False
+    today = today or date.today()
+    alive = {f"ev:{e.id}" for e in store.all()}
+    today_key = f"today:{today.isoformat()}"
+    keep = {k: v for k, v in marks.items()
+            if (k in alive) or k == today_key}
+    if len(keep) == len(marks):
+        return False
+    config[DISMISS_KEY] = keep
+    return True
+
+
+def highlight_urgency(text: str) -> str:
+    """'N건'·'N일 전'·'오늘 마감'을 빨간 배경+흰 글씨로 강조한 HTML로 바꾼다.
+
+    '오늘 마감'에는 숫자가 없어서 예전 규칙으로는 가장 급한 알림이 오히려
+    밋밋하게 보였다 — 그래서 낱말째로 함께 잡는다.
+    """
+    import html
+    import re
+    esc = html.escape(text).replace("\n", "<br>")
+    return re.sub(
+        r"(\d+건|\d+일 전|오늘 마감)",
+        rf'<span style="background-color:{theme.DANGER};color:white;'
+        r'font-weight:bold;">&nbsp;\1&nbsp;</span>', esc)
 
 
 class AlertBubble(QWidget):
@@ -84,16 +183,8 @@ class AlertBubble(QWidget):
         self._sync()
 
     def _sync(self) -> None:
-        # 'N건'·'N일 전' 같은 숫자는 빨간 배경+흰 글씨로 강조해 눈에 띄게
-        import html
-        import re
-        esc = html.escape(self.alerts[self.idx]).replace("\n", "<br>")
-        esc = re.sub(
-            r"(\d+건|\d+일 전)",
-            rf'<span style="background-color:{theme.DANGER};color:white;'
-            r'font-weight:bold;">&nbsp;\1&nbsp;</span>', esc)
         self.text.setTextFormat(Qt.TextFormat.RichText)
-        self.text.setText(esc)
+        self.text.setText(highlight_urgency(self.alerts[self.idx]))
         remain = len(self.alerts) - self.idx - 1
         self.hint.setText(f"클릭하면 {'다음 알림' if remain else '닫기'} "
                           f"({self.idx + 1}/{len(self.alerts)})")
@@ -194,9 +285,10 @@ def _mark_version_seen(widget) -> None:
 
 
 def show_startup_alerts(widget) -> None:
-    """앱 세션당 한 번만 알림 말풍선을 띄운다. widget = WidgetBase 인스턴스.
+    """앱 세션당 한 번만 알림 포스트잇을 띄운다. widget = WidgetBase 인스턴스.
 
-    첫 실행이면 알림 대신 기능 안내(인트로) 3장을 먼저 보여준다.
+    첫 실행이면 알림 대신 기능 안내(인트로) 3장을 말풍선으로 먼저 보여준다.
+    설정에서 알림을 꺼 두었으면 아무것도 띄우지 않는다.
     """
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance()
@@ -235,22 +327,51 @@ def show_startup_alerts(widget) -> None:
     else:
         _mark_version_seen(widget)
 
-    days = tuple(widget.config.get("alert_days", [3, 1])) or (3, 1)
-    alerts = build_alerts(widget.store, days=days)
+    # 설정에서 알림을 끈 사용자에게는 아무것도 띄우지 않는다
+    if not widget.config.get("alert_enabled", True):
+        return
+
+    from parser import pipeline
+    today = date.today()
+    days_before = widget.config.get("alert_before_days", 3)
+    alerts = build_alerts(widget.store, today, days_before=days_before)
+
+    # ✕로 뗀 알림은 거른다. 전부 뗀 상태면 아무것도 띄우지 않는다 —
+    # "다 봤다"고 표시한 사람에게 '새 알림 없어요'를 다시 들이밀지 않게.
+    if prune_dismissed(widget.config, widget.store, today):
+        pipeline.save_config(widget.base_dir, widget.config)
+    had_any = bool(alerts)
+    alerts = [a for a in alerts if not is_dismissed(a, widget.config)]
+
     # 구 '반절 캘린더' 사용자에게 위젯 개편을 최초 1회만 안내
+    notice = None
     if not widget.config.get("desk_migration_notice_done", True):
-        alerts.insert(0,
+        notice = Alert(
             "🔄 바탕화면 캘린더가 주간·월간 위젯 2개로 바뀌었어요.\n"
             "이제 드래그로 옮기고 모서리를 끌어 크기를 조절할 수 있어요.\n"
             "펭귄 → 위젯 메뉴에서 켜고 끕니다.")
-        from parser import pipeline
+        alerts.insert(0, notice)
         widget.config["desk_migration_notice_done"] = True
         pipeline.save_config(widget.base_dir, widget.config)
+
     if not alerts:
+        if had_any:
+            return          # 있던 알림을 전부 뗐다 — 조용히 넘어간다
         # 알림이 없어도 '켜졌다'는 것은 보이게 — 창이 없는 앱이라
         # 실행됐는지 몰라 헤매는 문제 방지 (2026-07-22 사용자 피드백)
-        alerts = ["COOL-비서가 켜졌어요 — 오늘은 새 알림이 없어요.\n"
-                  "이 펭귄을 누르면 메뉴가 열립니다."]
-    bubble = AlertBubble(alerts, widget)
-    widget._alert_bubble = bubble          # GC 방지
-    bubble.show()
+        alerts = [Alert("COOL-비서가 켜졌어요 — 오늘은 새 알림이 없어요.\n"
+                        "펭귄을 누르면 메뉴가 열립니다.")]
+
+    def remember(alert: Alert) -> None:
+        if mark_dismissed(alert, widget.config):
+            try:
+                pipeline.save_config(widget.base_dir, widget.config)
+            except OSError:
+                pass        # 기록에 실패해도 알림을 떼는 동작은 막지 않는다
+
+    from ui.alert_note import AlertNote
+    note = AlertNote(alerts, widget, today=today, on_dismiss=remember,
+                     on_open=getattr(widget, "open_calendar", None))
+    widget._alert_note = note              # GC 방지
+    note.place()
+    note.show()

@@ -5,8 +5,8 @@ from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from parser.pipeline import (clamp_geometry, desk_conf, drop_monthly,
-                             ensure_planner, load_config, migrate_desk_config,
-                             prune_notes, DEFAULT_CONFIG)
+                             ensure_planner, load_config, migrate_alert_days,
+                             migrate_desk_config, prune_notes, DEFAULT_CONFIG)
 from store.event_store import EventStore
 
 TODAY = date(2026, 7, 20)
@@ -78,6 +78,31 @@ class TestDropMonthly(unittest.TestCase):
     def test_noop_when_absent(self):
         self.assertFalse(drop_monthly({"desk_widgets": {}}))
         self.assertFalse(drop_monthly({}))
+
+
+class TestMigrateAlertDays(unittest.TestCase):
+    def test_old_list_takes_earliest_day(self):
+        config = {"alert_days": [3, 1]}
+        self.assertTrue(migrate_alert_days(config))
+        self.assertEqual(config["alert_before_days"], 3)
+        self.assertTrue(config["alert_enabled"])
+        self.assertNotIn("alert_days", config)
+
+    def test_missing_key_gets_default(self):
+        config = {}
+        self.assertTrue(migrate_alert_days(config))
+        self.assertEqual(config["alert_before_days"], 3)
+
+    def test_noop_when_already_migrated(self):
+        config = {"alert_before_days": 7, "alert_enabled": False}
+        self.assertFalse(migrate_alert_days(config))
+        self.assertEqual(config["alert_before_days"], 7)
+        self.assertFalse(config["alert_enabled"])
+
+    def test_junk_value_falls_back(self):
+        config = {"alert_days": "3일"}
+        self.assertTrue(migrate_alert_days(config))
+        self.assertEqual(config["alert_before_days"], 3)
 
 
 class TestDeskConf(unittest.TestCase):

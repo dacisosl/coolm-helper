@@ -71,7 +71,8 @@ DEFAULT_CONFIG = {
     },
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "animations_enabled": True,     # 화면 전환 애니메이션 (끄면 즉시 표시)
-    "alert_days": [3, 1],           # 마감 며칠 전에 알림할지
+    "alert_enabled": True,          # 마감 알림 포스트잇 (설정에서 끄고 켬)
+    "alert_before_days": 3,         # 마감 며칠 전부터 알릴지 (1~14, 기본 3)
     "auto_archive_days": 90,        # 지난 일정 자동 보관 (0=끔)
     "intro_done": False,            # 첫 실행 기능 안내를 봤는지
     "auto_update_check": True,      # 시작 시 새 버전 확인 (update_url 있을 때만)
@@ -152,6 +153,23 @@ def drop_monthly(config: dict) -> bool:
     return True
 
 
+def migrate_alert_days(config: dict) -> bool:
+    """구 alert_days([3, 1])를 'N일 전부터'(alert_before_days)로 옮긴다. 변경 시 True.
+
+    예전에는 딱 3일 전과 1일 전에만 알렸다. 이제는 사용자가 고른 날부터
+    마감 당일까지 매일 알리므로, 옛 값 중 가장 이른 날(가장 큰 수)을
+    그대로 물려받으면 알림이 사라지는 일 없이 넘어간다.
+    """
+    if "alert_before_days" in config:
+        return False
+    old = config.pop("alert_days", None)
+    days = [int(d) for d in old
+            if isinstance(d, (int, float))] if isinstance(old, list) else []
+    config["alert_before_days"] = max(days) if days else 3
+    config.setdefault("alert_enabled", True)
+    return True
+
+
 def prune_notes(config: dict, existing_ids: set[str]) -> bool:
     """삭제된 일정을 가리키는 포스트잇 항목을 정리한다. 변경 시 True."""
     notes = desk_conf(config, "notes")
@@ -203,6 +221,7 @@ def load_config(base_dir: str) -> dict:
         changed = migrate_desk_config(config)
         changed = ensure_planner(config) or changed
         changed = drop_monthly(config) or changed
+        changed = migrate_alert_days(config) or changed
         if changed:
             save_config(base_dir, config)
         return config

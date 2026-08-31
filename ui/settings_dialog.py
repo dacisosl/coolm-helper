@@ -281,6 +281,44 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         c.addWidget(row)
         lay.addWidget(card)
 
+        card, c = _card("알림",
+                        "프로그램을 켤 때 마감이 다가온 일정을\n"
+                        "노란 포스트잇으로 붙여 줍니다.")
+        self.alert_cb, row = _check(
+            "마감 알림 포스트잇",
+            bool(self.config.get("alert_enabled", True)),
+            "끄면 시작할 때 알림 메모지가 뜨지 않습니다.")
+        c.addWidget(row)
+        days_widget = QWidget()
+        # BASE_QSS의 QWidget 전역 배경(회색 띠)이 카드 안에 비치지 않게.
+        # 선택자를 이 위젯으로 좁힌다 — 범위를 안 좁히면 안에 든 숫자칸의
+        # 테두리까지 같이 지워져 입력칸으로 안 보인다.
+        days_widget.setObjectName("alertdays")
+        days_widget.setStyleSheet(
+            "#alertdays{background:transparent;border:none}")
+        days_row = QHBoxLayout(days_widget)
+        days_row.setContentsMargins(26, 0, 0, 0)   # 체크박스 글자와 줄 맞춤
+        days_row.setSpacing(6)
+        self.alert_days_label = QLabel("마감")
+        days_row.addWidget(self.alert_days_label)
+        self.alert_days_spin = QSpinBox()
+        self.alert_days_spin.setRange(1, 14)
+        self.alert_days_spin.setValue(
+            max(1, min(14, int(self.config.get("alert_before_days", 3) or 3))))
+        self.alert_days_spin.setFixedWidth(64)
+        days_row.addWidget(self.alert_days_spin)
+        self.alert_days_suffix = QLabel("일 전부터 알림")
+        days_row.addWidget(self.alert_days_suffix)
+        days_row.addWidget(_help_dot(
+            "고른 날부터 마감 당일까지 매일 알려 줍니다.\n"
+            "예) 3일 전 → 3일 전·2일 전·1일 전·당일에 알림."))
+        days_row.addStretch()
+        c.addWidget(days_widget)
+        # 알림을 끄면 '며칠 전' 칸은 회색으로 — 눌러도 소용없다는 걸 보이게
+        self.alert_cb.toggled.connect(days_widget.setEnabled)
+        days_widget.setEnabled(self.alert_cb.isChecked())
+        lay.addWidget(card)
+
         card, c = _card("바탕화면 위젯",
                         "체크하면 바로 화면에 나타납니다.\n"
                         "위젯의 🔧으로 크기·투명도·글씨를 조절하고,\n"
@@ -641,7 +679,8 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         self.config["neis_enabled"] = self.neis_cb.isChecked()
         import neis as _neis
         _neis.set_key(self.config, self.neis_key_edit.text())
-        self.config["alert_days"] = [3, 1]   # 알림은 기본값 고정
+        self.config["alert_enabled"] = self.alert_cb.isChecked()
+        self.config["alert_before_days"] = self.alert_days_spin.value()
         self.config["auto_archive_days"] = self.archive_combo.currentData()
         # 바탕화면 위젯은 체크 즉시 반영·저장되므로 여기서는 건드리지 않는다
         try:
