@@ -282,10 +282,10 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         lay.addWidget(card)
 
         card, c = _card("알림",
-                        "프로그램을 켤 때 마감이 다가온 일정을\n"
+                        "프로그램을 켤 때 다가온 일정을\n"
                         "노란 포스트잇으로 붙여 줍니다.")
         self.alert_cb, row = _check(
-            "마감 알림 포스트잇",
+            "일정 알림 포스트잇",
             bool(self.config.get("alert_enabled", True)),
             "끄면 시작할 때 알림 메모지가 뜨지 않습니다.")
         c.addWidget(row)
@@ -299,7 +299,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         days_row = QHBoxLayout(days_widget)
         days_row.setContentsMargins(26, 0, 0, 0)   # 체크박스 글자와 줄 맞춤
         days_row.setSpacing(6)
-        self.alert_days_label = QLabel("마감")
+        self.alert_days_label = QLabel("일정")
         days_row.addWidget(self.alert_days_label)
         self.alert_days_spin = QSpinBox()
         self.alert_days_spin.setRange(1, 14)
@@ -310,8 +310,9 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         self.alert_days_suffix = QLabel("일 전부터 알림")
         days_row.addWidget(self.alert_days_suffix)
         days_row.addWidget(_help_dot(
-            "고른 날부터 마감 당일까지 매일 알려 줍니다.\n"
-            "예) 3일 전 → 3일 전·2일 전·1일 전·당일에 알림."))
+            "고른 날부터 일정 당일까지 매일 알려 줍니다.\n"
+            "예) 3일 전 → 3일 전·2일 전·1일 전·당일에 알림.\n"
+            "'마감'으로 표시한 일정은 ⏰로 강조되어 맨 위에 옵니다."))
         days_row.addStretch()
         c.addWidget(days_widget)
         # 알림을 끄면 '며칠 전' 칸은 회색으로 — 눌러도 소용없다는 걸 보이게
