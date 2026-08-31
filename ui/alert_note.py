@@ -32,14 +32,15 @@ class AlertNote(QWidget):
 
     WIDTH = 272
 
-    def __init__(self, alerts: list[str], anchor: QWidget | None = None,
-                 on_open=None, today: date | None = None):
+    def __init__(self, alerts: list, anchor: QWidget | None = None,
+                 on_open=None, on_dismiss=None, today: date | None = None):
         super().__init__(None, Qt.WindowType.Tool
                          | Qt.WindowType.FramelessWindowHint
                          | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.anchor = anchor
         self.on_open = on_open
+        self.on_dismiss = on_dismiss
         self._drag: QPoint | None = None
         self._popped = False
         bg, border, fg = theme.postit_colors("yellow")
@@ -70,32 +71,53 @@ class AlertNote(QWidget):
         head.addWidget(when)
         head.addStretch()
         close_btn = QPushButton("✕")
-        close_btn.setToolTip("알림 떼기")
+        close_btn.setToolTip("남은 알림 모두 떼기")
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(
             f"QPushButton{{background:transparent;border:none;"
             f"color:{fg};font-size:12px;padding:0 4px}}"
             f"QPushButton:hover{{color:{theme.DANGER}}}")
-        close_btn.clicked.connect(self.dismiss)
+        # 람다로 감싼다 — clicked는 checked(bool)를 넘겨서 그냥 연결하면
+        # dismiss(remember=False)로 불려 기억을 안 하고 닫힌다
+        close_btn.clicked.connect(lambda: self.dismiss())
         head.addWidget(close_btn)
         root.addLayout(head)
 
-        # ── 알림 목록 ────────────────────────────────────────
-        shown = alerts[:MAX_ITEMS]
-        for i, text in enumerate(shown):
-            if i:
-                line = QFrame()
-                line.setFixedHeight(1)
-                line.setStyleSheet(f"background:{border};border:none")
-                root.addWidget(line)
+        # ── 알림 목록 (한 줄씩 따로 뗄 수 있다) ──────────────
+        self._rows: list[tuple] = []        # [(alert, 줄 위젯, 구분선)]
+        for i, alert in enumerate(alerts[:MAX_ITEMS]):
+            line = QFrame()
+            line.setFixedHeight(1)
+            line.setStyleSheet(f"background:{border};border:none")
+            line.setVisible(bool(i))        # 첫 줄 위에는 선을 긋지 않는다
+            root.addWidget(line)
+
+            row = QWidget()
+            row.setObjectName("alertrow")
+            row.setStyleSheet("#alertrow{background:transparent;border:none}")
+            rl = QHBoxLayout(row)
+            rl.setContentsMargins(0, 0, 0, 0)
+            rl.setSpacing(6)
             item = QLabel()
             item.setTextFormat(Qt.TextFormat.RichText)
-            item.setText(highlight_urgency(text))
+            item.setText(highlight_urgency(alert.text))
             item.setWordWrap(True)
             item.setStyleSheet(
                 f"color:{theme.TEXT};font-size:12px;font-weight:bold;"
                 f"background:transparent")
-            root.addWidget(item)
+            rl.addWidget(item, stretch=1)
+            drop = QPushButton("✕")
+            drop.setToolTip("이 알림만 떼기")
+            drop.setCursor(Qt.CursorShape.PointingHandCursor)
+            drop.setFixedWidth(20)
+            drop.setStyleSheet(
+                f"QPushButton{{background:transparent;border:none;"
+                f"color:{border};font-size:11px;padding:0}}"
+                f"QPushButton:hover{{color:{theme.DANGER}}}")
+            drop.clicked.connect(lambda _, a=alert: self.drop_item(a))
+            rl.addWidget(drop, alignment=Qt.AlignmentFlag.AlignTop)
+            root.addWidget(row)
+            self._rows.append((alert, row, line))
         if len(alerts) > MAX_ITEMS:
             more = QLabel(f"… 그리고 {len(alerts) - MAX_ITEMS}건 더")
             more.setStyleSheet(
@@ -153,9 +175,48 @@ class AlertNote(QWidget):
                 pass            # 캘린더가 안 열려도 알림은 조용히 닫힌다
         self.dismiss()
 
-    def dismiss(self) -> None:
+    def drop_item(self, alert) -> None:
+        """줄 하나만 뗀다. 마지막 줄까지 떼면 메모지도 사라진다."""
+        self._remember(alert)
+        for a, row, line in self._rows:
+            if a is alert:
+                row.hide()
+                line.hide()
+                break
+        left = [r for _a, r, _l in self._rows if r.isVisible()]
+        if not left:
+            self.dismiss(remember=False)   # 이미 한 줄씩 기억해 두었다
+            return
+        # 맨 위로 올라온 줄의 구분선은 지운다 (허공에 뜬 선 방지)
+        first = True
+        for _a, row, line in self._rows:
+            if not row.isVisible():
+                continue
+            line.setVisible(not first)
+            first = False
+        # 줄어들 때 아래 모서리를 고정한다 — 펭귄 위에 붙여 둔 메모지가
+        # 위로 달아나지 않고, 사용자가 끌어다 놓은 자리도 흐트러지지 않는다
+        left, bottom = self.x(), self.y() + self.height()
+        self.adjustSize()
+        self.move(clamp_to_screens(
+            QPoint(left, bottom - self.height()), self.size()))
+
+    def dismiss(self, remember: bool = True) -> None:
+        """메모지를 뗀다. 남아 있던 줄은 '봤다'로 기억한다."""
+        if remember:
+            for alert, row, _line in self._rows:
+                if row.isVisible():
+                    self._remember(alert)
         from ui import motion
         motion.fade_out_close(self, ms=120)
+
+    def _remember(self, alert) -> None:
+        if self.on_dismiss is None:
+            return
+        try:
+            self.on_dismiss(alert)
+        except Exception:
+            pass                # 기록 실패가 알림을 못 떼게 만들지 않는다
 
     # ── 드래그 이동 ─────────────────────────────────────────
     def mousePressEvent(self, ev) -> None:

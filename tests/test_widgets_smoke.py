@@ -60,8 +60,10 @@ class TestWidgetSmoke(unittest.TestCase):
         # 시작 시 뜨는 알림 포스트잇 — 말풍선과 같은 유형의 크래시 방지
         from ui.mini_widget import MiniWidget
         from ui.alert_note import AlertNote
+        from ui.alerts import Alert
         anchor = MiniWidget(self.tmp)
-        note = AlertNote(["⏰ 마감 3일 전\n성적 입력", "📋 오늘 일정 2건"],
+        note = AlertNote([Alert("⏰ 마감 3일 전\n성적 입력", "ev:a1", 3),
+                          Alert("📋 오늘 일정 2건", "today:2026-07-20")],
                          anchor, on_open=lambda: None)
         note.place()
         self._show(note)
@@ -70,9 +72,46 @@ class TestWidgetSmoke(unittest.TestCase):
     def test_alert_note_without_anchor(self):
         # 펭귄이 아직 안 떴을 때도 화면 오른쪽 아래에 자리를 잡아야 한다
         from ui.alert_note import AlertNote
-        note = AlertNote([f"⏰ 마감 {i}일 전\n일정 {i}" for i in range(1, 10)])
+        from ui.alerts import Alert
+        note = AlertNote([Alert(f"⏰ 마감 {i}일 전\n일정 {i}", f"ev:{i}", i)
+                          for i in range(1, 10)])
         note.place()
         self._show(note)
+
+    def test_alert_note_drop_item(self):
+        """항목별 ✕ — 뗀 것만 사라지고, 다 떼면 메모지가 닫힌다."""
+        from ui.alert_note import AlertNote
+        from ui.alerts import Alert
+        dropped = []
+        alerts = [Alert("⏰ 마감 1일 전\n성적", "ev:a1", 1),
+                  Alert("📋 오늘 일정 2건", "today:2026-07-20")]
+        note = AlertNote(alerts, on_dismiss=dropped.append)
+        note.place()
+        note.show()
+        _app.processEvents()
+        note.drop_item(alerts[0])
+        self.assertEqual(dropped, [alerts[0]])
+        self.assertFalse(note._rows[0][1].isVisible())
+        self.assertTrue(note._rows[1][1].isVisible())
+        note.drop_item(alerts[1])       # 마지막 줄까지 떼면 닫힌다
+        self.assertEqual(dropped, alerts)
+        _app.processEvents()
+        note.close()
+
+    def test_alert_note_close_remembers_rest(self):
+        """머리글 ✕ — 남아 있던 줄은 전부 '봤다'로 기억한다."""
+        from ui.alert_note import AlertNote
+        from ui.alerts import Alert
+        dropped = []
+        alerts = [Alert("⏰ 마감 1일 전\n성적", "ev:a1", 1),
+                  Alert("⏰ 마감 3일 전\n협의록", "ev:a2", 3)]
+        note = AlertNote(alerts, on_dismiss=dropped.append)
+        note.show()
+        _app.processEvents()
+        note.dismiss()
+        self.assertEqual(dropped, alerts)
+        _app.processEvents()
+        note.close()
 
     def test_all_windows(self):
         from ui.floating_widget import FloatingWidget

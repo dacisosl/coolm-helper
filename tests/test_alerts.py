@@ -4,9 +4,14 @@ from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from store.event_store import EventStore
-from ui.alerts import build_alerts
+from ui.alerts import (Alert, build_alerts, is_dismissed, mark_dismissed,
+                       prune_dismissed)
 
 TODAY = date(2026, 7, 20)
+
+
+def texts(alerts) -> str:
+    return "\n".join(a.text for a in alerts)
 
 
 class TestBuildAlerts(unittest.TestCase):
@@ -23,7 +28,7 @@ class TestBuildAlerts(unittest.TestCase):
         self.store.add("2일 뒤 마감", datetime(2026, 7, 22), is_deadline=True)
         self.store.add("1일 뒤 마감", datetime(2026, 7, 21), is_deadline=True)
         self.store.add("오늘 마감", datetime(2026, 7, 20), is_deadline=True)
-        joined = "\n".join(build_alerts(self.store, TODAY))
+        joined = texts(build_alerts(self.store, TODAY))
         self.assertIn("마감 3일 전", joined)
         self.assertIn("마감 2일 전", joined)
         self.assertIn("마감 1일 전", joined)
@@ -39,7 +44,7 @@ class TestBuildAlerts(unittest.TestCase):
         """사용자가 고른 일수(기본 3 아님)를 그대로 따른다."""
         self.store.add("5일 뒤 마감", datetime(2026, 7, 25), is_deadline=True)
         self.assertEqual(build_alerts(self.store, TODAY), [])
-        joined = "\n".join(build_alerts(self.store, TODAY, days_before=7))
+        joined = texts(build_alerts(self.store, TODAY, days_before=7))
         self.assertIn("마감 5일 전", joined)
 
     def test_urgent_first(self):
@@ -47,8 +52,8 @@ class TestBuildAlerts(unittest.TestCase):
         self.store.add("3일 뒤 마감", datetime(2026, 7, 23), is_deadline=True)
         self.store.add("1일 뒤 마감", datetime(2026, 7, 21), is_deadline=True)
         alerts = build_alerts(self.store, TODAY)
-        self.assertIn("1일 전", alerts[0])
-        self.assertIn("3일 전", alerts[1])
+        self.assertIn("1일 전", alerts[0].text)
+        self.assertIn("3일 전", alerts[1].text)
 
     def test_done_deadline_skipped(self):
         ev = self.store.add("완료된 마감", datetime(2026, 7, 21), is_deadline=True)
@@ -59,17 +64,80 @@ class TestBuildAlerts(unittest.TestCase):
         self.store.add("오늘 일정", datetime(2026, 7, 20, 14), all_day=False)
         self.store.add("오늘 종일", datetime(2026, 7, 20))
         alerts = build_alerts(self.store, TODAY)
-        self.assertTrue(any("오늘 일정 2건" in a for a in alerts))
+        self.assertTrue(any("오늘 일정 2건" in a.text for a in alerts))
 
     def test_order_deadline_first(self):
         self.store.add("오늘 일정", datetime(2026, 7, 20))
         self.store.add("마감", datetime(2026, 7, 21), is_deadline=True)
         alerts = build_alerts(self.store, TODAY)
-        self.assertIn("마감", alerts[0])
-        self.assertIn("오늘", alerts[-1])
+        self.assertIn("마감", alerts[0].text)
+        self.assertIn("오늘", alerts[-1].text)
 
     def test_empty(self):
         self.assertEqual(build_alerts(self.store, TODAY), [])
+
+    def test_deadline_alert_carries_event_key(self):
+        ev = self.store.add("마감", datetime(2026, 7, 21), is_deadline=True)
+        alert = build_alerts(self.store, TODAY)[0]
+        self.assertEqual(alert.key, f"ev:{ev.id}")
+        self.assertEqual(alert.days_left, 1)
+
+
+class TestDismiss(unittest.TestCase):
+    """✕로 뗀 알림 기억하기 — 마감 당일만 예외로 한 번 더 뜬다."""
+
+    def test_dismissed_alert_stays_hidden(self):
+        config = {}
+        alert = Alert("⏰ 마감 3일 전\n성적", key="ev:a1", days_left=3)
+        self.assertFalse(is_dismissed(alert, config))
+        self.assertTrue(mark_dismissed(alert, config))
+        self.assertTrue(is_dismissed(alert, config))
+        # 다음 날 더 급해져도(2일 전) 이미 뗐으므로 조용하다
+        self.assertTrue(is_dismissed(
+            Alert("⏰ 마감 2일 전\n성적", key="ev:a1", days_left=2), config))
+
+    def test_deadline_day_shows_once_more(self):
+        config = {}
+        mark_dismissed(Alert("", key="ev:a1", days_left=3), config)
+        final = Alert("⏰ 오늘 마감\n성적", key="ev:a1", days_left=0)
+        self.assertFalse(is_dismissed(final, config))   # 당일은 예외
+        mark_dismissed(final, config)                   # 당일에 뗐다면
+        self.assertTrue(is_dismissed(final, config))    # 그걸로 끝
+
+    def test_keyless_alert_never_remembered(self):
+        config = {}
+        notice = Alert("COOL-비서가 켜졌어요")
+        self.assertFalse(mark_dismissed(notice, config))
+        self.assertFalse(is_dismissed(notice, config))
+
+    def test_junk_record_treated_as_final(self):
+        config = {"alert_dismissed": {"ev:a1": "셋"}}
+        self.assertTrue(is_dismissed(
+            Alert("", key="ev:a1", days_left=0), config))
+
+
+class TestPruneDismissed(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.store = EventStore(self.tmp, "store")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_deleted_event_record_removed(self):
+        ev = self.store.add("마감", datetime(2026, 7, 21), is_deadline=True)
+        config = {"alert_dismissed": {f"ev:{ev.id}": 1, "ev:없는것": 2}}
+        self.assertTrue(prune_dismissed(config, self.store, TODAY))
+        self.assertEqual(list(config["alert_dismissed"]), [f"ev:{ev.id}"])
+
+    def test_yesterday_today_key_removed(self):
+        config = {"alert_dismissed": {"today:2026-07-19": 0,
+                                      "today:2026-07-20": 0}}
+        self.assertTrue(prune_dismissed(config, self.store, TODAY))
+        self.assertEqual(list(config["alert_dismissed"]), ["today:2026-07-20"])
+
+    def test_noop_when_nothing_to_clean(self):
+        self.assertFalse(prune_dismissed({}, self.store, TODAY))
 
 
 if __name__ == "__main__":
