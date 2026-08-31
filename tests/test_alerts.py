@@ -17,16 +17,38 @@ class TestBuildAlerts(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def test_deadline_3_and_1_days(self):
+    def test_default_3_days_before(self):
+        """기본값: 3일 전부터 마감 당일까지 매일 알린다."""
+        self.store.add("3일 뒤 마감", datetime(2026, 7, 23), is_deadline=True)
+        self.store.add("2일 뒤 마감", datetime(2026, 7, 22), is_deadline=True)
+        self.store.add("1일 뒤 마감", datetime(2026, 7, 21), is_deadline=True)
+        self.store.add("오늘 마감", datetime(2026, 7, 20), is_deadline=True)
+        joined = "\n".join(build_alerts(self.store, TODAY))
+        self.assertIn("마감 3일 전", joined)
+        self.assertIn("마감 2일 전", joined)
+        self.assertIn("마감 1일 전", joined)
+        self.assertIn("오늘 마감", joined)
+
+    def test_beyond_range_and_past_skipped(self):
+        """고른 날보다 먼 마감과 이미 지난 마감은 알리지 않는다."""
+        self.store.add("4일 뒤 마감", datetime(2026, 7, 24), is_deadline=True)
+        self.store.add("지난 마감", datetime(2026, 7, 19), is_deadline=True)
+        self.assertEqual(build_alerts(self.store, TODAY), [])
+
+    def test_days_before_setting(self):
+        """사용자가 고른 일수(기본 3 아님)를 그대로 따른다."""
+        self.store.add("5일 뒤 마감", datetime(2026, 7, 25), is_deadline=True)
+        self.assertEqual(build_alerts(self.store, TODAY), [])
+        joined = "\n".join(build_alerts(self.store, TODAY, days_before=7))
+        self.assertIn("마감 5일 전", joined)
+
+    def test_urgent_first(self):
+        """급한 마감이 위로 온다."""
         self.store.add("3일 뒤 마감", datetime(2026, 7, 23), is_deadline=True)
         self.store.add("1일 뒤 마감", datetime(2026, 7, 21), is_deadline=True)
-        self.store.add("2일 뒤 마감(알림 없음)", datetime(2026, 7, 22),
-                       is_deadline=True)
         alerts = build_alerts(self.store, TODAY)
-        joined = "\n".join(alerts)
-        self.assertIn("마감 3일 전", joined)
-        self.assertIn("마감 1일 전", joined)
-        self.assertNotIn("2일", joined)
+        self.assertIn("1일 전", alerts[0])
+        self.assertIn("3일 전", alerts[1])
 
     def test_done_deadline_skipped(self):
         ev = self.store.add("완료된 마감", datetime(2026, 7, 21), is_deadline=True)

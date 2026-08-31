@@ -56,6 +56,24 @@ class TestWidgetSmoke(unittest.TestCase):
         self._show(AlertBubble(["오늘 일정 3건", "성적 마감 1일 전"], anchor))
         anchor.close()
 
+    def test_alert_note(self):
+        # 시작 시 뜨는 알림 포스트잇 — 말풍선과 같은 유형의 크래시 방지
+        from ui.mini_widget import MiniWidget
+        from ui.alert_note import AlertNote
+        anchor = MiniWidget(self.tmp)
+        note = AlertNote(["⏰ 마감 3일 전\n성적 입력", "📋 오늘 일정 2건"],
+                         anchor, on_open=lambda: None)
+        note.place()
+        self._show(note)
+        anchor.close()
+
+    def test_alert_note_without_anchor(self):
+        # 펭귄이 아직 안 떴을 때도 화면 오른쪽 아래에 자리를 잡아야 한다
+        from ui.alert_note import AlertNote
+        note = AlertNote([f"⏰ 마감 {i}일 전\n일정 {i}" for i in range(1, 10)])
+        note.place()
+        self._show(note)
+
     def test_all_windows(self):
         from ui.floating_widget import FloatingWidget
         from ui.calendar_view import CalendarWindow, EventItemCard
