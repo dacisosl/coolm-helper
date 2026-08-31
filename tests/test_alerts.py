@@ -35,9 +35,40 @@ class TestBuildAlerts(unittest.TestCase):
         self.assertIn("오늘 마감", joined)
 
     def test_beyond_range_and_past_skipped(self):
-        """고른 날보다 먼 마감과 이미 지난 마감은 알리지 않는다."""
+        """고른 날보다 먼 일정과 이미 지난 일정은 알리지 않는다."""
         self.store.add("4일 뒤 마감", datetime(2026, 7, 24), is_deadline=True)
         self.store.add("지난 마감", datetime(2026, 7, 19), is_deadline=True)
+        self.assertEqual(build_alerts(self.store, TODAY), [])
+
+    def test_plain_events_also_alert(self):
+        """마감 표시가 없어도 다가온 일정이면 알린다 (2026-08-31 결정)."""
+        self.store.add("교육청 연수 교안", datetime(2026, 7, 21))
+        self.store.add("모레 회의", datetime(2026, 7, 22))
+        joined = texts(build_alerts(self.store, TODAY))
+        self.assertIn("🗓 내일", joined)
+        self.assertIn("🗓 모레", joined)
+        self.assertIn("교육청 연수 교안", joined)
+
+    def test_deadline_sorts_above_plain(self):
+        """같은 날이라도 마감이 위에 온다 — ⏰로 강조."""
+        self.store.add("그냥 일정", datetime(2026, 7, 20))
+        self.store.add("먼 마감", datetime(2026, 7, 23), is_deadline=True)
+        alerts = build_alerts(self.store, TODAY)
+        self.assertIn("⏰ 마감 3일 전", alerts[0].text)
+        self.assertIn("🗓 오늘", alerts[1].text)
+
+    def test_running_multiday_event_counts_as_today(self):
+        """어제 시작해 내일 끝나는 일정은 '오늘'로 알린다."""
+        self.store.add("전시 주간", datetime(2026, 7, 19),
+                       end=datetime(2026, 7, 21))
+        alerts = build_alerts(self.store, TODAY)
+        self.assertEqual(len(alerts), 1)
+        self.assertIn("🗓 오늘", alerts[0].text)
+        self.assertEqual(alerts[0].days_left, 0)
+
+    def test_done_event_skipped(self):
+        ev = self.store.add("끝낸 일", datetime(2026, 7, 21))
+        self.store.set_done(ev.id, True)
         self.assertEqual(build_alerts(self.store, TODAY), [])
 
     def test_days_before_setting(self):
@@ -60,18 +91,14 @@ class TestBuildAlerts(unittest.TestCase):
         self.store.set_done(ev.id, True)
         self.assertEqual(build_alerts(self.store, TODAY), [])
 
-    def test_today_count(self):
-        self.store.add("오늘 일정", datetime(2026, 7, 20, 14), all_day=False)
+    def test_today_events_listed_one_by_one(self):
+        """오늘 것은 'N건' 요약이 아니라 제목이 보이게 한 줄씩 나온다."""
+        self.store.add("오늘 회의", datetime(2026, 7, 20, 14), all_day=False)
         self.store.add("오늘 종일", datetime(2026, 7, 20))
-        alerts = build_alerts(self.store, TODAY)
-        self.assertTrue(any("오늘 일정 2건" in a.text for a in alerts))
-
-    def test_order_deadline_first(self):
-        self.store.add("오늘 일정", datetime(2026, 7, 20))
-        self.store.add("마감", datetime(2026, 7, 21), is_deadline=True)
-        alerts = build_alerts(self.store, TODAY)
-        self.assertIn("마감", alerts[0].text)
-        self.assertIn("오늘", alerts[-1].text)
+        joined = texts(build_alerts(self.store, TODAY))
+        self.assertIn("오늘 회의", joined)
+        self.assertIn("오늘 종일", joined)
+        self.assertNotIn("2건", joined)
 
     def test_empty(self):
         self.assertEqual(build_alerts(self.store, TODAY), [])
@@ -130,11 +157,11 @@ class TestPruneDismissed(unittest.TestCase):
         self.assertTrue(prune_dismissed(config, self.store, TODAY))
         self.assertEqual(list(config["alert_dismissed"]), [f"ev:{ev.id}"])
 
-    def test_yesterday_today_key_removed(self):
-        config = {"alert_dismissed": {"today:2026-07-19": 0,
-                                      "today:2026-07-20": 0}}
+    def test_stale_summary_key_removed(self):
+        """옛 버전이 남긴 'today:...' 기록도 정리된다."""
+        config = {"alert_dismissed": {"today:2026-07-19": 0}}
         self.assertTrue(prune_dismissed(config, self.store, TODAY))
-        self.assertEqual(list(config["alert_dismissed"]), ["today:2026-07-20"])
+        self.assertEqual(config["alert_dismissed"], {})
 
     def test_noop_when_nothing_to_clean(self):
         self.assertFalse(prune_dismissed({}, self.store, TODAY))

@@ -32,30 +32,44 @@ class Alert:
     days_left: int | None = None
 
 
+def _when_label(days_left: int, is_deadline: bool) -> str:
+    """'⏰ 마감 2일 전' / '🗓 모레' 같은 머리말."""
+    if is_deadline:
+        return "⏰ 오늘 마감" if days_left == 0 else f"⏰ 마감 {days_left}일 전"
+    return "🗓 " + {0: "오늘", 1: "내일", 2: "모레"}.get(
+        days_left, f"{days_left}일 뒤")
+
+
 def build_alerts(store: EventStore, today: date | None = None,
                  days_before: int = 3) -> list[Alert]:
-    """마감 알림(N일 전부터 당일까지) → 오늘 할일 순서로 알림을 만든다.
+    """N일 안으로 다가온 일정을 알림 문구로 만든다 (급한 것부터).
 
-    days_before는 사용자가 설정에서 고른다(기본 3). 예전에는 딱 3일 전·1일 전
-    이틀만 알려서 그 사이에 프로그램을 안 켜면 알림을 통째로 놓쳤다.
-    급한 것(마감이 가까운 것)부터 위로 온다.
+    days_before는 사용자가 설정에서 고른다(기본 3).
+
+    **마감 표시가 없는 일정도 알린다** (2026-08-31 사용자 결정). 처음에는
+    마감(is_deadline)만 대상으로 했는데, 쪽지에서 자동 감지되는 값이라
+    실제 등록된 일정 32건 중 마감 표시가 하나도 없었다 — 알림이 영영 안 뜨는
+    셈이었다. 마감은 ⏰로 강조하고 목록 위쪽에 둬서 구분만 유지한다.
     """
     today = today or date.today()
     days_before = max(0, int(days_before))
-    items: list[Alert] = []
+    rows: list[tuple[int, int, Alert]] = []
     for e in store.all():
-        if e.is_deadline and not e.done:
-            days_left = (e.start_dt.date() - today).days
-            if 0 <= days_left <= days_before:
-                label = "오늘 마감" if days_left == 0 else f"마감 {days_left}일 전"
-                items.append(Alert(f"⏰ {label}\n{e.title}",
-                                   key=f"ev:{e.id}", days_left=days_left))
-    items.sort(key=lambda a: a.days_left)
-    n = len(store.on_date(today))
-    if n:
-        items.append(Alert(f"📋 오늘 일정 {n}건",
-                           key=f"today:{today.isoformat()}"))
-    return items
+        if e.done:
+            continue
+        start_d = e.start_dt.date()
+        end_d = e.end_dt.date() if e.end_dt else start_d
+        if end_d < today:
+            continue                      # 이미 끝난 일정
+        days_left = (start_d - today).days
+        if days_left > days_before:
+            continue                      # 아직 먼 일정
+        days_left = max(0, days_left)     # 여러 날짜리가 진행 중이면 '오늘'
+        alert = Alert(f"{_when_label(days_left, e.is_deadline)}\n{e.title}",
+                      key=f"ev:{e.id}", days_left=days_left)
+        rows.append((0 if e.is_deadline else 1, days_left, alert))
+    rows.sort(key=lambda r: (r[0], r[1]))   # 마감 먼저, 그 안에서 급한 순
+    return [alert for _rank, _days, alert in rows]
 
 
 # ── ✕로 뗀 알림 기억하기 ────────────────────────────────────
@@ -99,18 +113,16 @@ def mark_dismissed(alert: Alert, config: dict) -> bool:
 
 def prune_dismissed(config: dict, store: EventStore,
                     today: date | None = None) -> bool:
-    """사라진 일정·지난 날짜의 기록을 지운다. 변경 시 True.
+    """이제 없는 일정의 기록을 지운다. 변경 시 True.
 
-    안 지우면 config가 뗀 알림 기록으로 계속 불어난다.
+    안 지우면 config가 뗀 알림 기록으로 계속 불어난다. today는 쓰지 않지만
+    호출부(시작 알림)가 날짜를 이미 들고 있어 받아만 둔다.
     """
     marks = _dismissed(config)
     if not marks:
         return False
-    today = today or date.today()
     alive = {f"ev:{e.id}" for e in store.all()}
-    today_key = f"today:{today.isoformat()}"
-    keep = {k: v for k, v in marks.items()
-            if (k in alive) or k == today_key}
+    keep = {k: v for k, v in marks.items() if k in alive}
     if len(keep) == len(marks):
         return False
     config[DISMISS_KEY] = keep
