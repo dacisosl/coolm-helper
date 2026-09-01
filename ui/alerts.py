@@ -22,14 +22,23 @@ from version import APP_VERSION
 
 @dataclass
 class Alert:
-    """알림 한 줄. key가 있으면 ✕로 뗀 사실을 config에 기억한다.
+    """알림 한 줄 = '언제'(when) + '무엇'(title).
 
-    days_left: 마감까지 남은 날 (마감 알림만, 0=오늘 마감). 마감 알림이
-    아니면 None — '오늘 일정 N건'이나 안내 문구가 그렇다.
+    둘을 나눠 두는 이유: 포스트잇에서 '오늘·내일' 같은 때 표시와 일정 제목을
+    **다른 색·크기로** 그려 한눈에 구분되게 하기 위해서다 (2026-09-01 요청).
+
+    key가 있으면 ✕로 뗀 사실을 config에 기억한다.
+    days_left: 그날까지 남은 날 (0=당일). 안내 문구처럼 일정이 아니면 None.
     """
-    text: str
+    when: str
+    title: str = ""
     key: str = ""              # "" = 기억하지 않는다 (안내 문구 등)
     days_left: int | None = None
+
+    @property
+    def text(self) -> str:
+        """한 덩어리 문자열 (기록·테스트용)."""
+        return f"{self.when}\n{self.title}" if self.title else self.when
 
 
 def _when_label(days_left: int, is_deadline: bool) -> str:
@@ -65,7 +74,7 @@ def build_alerts(store: EventStore, today: date | None = None,
         if days_left > days_before:
             continue                      # 아직 먼 일정
         days_left = max(0, days_left)     # 여러 날짜리가 진행 중이면 '오늘'
-        alert = Alert(f"{_when_label(days_left, e.is_deadline)}\n{e.title}",
+        alert = Alert(_when_label(days_left, e.is_deadline), e.title,
                       key=f"ev:{e.id}", days_left=days_left)
         rows.append((0 if e.is_deadline else 1, days_left, alert))
     rows.sort(key=lambda r: (r[0], r[1]))   # 마감 먼저, 그 안에서 급한 순
@@ -334,12 +343,19 @@ def show_startup_alerts(widget) -> None:
                  or _bundled_notes(widget.base_dir))
         _mark_version_seen(widget)      # 못 띄우더라도 기록은 남긴다
         from ui.intro import play_update_intro
-        if play_update_intro(widget.base_dir, APP_VERSION, notes):
+        # 인사가 끝나면 이어서 알림도 띄운다 — 예전에는 여기서 끝내 버려서
+        # 업데이트 직후 첫 실행에는 알림을 아예 못 봤다 (2026-09-01).
+        if play_update_intro(widget.base_dir, APP_VERSION, notes,
+                             on_done=lambda: _show_alert_note(widget)):
             return
     else:
         _mark_version_seen(widget)
 
-    # 설정에서 알림을 끈 사용자에게는 아무것도 띄우지 않는다
+    _show_alert_note(widget)
+
+
+def _show_alert_note(widget) -> None:
+    """다가온 일정을 포스트잇 한 장에 모아 띄운다 (설정에서 끌 수 있다)."""
     if not widget.config.get("alert_enabled", True):
         return
 
@@ -356,13 +372,11 @@ def show_startup_alerts(widget) -> None:
     alerts = [a for a in alerts if not is_dismissed(a, widget.config)]
 
     # 구 '반절 캘린더' 사용자에게 위젯 개편을 최초 1회만 안내
-    notice = None
     if not widget.config.get("desk_migration_notice_done", True):
-        notice = Alert(
+        alerts.insert(0, Alert(
             "🔄 바탕화면 캘린더가 주간·월간 위젯 2개로 바뀌었어요.\n"
             "이제 드래그로 옮기고 모서리를 끌어 크기를 조절할 수 있어요.\n"
-            "펭귄 → 위젯 메뉴에서 켜고 끕니다.")
-        alerts.insert(0, notice)
+            "펭귄 → 위젯 메뉴에서 켜고 끕니다."))
         widget.config["desk_migration_notice_done"] = True
         pipeline.save_config(widget.base_dir, widget.config)
 

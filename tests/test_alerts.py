@@ -103,6 +103,14 @@ class TestBuildAlerts(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(build_alerts(self.store, TODAY), [])
 
+    def test_when_and_title_are_separate(self):
+        """때 표시와 제목이 나뉘어 있어야 포스트잇에서 다르게 꾸밀 수 있다."""
+        self.store.add("교과협의록 제출", datetime(2026, 7, 21))
+        a = build_alerts(self.store, TODAY)[0]
+        self.assertEqual(a.when, "🗓 내일")
+        self.assertEqual(a.title, "교과협의록 제출")
+        self.assertEqual(a.text, "🗓 내일\n교과협의록 제출")
+
     def test_deadline_alert_carries_event_key(self):
         ev = self.store.add("마감", datetime(2026, 7, 21), is_deadline=True)
         alert = build_alerts(self.store, TODAY)[0]
@@ -115,18 +123,18 @@ class TestDismiss(unittest.TestCase):
 
     def test_dismissed_alert_stays_hidden(self):
         config = {}
-        alert = Alert("⏰ 마감 3일 전\n성적", key="ev:a1", days_left=3)
+        alert = Alert("⏰ 마감 3일 전", "성적", key="ev:a1", days_left=3)
         self.assertFalse(is_dismissed(alert, config))
         self.assertTrue(mark_dismissed(alert, config))
         self.assertTrue(is_dismissed(alert, config))
         # 다음 날 더 급해져도(2일 전) 이미 뗐으므로 조용하다
         self.assertTrue(is_dismissed(
-            Alert("⏰ 마감 2일 전\n성적", key="ev:a1", days_left=2), config))
+            Alert("⏰ 마감 2일 전", "성적", key="ev:a1", days_left=2), config))
 
     def test_deadline_day_shows_once_more(self):
         config = {}
         mark_dismissed(Alert("", key="ev:a1", days_left=3), config)
-        final = Alert("⏰ 오늘 마감\n성적", key="ev:a1", days_left=0)
+        final = Alert("⏰ 오늘 마감", "성적", key="ev:a1", days_left=0)
         self.assertFalse(is_dismissed(final, config))   # 당일은 예외
         mark_dismissed(final, config)                   # 당일에 뗐다면
         self.assertTrue(is_dismissed(final, config))    # 그걸로 끝

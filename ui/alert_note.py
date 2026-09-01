@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
 )
@@ -48,6 +48,7 @@ class AlertNote(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(10, 10, 10, 12)    # 그림자 자리
         card = QFrame()
+        self.card = card
         card.setObjectName("alertnote")
         card.setStyleSheet(
             theme.BASE_QSS
@@ -58,11 +59,18 @@ class AlertNote(QWidget):
         outer.addWidget(card)
 
         root = QVBoxLayout(card)
+        self.root = root
         root.setContentsMargins(14, 10, 10, 12)
         root.setSpacing(8)
 
-        # ── 머리글: 오늘 날짜 + 닫기 ─────────────────────────
-        head = QHBoxLayout()
+        # ── 머리글: 오늘 날짜 + 닫기 (여기를 잡으면 옮겨진다) ──
+        head_w = QWidget()
+        head_w.setObjectName("alerthead")
+        head_w.setStyleSheet("#alerthead{background:transparent;border:none}")
+        head_w.setCursor(Qt.CursorShape.SizeAllCursor)   # 잡을 수 있다는 신호
+        head_w.setToolTip("여기를 잡고 끌면 옮길 수 있어요")
+        head = QHBoxLayout(head_w)
+        head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(6)
         d = today or date.today()
         when = QLabel(f"🐧 {d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]}) 알림")
@@ -81,7 +89,7 @@ class AlertNote(QWidget):
         # dismiss(remember=False)로 불려 기억을 안 하고 닫힌다
         close_btn.clicked.connect(lambda: self.dismiss())
         head.addWidget(close_btn)
-        root.addLayout(head)
+        root.addWidget(head_w)
 
         # ── 알림 목록 (한 줄씩 따로 뗄 수 있다) ──────────────
         self._rows: list[tuple] = []        # [(alert, 줄 위젯, 구분선)]
@@ -98,14 +106,33 @@ class AlertNote(QWidget):
             rl = QHBoxLayout(row)
             rl.setContentsMargins(0, 0, 0, 0)
             rl.setSpacing(6)
-            item = QLabel()
-            item.setTextFormat(Qt.TextFormat.RichText)
-            item.setText(highlight_urgency(alert.text))
-            item.setWordWrap(True)
-            item.setStyleSheet(
-                f"color:{theme.TEXT};font-size:12px;font-weight:bold;"
-                f"background:transparent")
-            rl.addWidget(item, stretch=1)
+            # '언제'와 '무엇'을 두 줄로 나눠 다르게 꾸민다 — 때 표시는 작고
+            # 옅은 메모지색, 제목은 크고 진하게. 한 덩어리로 굵게 쓰면
+            # 날짜와 일정이 구분되지 않았다 (2026-09-01 사용자 요청).
+            texts = QVBoxLayout()
+            texts.setContentsMargins(0, 0, 0, 0)
+            texts.setSpacing(1)
+            when_lab = QLabel()
+            when_lab.setTextFormat(Qt.TextFormat.RichText)
+            when_lab.setText(highlight_urgency(alert.when))
+            when_lab.setWordWrap(True)
+            if alert.title:
+                when_lab.setStyleSheet(
+                    f"color:{fg};font-size:10px;font-weight:bold;"
+                    f"background:transparent")
+            else:       # 안내 문구는 때 표시가 아니라 본문이다
+                when_lab.setStyleSheet(
+                    f"color:{theme.TEXT};font-size:12px;"
+                    f"background:transparent")
+            texts.addWidget(when_lab)
+            if alert.title:
+                title_lab = QLabel(alert.title)
+                title_lab.setWordWrap(True)
+                title_lab.setStyleSheet(
+                    f"color:{theme.TEXT};font-size:13px;font-weight:bold;"
+                    f"background:transparent")
+                texts.addWidget(title_lab)
+            rl.addLayout(texts, stretch=1)
             drop = QPushButton("✕")
             drop.setToolTip("이 알림만 떼기")
             drop.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -124,10 +151,12 @@ class AlertNote(QWidget):
                 f"color:{fg};font-size:11px;background:transparent")
             root.addWidget(more)
 
-        # ── 바닥: 캘린더 바로가기 + 안내 ─────────────────────
-        foot = QHBoxLayout()
-        foot.setSpacing(6)
+        # ── 바닥: 캘린더 바로가기 ────────────────────────────
+        # '끌어서 옮기기' 안내 글씨는 뺐다 — 머리글 커서(✥)가 대신 알려준다
+        # (2026-09-01 사용자 요청).
         if on_open is not None:
+            foot = QHBoxLayout()
+            foot.setSpacing(6)
             cal = QPushButton("🗓 캘린더 열기")
             cal.setCursor(Qt.CursorShape.PointingHandCursor)
             cal.setStyleSheet(
@@ -138,12 +167,8 @@ class AlertNote(QWidget):
                 f"color:{theme.SIGNATURE_DARK}}}")
             cal.clicked.connect(self._open_calendar)
             foot.addWidget(cal)
-        foot.addStretch()
-        hint = QLabel("끌어서 옮기기")
-        hint.setStyleSheet(
-            f"color:{theme.SUBTLE};font-size:10px;background:transparent")
-        foot.addWidget(hint)
-        root.addLayout(foot)
+            foot.addStretch()
+            root.addLayout(foot)
 
         self.setFixedWidth(self.WIDTH)
         self.adjustSize()
@@ -173,40 +198,72 @@ class AlertNote(QWidget):
                 self.on_open()
             except Exception:
                 pass            # 캘린더가 안 열려도 알림은 조용히 닫힌다
-        self.dismiss()
+        # remember=False — 캘린더를 열러 간 것은 '알림을 뗀 것'이 아니다.
+        # 여기서 기억해 버리면 일정을 보러 갔다는 이유로 알림이 영영 사라진다.
+        self.dismiss(remember=False)
 
     def drop_item(self, alert) -> None:
-        """줄 하나만 뗀다. 마지막 줄까지 떼면 메모지도 사라진다."""
+        """줄 하나만 뗀다. 마지막 줄까지 떼면 메모지도 사라진다.
+
+        숨기기(hide)가 아니라 레이아웃에서 **빼고 지운다**. 숨기기만 하면
+        반투명 창 + 그림자 조합에서 옛 크기의 그림이 남아 글자가 겹쳐 보였다
+        (2026-09-01 사용자 제보).
+        """
+        found = next(((a, r, l) for a, r, l in self._rows if a is alert), None)
+        if found is None:
+            return                          # 이미 뗀 줄 (중복 클릭)
         self._remember(alert)
-        for a, row, line in self._rows:
-            if a is alert:
-                row.hide()
-                line.hide()
-                break
-        left = [r for _a, r, _l in self._rows if r.isVisible()]
-        if not left:
-            self.dismiss(remember=False)   # 이미 한 줄씩 기억해 두었다
+        self._rows.remove(found)
+        for w in found[1:]:                 # 줄 위젯 + 그 위 구분선
+            self.root.removeWidget(w)       # 레이아웃에서 빼면 자리도 사라진다
+            w.hide()
+            # setParent(None)은 쓰지 않는다 — 잠깐 독립 창이 되어 깜빡일 수 있다.
+            # deleteLater는 이 클릭의 발신 버튼이 안에 있어서 필요하다.
+            w.deleteLater()
+        if not self._rows:
+            self.dismiss(remember=False)    # 이미 한 줄씩 기억해 두었다
             return
-        # 맨 위로 올라온 줄의 구분선은 지운다 (허공에 뜬 선 방지)
-        first = True
-        for _a, row, line in self._rows:
-            if not row.isVisible():
-                continue
-            line.setVisible(not first)
-            first = False
-        # 줄어들 때 아래 모서리를 고정한다 — 펭귄 위에 붙여 둔 메모지가
-        # 위로 달아나지 않고, 사용자가 끌어다 놓은 자리도 흐트러지지 않는다
-        left, bottom = self.x(), self.y() + self.height()
-        self.adjustSize()
-        self.move(clamp_to_screens(
-            QPoint(left, bottom - self.height()), self.size()))
+        self._rows[0][2].hide()             # 맨 위로 올라온 줄의 구분선은 지운다
+        self._resize_to_content()
+
+    def _resize_to_content(self) -> None:
+        """줄을 뺀 뒤 메모지를 다시 재고 그린다.
+
+        아래 모서리를 고정한다 — 펭귄 위에 붙여 둔 메모지가 위로 달아나지
+        않고, 끌어다 놓은 자리도 흐트러지지 않는다.
+        """
+        self._keep_bottom = self.y() + self.height()
+        self.update()                   # 옛 그림을 남기지 않게 한 번 지운다
+        # 크기 조절은 **다음 프레임으로 미룬다**. 줄을 빼자마자 재면 창의
+        # sizeHint가 아직 옛 값이고, 억지로 줄여 놔도 레이아웃이 한 프레임 뒤에
+        # 도로 늘린다. 그 어긋난 한 프레임에 옛 크기의 그림이 남아 글자가
+        # 겹쳐 보였다 (2026-09-01 사용자 제보).
+        QTimer.singleShot(0, self._apply_size)
+
+    def _apply_size(self) -> None:
+        """레이아웃이 정리된 뒤 실제 크기·위치를 맞춘다."""
+        if getattr(self, "_closing", False) or not self._rows:
+            return
+        left = self.x()
+        bottom = getattr(self, "_keep_bottom", self.y() + self.height())
+        self.setMinimumHeight(0)        # 레이아웃이 걸어 둔 옛 최소 높이 풀기
+        self.layout().activate()
+        height = self.sizeHint().height()
+        self.resize(self.width(), height)
+        # 아래 모서리를 고정한다 — 펭귄 위에 붙여 둔 메모지가 위로 달아나지
+        # 않고, 끌어다 놓은 자리도 흐트러지지 않는다
+        self.move(clamp_to_screens(QPoint(left, bottom - height), self.size()))
+        # 그림자(QGraphicsEffect)는 그린 결과를 캐시해서, 창이 줄어도 옛 크기의
+        # 그림이 남는다. 새로 달아 캐시를 버리게 한다.
+        self.card.setGraphicsEffect(theme.make_shadow(self, 2))
+        self.card.update()
+        self.update()
 
     def dismiss(self, remember: bool = True) -> None:
         """메모지를 뗀다. 남아 있던 줄은 '봤다'로 기억한다."""
         if remember:
-            for alert, row, _line in self._rows:
-                if row.isVisible():
-                    self._remember(alert)
+            for alert, _row, _line in self._rows:
+                self._remember(alert)
         from ui import motion
         motion.fade_out_close(self, ms=120)
 
