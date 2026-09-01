@@ -107,6 +107,30 @@ class TestWidgetSmoke(unittest.TestCase):
         _app.processEvents()
         note.close()
 
+    def test_bubble_click_does_not_open_today_widget(self):
+        """안내 말풍선을 넘긴다고 '오늘 할 일' 위젯이 켜지면 안 된다.
+
+        시작 알림이 포스트잇으로 바뀌기 전의 잔재였다 (2026-09-01 제거).
+        """
+        from PyQt6.QtCore import QPoint, QPointF, Qt
+        from PyQt6.QtGui import QMouseEvent
+        from ui.alerts import AlertBubble
+        from ui.mini_widget import MiniWidget
+        from parser.pipeline import desk_conf
+        anchor = MiniWidget(self.tmp)
+        self.assertFalse(desk_conf(anchor.config, "today").get("enabled"))
+        bubble = AlertBubble(["안내 1", "안내 2"], anchor)
+        bubble.show()
+        _app.processEvents()
+        for _ in range(2):          # 두 장 다 넘긴다
+            bubble.mousePressEvent(QMouseEvent(
+                QMouseEvent.Type.MouseButtonPress, QPointF(5, 5),
+                Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier))
+        _app.processEvents()
+        self.assertFalse(desk_conf(anchor.config, "today").get("enabled"))
+        anchor.close()
+
     def test_show_alert_note_end_to_end(self):
         """시작 경로 전체 — 설정을 읽고, 뗀 것을 거르고, 포스트잇을 띄운다."""
         from datetime import timedelta
