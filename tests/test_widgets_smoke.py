@@ -89,10 +89,16 @@ class TestWidgetSmoke(unittest.TestCase):
         note.place()
         note.show()
         _app.processEvents()
+        tall = note.height()
         note.drop_item(alerts[0])
+        for _ in range(3):      # 크기 조절은 다음 프레임에 일어난다
+            _app.processEvents()
         self.assertEqual(dropped, [alerts[0]])
-        self.assertFalse(note._rows[0][1].isVisible())
-        self.assertTrue(note._rows[1][1].isVisible())
+        # 뗀 줄은 레이아웃에서 빠지고, 메모지도 그만큼 줄어든다
+        self.assertEqual([a for a, _r, _l in note._rows], [alerts[1]])
+        self.assertLess(note.height(), tall)
+        note.drop_item(alerts[0])       # 이미 뗀 줄을 또 눌러도 조용하다
+        self.assertEqual(dropped, [alerts[0]])
         note.drop_item(alerts[1])       # 마지막 줄까지 떼면 닫힌다
         self.assertEqual(dropped, alerts)
         _app.processEvents()
