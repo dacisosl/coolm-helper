@@ -62,8 +62,10 @@ class TestWidgetSmoke(unittest.TestCase):
         from ui.alert_note import AlertNote
         from ui.alerts import Alert
         anchor = MiniWidget(self.tmp)
-        note = AlertNote([Alert("⏰ 마감 3일 전\n성적 입력", "ev:a1", 3),
-                          Alert("📋 오늘 일정 2건", "today:2026-07-20")],
+        note = AlertNote([Alert("⏰ 마감 3일 전", "성적 입력",
+                                key="ev:a1", days_left=3),
+                          Alert("🗓 오늘", "교직원 회의",
+                                key="ev:a2", days_left=0)],
                          anchor, on_open=lambda: None)
         note.place()
         self._show(note)
@@ -73,7 +75,8 @@ class TestWidgetSmoke(unittest.TestCase):
         # 펭귄이 아직 안 떴을 때도 화면 오른쪽 아래에 자리를 잡아야 한다
         from ui.alert_note import AlertNote
         from ui.alerts import Alert
-        note = AlertNote([Alert(f"⏰ 마감 {i}일 전\n일정 {i}", f"ev:{i}", i)
+        note = AlertNote([Alert(f"⏰ 마감 {i}일 전", f"일정 {i}",
+                                key=f"ev:{i}", days_left=i)
                           for i in range(1, 10)])
         note.place()
         self._show(note)
@@ -83,8 +86,8 @@ class TestWidgetSmoke(unittest.TestCase):
         from ui.alert_note import AlertNote
         from ui.alerts import Alert
         dropped = []
-        alerts = [Alert("⏰ 마감 1일 전\n성적", "ev:a1", 1),
-                  Alert("📋 오늘 일정 2건", "today:2026-07-20")]
+        alerts = [Alert("⏰ 마감 1일 전", "성적", key="ev:a1", days_left=1),
+                  Alert("🗓 오늘", "교직원 회의", key="ev:a2", days_left=0)]
         note = AlertNote(alerts, on_dismiss=dropped.append)
         note.place()
         note.show()
@@ -104,13 +107,68 @@ class TestWidgetSmoke(unittest.TestCase):
         _app.processEvents()
         note.close()
 
+    def test_show_alert_note_end_to_end(self):
+        """시작 경로 전체 — 설정을 읽고, 뗀 것을 거르고, 포스트잇을 띄운다."""
+        from datetime import timedelta
+        from ui import alerts as alerts_mod
+
+        from PyQt6.QtWidgets import QWidget
+
+        class Stub(QWidget):   # WidgetBase 대신 최소한의 것만 (앵커라 위젯이어야)
+            pass
+
+        w = Stub()
+        w.config = dict(self.conf)
+        w.base_dir = self.tmp
+        w.store = self.store
+        w.open_calendar = lambda: None
+        tomorrow = datetime.combine(date.today() + timedelta(days=1),
+                                    datetime.min.time())
+        ev = self.store.add("내일 마감", tomorrow, is_deadline=True)
+
+        alerts_mod._show_alert_note(w)
+        _app.processEvents()
+        self.assertEqual(len(w._alert_note._rows), 1)
+        self.assertIn("내일 마감", w._alert_note._rows[0][0].title)
+
+        # ✕로 떼면 기록되고, 다음 번에는 뜨지 않는다
+        w._alert_note.drop_item(w._alert_note._rows[0][0])
+        _app.processEvents()
+        self.assertIn(f"ev:{ev.id}", w.config["alert_dismissed"])
+        w._alert_note = None
+        alerts_mod._show_alert_note(w)
+        _app.processEvents()
+        self.assertIsNone(w._alert_note)
+
+        # 설정에서 끄면 아무것도 안 뜬다
+        w.config["alert_dismissed"] = {}
+        w.config["alert_enabled"] = False
+        alerts_mod._show_alert_note(w)
+        self.assertIsNone(w._alert_note)
+
+    def test_alert_note_calendar_does_not_dismiss(self):
+        """'캘린더 열기'는 알림을 뗀 것이 아니다 — 기억하지 않는다."""
+        from ui.alert_note import AlertNote
+        from ui.alerts import Alert
+        dropped, opened = [], []
+        alerts = [Alert("⏰ 마감 1일 전", "성적", key="ev:a1", days_left=1)]
+        note = AlertNote(alerts, on_open=lambda: opened.append(1),
+                         on_dismiss=dropped.append)
+        note.show()
+        _app.processEvents()
+        note._open_calendar()
+        self.assertEqual(opened, [1])
+        self.assertEqual(dropped, [])
+        _app.processEvents()
+        note.close()
+
     def test_alert_note_close_remembers_rest(self):
         """머리글 ✕ — 남아 있던 줄은 전부 '봤다'로 기억한다."""
         from ui.alert_note import AlertNote
         from ui.alerts import Alert
         dropped = []
-        alerts = [Alert("⏰ 마감 1일 전\n성적", "ev:a1", 1),
-                  Alert("⏰ 마감 3일 전\n협의록", "ev:a2", 3)]
+        alerts = [Alert("⏰ 마감 1일 전", "성적", key="ev:a1", days_left=1),
+                  Alert("⏰ 마감 3일 전", "협의록", key="ev:a2", days_left=3)]
         note = AlertNote(alerts, on_dismiss=dropped.append)
         note.show()
         _app.processEvents()
