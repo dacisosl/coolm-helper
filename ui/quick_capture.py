@@ -315,6 +315,20 @@ def confirm_clipboard(owner, cands, msg) -> bool:
     return dlg.exec() == QDialog.DialogCode.Accepted
 
 
+def _hush(owner) -> None:
+    """떠 있는 말풍선("읽는 중…" 등)을 닫는다 — 모달을 띄우기 전에 부른다.
+
+    안 닫으면 사용자가 모달을 취소했을 때 '읽는 중' 말풍선만 덩그러니 남는다.
+    """
+    old = getattr(owner, "_quick_bubble", None)
+    if old is not None:
+        try:
+            old.close()
+        except Exception:
+            pass
+        owner._quick_bubble = None
+
+
 def _say(owner, text: str) -> None:
     """펭귄 옆 말풍선으로 알린다.
 
@@ -323,12 +337,7 @@ def _say(owner, text: str) -> None:
     """
     try:
         from ui.alerts import AlertBubble
-        old = getattr(owner, "_quick_bubble", None)
-        if old is not None:                # "읽는 중…" 등 이전 말풍선 정리
-            try:
-                old.close()
-            except Exception:
-                pass
+        _hush(owner)                       # "읽는 중…" 등 이전 말풍선 정리
         bubble = AlertBubble([text], owner)
         owner._quick_bubble = bubble       # GC 방지
         bubble.show()
@@ -359,6 +368,7 @@ def quick_pin(owner) -> None:
         # 클립보드에서 가져올 때만 내용을 보여주고 물어본다.
         # 날짜를 찾았으면 날짜 선택 모달이 그 확인 역할까지 겸한다
         # (본문 미리보기를 같이 보여줘서 창이 두 번 뜨지 않게).
+        _hush(owner)                      # 모달 뒤에 '읽는 중' 말풍선이 남지 않게
         if cands:
             chosen = ask_dates(owner, cands, msg, text)
             if chosen is None:
@@ -390,6 +400,7 @@ def quick_pin(owner) -> None:
         날짜를 못 찾았으면 예전처럼 묻지 않고 오늘로 바로 등록한다.
         """
         if cands:
+            _hush(owner)                  # 모달 뒤에 '읽는 중' 말풍선이 남지 않게
             chosen = ask_dates(owner, cands, msg)
             if chosen is None:
                 return                    # 취소
