@@ -253,7 +253,7 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
         card, c = _card("기능")
         try:
             import autostart
-            auto_on = autostart.is_enabled()
+            auto_on = autostart.is_enabled(self.base_dir)
         except Exception:       # Windows 밖(테스트 환경 등)
             auto_on = False
         self.autostart_cb, row = _check(

@@ -77,6 +77,15 @@ def main() -> None:
 
     from parser import pipeline
     config = pipeline.load_config(BASE_DIR)
+
+    # 자동 실행 자가 복구 — Run 키가 옛 경로를 가리키거나 작업 관리자에서
+    # '사용 안 함'이 된 상태를 바로잡는다 (autostart.repair 주석 참고).
+    # winreg는 Windows 전용이라 다른 OS에서는 조용히 건너뛴다.
+    try:
+        import autostart
+        autostart.repair(BASE_DIR)
+    except Exception:
+        pass
     from ui import motion
     motion.set_enabled(bool(config.get("animations_enabled", True)))
     style = config.get("widget_style", "mini")
