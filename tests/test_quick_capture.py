@@ -312,6 +312,90 @@ class TestDatePick(unittest.TestCase):
         self.assertIn("오후 3:00", label)
 
 
+class TestDatePickLayout(unittest.TestCase):
+    """날짜 선택 모달 2차 개선 (2026-09-03): 날짜순 · 본문 · 화면 가운데.
+
+    본문에 늦은 날짜가 먼저 나오는 쪽지로, 정렬이 실제로 일어나는지 본다.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        from ui import quick_capture
+        self.qc = quick_capture
+        self.msg = Message(
+            -1, "교무기획부", datetime(2026, 9, 1, 9, 0),
+            "2학기 1회 정기시험 출제 안내",
+            "안녕하세요. 출제 원고는 9월 16일까지 제출해 주세요.\n"
+            "9월 9일 출제 협의회를 진행합니다.\n"
+            "9월 11일 문항 검토가 있습니다.")
+        self.cands = candidates_from_message(self.msg, set())
+
+    def test_options_sorted_by_date(self):
+        opts = self.qc.date_options(self.cands)
+        days = [c.start.date() for c in opts]
+        self.assertEqual(days, sorted(days))
+        # 본문 순서(16→9→11)와 다르게 정렬됐는지 = 정렬이 실제로 일어났나
+        self.assertNotEqual(days, [c.start.date() for c in self.cands])
+        self.assertEqual(days[0], date(2026, 9, 9))
+
+    def test_auto_pick_stays_checked_after_sorting(self):
+        """정렬로 자리가 밀려도 '예전에 자동 등록되던 날짜'가 체크된다."""
+        opts = self.qc.date_options(self.cands)
+        dlg = self.qc.DatePickDialog(opts, default=self.cands[0])
+        self.assertEqual(dlg.chosen(), [self.cands[0]])
+        # 그 후보는 첫 줄이 아니다 (첫 줄만 체크하는 옛 방식이면 실패한다)
+        self.assertNotEqual(opts[0].start, self.cands[0].start)
+
+    def test_context_shows_where_the_date_came_from(self):
+        opts = self.qc.date_options(self.cands)
+        by_day = {c.start.date(): c for c in opts}
+        self.assertIn("협의회", self.qc.source_context(by_day[date(2026, 9, 9)]))
+        self.assertIn("제출", self.qc.source_context(by_day[date(2026, 9, 16)]))
+
+    def test_body_pane_has_full_message(self):
+        from PyQt6.QtWidgets import QTextEdit
+        opts = self.qc.date_options(self.cands)
+        dlg = self.qc.DatePickDialog(opts)
+        views = dlg.findChildren(QTextEdit)
+        self.assertTrue(views)
+        text = views[0].toPlainText()
+        self.assertIn("출제 협의회", text)        # 본문이 그대로 보인다
+        self.assertIn("정기시험 출제 안내", text)  # 제목도 함께
+
+    def test_clicking_date_highlights_it_in_body(self):
+        opts = self.qc.date_options(self.cands)
+        dlg = self.qc.DatePickDialog(opts)
+        self.assertTrue(dlg.show_in_body(0))
+        self.assertIn("9월 9일", dlg.body_view.textCursor().selectedText())
+
+    def test_row_click_toggles_check(self):
+        opts = self.qc.date_options(self.cands)
+        dlg = self.qc.DatePickDialog(opts, default=opts[0])
+        dlg._on_row_clicked(1)
+        self.assertEqual(len(dlg.chosen()), 2)     # 첫 줄 + 방금 누른 줄
+        dlg._on_row_clicked(1)
+        self.assertEqual(dlg.chosen(), [opts[0]])
+
+    def test_opens_at_screen_center(self):
+        from PyQt6.QtWidgets import QApplication
+        opts = self.qc.date_options(self.cands)
+        dlg = self.qc.DatePickDialog(opts)
+        dlg.show()
+        try:
+            g = QApplication.primaryScreen().availableGeometry()
+            center = dlg.geometry().center()
+            # 정확히 한가운데(창 테두리 오차 정도만 허용)
+            self.assertAlmostEqual(center.x(), g.center().x(), delta=40)
+            self.assertAlmostEqual(center.y(), g.center().y(), delta=40)
+        finally:
+            dlg.close()
+
+
 class TestSleepMood(unittest.TestCase):
     """완료한 일은 '남은 할 일'이 아니다 — 다 끝내면 자야 한다."""
 

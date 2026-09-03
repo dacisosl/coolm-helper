@@ -466,8 +466,9 @@ class SettingsDialog(motion.FadeInMixin, QDialog):
                         "일정에 넣을 수 있어요.\n"
                         "학교 이름과 조회 기간만 나이스로 보냅니다.")
         self.neis_cb, row = _check(
-            "펭귄 메뉴에 '학사일정' 넣기",
-            bool(self.config.get("neis_enabled", True)))
+            "펭귄 우클릭 메뉴에 '학사일정' 넣기",
+            bool(self.config.get("neis_enabled", True)),
+            "펭귄을 오른쪽 버튼으로 누르면 나오는 메뉴에 들어갑니다.")
         c.addWidget(row)
         school_row = QHBoxLayout()
         self.neis_school_label = QLabel()

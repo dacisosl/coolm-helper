@@ -171,6 +171,40 @@ class TestPenguinMove(unittest.TestCase):
         self.assertIn("고정", btns[0].toolTip())
         bar.close()
 
+    def test_bar_has_only_three_icons(self):
+        """아이콘 바는 📌 고정 · ✉ 쪽지 목록 · ⚙ 설정 셋뿐 (2026-09-03)."""
+        from PyQt6.QtWidgets import QPushButton
+        self.w.config["neis_enabled"] = True       # 켜져 있어도 바에는 안 는다
+        self.w.config["proof_enabled"] = True
+        bar = _IconBar(self.w)
+        tips = [b.toolTip() for b in bar.findChildren(QPushButton)]
+        self.assertEqual(len(tips), 3)
+        self.assertIn("고정", tips[0])
+        self.assertIn("쪽지 목록", tips[1])
+        self.assertIn("설정", tips[2])
+        joined = " ".join(tips)
+        self.assertNotIn("바로 등록", joined)      # ⚡는 우클릭·더블클릭으로
+        self.assertNotIn("학사일정", joined)
+        bar.close()
+
+    def test_right_click_menu_keeps_moved_features(self):
+        """바에서 뺀 기능은 우클릭 메뉴에 살아 있어야 한다 (기능 유실 방지)."""
+        from PyQt6.QtWidgets import QMenu
+        self.w.config["neis_enabled"] = True
+        self.w.config["proof_enabled"] = True
+        opened = []
+        real = QMenu.exec
+        QMenu.exec = lambda self, *a: (
+            opened.extend(a.text() for a in self.actions()), None)[1]
+        try:
+            self.w.contextMenuEvent(_FakeContext(QPoint(0, 0)))
+        finally:
+            QMenu.exec = real
+        joined = " ".join(opened)
+        self.assertIn("바로 등록", joined)
+        self.assertIn("학사일정", joined)
+        self.assertIn("문구 보정", joined)
+
     def test_bar_flips_when_penguin_is_at_left_edge(self):
         g = _screen()
         self.w.move(g.left(), g.center().y())
@@ -180,6 +214,16 @@ class TestPenguinMove(unittest.TestCase):
         self.assertGreaterEqual(bar.x(), g.left())
         self.assertLessEqual(bar.x() + bar.width(), g.right() + 1)
         bar.close()
+
+
+class _FakeContext:
+    """contextMenuEvent에 넘길 가짜 이벤트 — 우클릭 좌표만 있으면 된다."""
+
+    def __init__(self, glob: QPoint):
+        self._g = glob
+
+    def globalPos(self):
+        return self._g
 
 
 class _FakePress:

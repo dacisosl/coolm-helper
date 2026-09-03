@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """미니 위젯 — 바탕화면 어디에나 놓는 펭귄.
 
-펭귄 클릭 → 세로 아이콘 바(📌 고정 / ⚡ 바로등록 / … / ⚙ 설정).
+펭귄 클릭 → 세로 아이콘 바(📌 고정 / ✉ 쪽지 목록 / ⚙ 설정).
 바깥을 클릭하면 자동으로 접힌다.
+그 밖의 기능(⚡ 바로 등록·학사일정·문구 보정)은 우클릭 메뉴에 있다
+(2026-09-03 사용자 요청 — 아이콘 바는 자주 쓰는 셋만).
 
 이동 규칙 (2026-08-25 사용자 요청):
 - 예전엔 오른쪽 벽에 붙은 채 위아래로만 움직였다 → **어디로든 자유롭게** 이동.
@@ -44,22 +46,19 @@ class _IconBar(QWidget):
         lay.setContentsMargins(6, 8, 6, 8)
         lay.setSpacing(4)
 
+        # 아이콘은 셋만 — 📌 고정 / ✉ 쪽지 목록 / ⚙ 설정 (2026-09-03 사용자 요청).
+        # ⚡ 바로 등록·학사일정·문구 보정은 펭귄 우클릭 메뉴로 옮겼다
+        # (⚡는 펭귄 더블클릭이 여전히 가장 빠른 길이다).
         locked = owner.is_locked()
-        buttons = [("pin",
-                    "위치 고정 해제 — 다시 끌어서 옮길 수 있어요" if locked
-                    else "위치 고정 — 펭귄이 지금 자리에서 움직이지 않아요",
-                    owner.toggle_lock)]
-        buttons.append(("bolt", "바로 등록 — 지금 보고 있는 쪽지를 즉시 등록 "
-                        "(펭귄 더블클릭으로도 열려요)", owner.open_quick))
-        buttons.append(("mail", "쪽지 목록 — 최근 쪽지에서 일정 고르기",
-                        owner.open_review))
-        # 캘린더·할일은 v0.11.0부터 바탕화면 위젯으로 이동 (관리는 설정에서)
-        if owner.config.get("neis_enabled", True):
-            buttons.append(("school", "학사일정 — 나이스에서 우리 학교 일정 가져오기",
-                            owner.open_neis))
-        if owner.config.get("proof_enabled"):
-            buttons.append(("chat", "문구 보정 (공개용 글)", owner.open_proof))
-        buttons.append(("gear", "설정", owner.open_settings))
+        buttons = [
+            ("pin",
+             "위치 고정 해제 — 다시 끌어서 옮길 수 있어요" if locked
+             else "위치 고정 — 펭귄이 지금 자리에서 움직이지 않아요",
+             owner.toggle_lock),
+            ("mail", "쪽지 목록 — 최근 쪽지에서 일정 고르기", owner.open_review),
+            # 캘린더·할일은 v0.11.0부터 바탕화면 위젯으로 이동 (관리는 설정에서)
+            ("gear", "설정", owner.open_settings),
+        ]
 
         # 메뉴 크기: 설정 → 일반 → 펭귄 위젯에서 보통(100)/크게(135) 선택
         from PyQt6.QtCore import QSize
@@ -248,7 +247,8 @@ class MiniWidget(WidgetBase):
         move = "이동: 📌 고정 중 (메뉴에서 해제)" if self.is_locked() \
             else "드래그: 이동 (다른 모니터로도)"
         self.penguin.setToolTip(
-            f"{head}클릭: 메뉴 / 더블클릭: 바로 등록 / {move} / 우클릭: 옵션")
+            f"{head}클릭: 메뉴(고정·쪽지·설정) / 더블클릭: ⚡ 바로 등록 / "
+            f"{move} / 우클릭: 학사일정·옵션")
 
     # ── 마우스: 클릭=메뉴, 드래그=자유 이동, 우클릭=옵션 ──────
     def mousePressEvent(self, ev):
@@ -316,6 +316,13 @@ class MiniWidget(WidgetBase):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
         menu.setStyleSheet(theme.BASE_QSS)
+        # 아이콘 바에서 뺀 기능들이 여기 있다 (2026-09-03)
+        act_quick = menu.addAction("⚡ 바로 등록 (펭귄 더블클릭)")
+        act_neis = menu.addAction("🏫 학사일정 가져오기") \
+            if self.config.get("neis_enabled", True) else None
+        act_proof = menu.addAction("✏ 문구 보정 (공개용 글)") \
+            if self.config.get("proof_enabled") else None
+        menu.addSeparator()
         act_tray = menu.addAction("트레이로 보내기 (펭귄 숨기기)")
         act_detail = menu.addAction("상세 위젯으로 전환")
         # 투명도 — 고르면 바로 반영된다
@@ -333,6 +340,15 @@ class MiniWidget(WidgetBase):
         chosen = menu.exec(ev.globalPos())
         if chosen == act_diag:
             self._show_capture_diagnosis()
+            return
+        if chosen is not None and chosen == act_quick:
+            self.open_quick()
+            return
+        if act_neis is not None and chosen == act_neis:
+            self.open_neis()
+            return
+        if act_proof is not None and chosen == act_proof:
+            self.open_proof()
             return
         if chosen in opacity_acts:
             self._set_opacity(opacity_acts[chosen])

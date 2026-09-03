@@ -172,6 +172,13 @@ def extract_events(text: str, base: datetime) -> list[ParsedEvent]:
             if i in used_times:
                 continue
             if dend <= ts <= dend + TIME_ATTACH_WINDOW:
+                # 사이에 다른 날짜가 끼어 있으면 그 시간은 뒷 날짜의 것이다.
+                # (2026-09-03) "9월 16일까지 제출 / 9월 9일 오후 3시 협의회"에서
+                # 30자 창이 줄을 넘어가 9월 16일에 오후 3시가 붙던 버그.
+                # 줄바꿈만으로 자르지 않는 이유: "일시: 9월 9일 / 시간: 오후 3시"
+                # 처럼 줄을 나눠 적는 안내문이 흔하다.
+                if any(dend <= ds < ts for ds, _e, _d in dates):
+                    continue
                 gap = ts - dend
                 if best is None or gap < best[0]:
                     best = (gap, i, h, mi)

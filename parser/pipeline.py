@@ -28,6 +28,10 @@ class Candidate:
     title_spans: list[PiiSpan] = field(default_factory=list)
     body_spans: list[PiiSpan] = field(default_factory=list)
     source_text: str = ""
+    # 날짜가 적혀 있던 자리 — "제목 + \n + 본문" 기준 (시작, 끝).
+    # 날짜 선택 모달에서 그 날짜가 나온 대목을 그대로 보여주는 데 쓴다.
+    # date_parser.normalize는 길이를 보존하므로 원문에 그대로 대입해도 된다.
+    source_span: tuple[int, int] | None = None
 
 
 DEFAULT_CONFIG = {
@@ -297,6 +301,7 @@ def candidates_from_message(msg: Message, roster: set[str],
             masked_title=prefix + masked,
             title_spans=title_spans, body_spans=body_spans,
             source_text=ev.source_text,
+            source_span=ev.spans[0] if ev.spans else None,
         ))
     return out
 
