@@ -15,9 +15,10 @@ import threading
 from datetime import timedelta
 
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
+from PyQt6.QtGui import QColor, QTextCursor
 from PyQt6.QtWidgets import (
-    QApplication, QCheckBox, QDialog, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QVBoxLayout,
+    QApplication, QCheckBox, QDialog, QFrame, QHBoxLayout, QLabel,
+    QPushButton, QScrollArea, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from ui import theme
@@ -63,6 +64,10 @@ def date_options(cands) -> list:
 
     파서는 같은 날짜를 문장마다 다시 잡아낼 수 있는데, 사용자에게는
     똑같아 보이는 줄이 여러 개면 고르기만 어려워진다.
+
+    개수를 자를 때는 **본문에 먼저 나온 순서**로 자르고(맨 앞 후보 =
+    예전에 자동으로 쓰이던 날짜라 항상 남는다), 보여줄 때는 **날짜순**으로
+    정렬한다 (2026-09-03 사용자 요청 — 뒤죽박죽이면 고르기 어렵다).
     """
     seen, out = set(), []
     for c in cands:
@@ -73,11 +78,15 @@ def date_options(cands) -> list:
         out.append(c)
         if len(out) >= MAX_DATE_OPTIONS:
             break
-    return out
+    return sorted(out, key=lambda c: (c.start, not c.all_day))
 
 
 def option_label(c) -> str:
-    """선택지 한 줄: '8/7(금) 오후 2:30 · 방학식' 형태."""
+    """선택지의 날짜 한 줄: '8/7(금) 오후 2:30' / '9/16(수) 하루 종일 · 마감'.
+
+    제목은 넣지 않는다 — 어느 날짜든 제목이 같아서(쪽지 제목) 줄만 길어지고
+    구분에 도움이 안 됐다. 무슨 일정인지는 옆의 본문 대목으로 판단한다.
+    """
     from ui.review_dialog import kr_date
     when = kr_date(c.start)
     if not c.all_day:
@@ -86,9 +95,53 @@ def option_label(c) -> str:
         h12 = h % 12 or 12
         when += f" {ampm} {h12}:{m:02d}"
     else:
-        when += " (하루 종일)"
-    title = (c.suggested_title or "").strip()
-    return f"{when} · {title}" if title else when
+        when += " 하루 종일"
+    return when + " · 마감" if c.is_deadline else when
+
+
+def source_text_of(c) -> str:
+    """후보를 뽑아낸 원문 — 파서가 본 것과 같은 '제목 + 줄바꿈 + 본문'.
+
+    \\r을 공백으로 바꾼다(길이는 그대로) — 화면에 그릴 때 위치가 한 칸씩
+    밀리면 아래 source_span 하이라이트가 엉뚱한 글자를 짚는다.
+    """
+    msg = getattr(c, "message", None)
+    if msg is None:
+        return ""
+    text = f"{getattr(msg, 'title', '') or ''}\n{getattr(msg, 'body', '') or ''}"
+    return text.replace("\r", " ")
+
+
+def source_context(c, width: int = 46) -> str:
+    """그 날짜가 적혀 있던 대목을 한 줄로 뽑는다 ('…9월 16일까지 제출…').
+
+    날짜만 봐서는 어떤 일정인지 모른다는 지적(2026-09-03)에 따라,
+    선택지마다 본문의 그 자리를 같이 보여주기 위한 것.
+    """
+    text = source_text_of(c)
+    span = getattr(c, "source_span", None)
+    if not text:
+        return ""
+    if span is None:                       # 위치를 모르면 원문 조각으로 찾는다
+        frag = (getattr(c, "source_text", "") or "").strip()
+        i = text.find(frag) if frag else -1
+        if i < 0:
+            return ""
+        span = (i, i + len(frag))
+    s, e = span
+    if not (0 <= s < e <= len(text)):
+        return ""
+    # 같은 줄 안에서만 앞뒤로 넓힌다 — 줄을 넘어가면 다른 문단이 섞인다
+    left = text.rfind("\n", 0, s) + 1
+    right = text.find("\n", e)
+    if right < 0:
+        right = len(text)
+    pad = max(0, (width - (e - s)) // 2)
+    a, b = max(left, s - pad), min(right, e + pad)
+    snippet = " ".join(text[a:b].split())
+    if not snippet:
+        return ""
+    return ("…" if a > left else "") + snippet + ("…" if b < right else "")
 
 
 def _add_event(owner, cand, msg, matched: bool):
@@ -138,6 +191,17 @@ def _register_and_pin(owner, cands, msg, matched: bool, chosen=None) -> int:
     return len(ids)
 
 
+class _OptionRow(QFrame):
+    """날짜 선택지 한 줄 — 글자 아무 데나 눌러도 체크가 토글된다."""
+
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(ev)
+
+
 class DatePickDialog(QDialog):
     """본문에서 날짜를 찾았을 때 '어느 날짜로 등록할까요?'를 묻는다.
 
@@ -145,19 +209,25 @@ class DatePickDialog(QDialog):
     아닐 때가 있어서, 알아서 넣기 전에 한 번 확인받는다.
     - 여러 개 체크하면 그 날짜마다 하나씩 등록된다.
     - 아무것도 체크하지 않으면 오늘 날짜로 등록된다.
-    첫 번째(예전에 자동으로 쓰이던) 날짜는 미리 체크해 둔다 — 그대로
-    엔터를 치면 지금까지와 똑같이 동작한다.
+
+    화면 구성 (2026-09-03 2차 요청):
+    - 왼쪽: 날짜순으로 정렬된 선택지. 날짜 밑에 그 날짜가 나온 본문 대목.
+    - 오른쪽: 쪽지 내용 그대로 — 읽어 보고 결정할 수 있게.
+    - 날짜를 누르면 오른쪽 본문에서 그 자리로 스크롤되며 노랗게 표시된다.
+    미리 체크되는 것은 '예전에 자동으로 등록되던 그 날짜'다(날짜순으로는
+    가운데일 수 있다) — 그대로 [등록하기]를 누르면 지금까지와 똑같이 된다.
     """
 
-    PREVIEW_CHARS = 400
+    BODY_CHARS = 8000          # 아주 긴 쪽지는 잘라서 창이 무거워지지 않게
 
-    def __init__(self, options: list, body: str = "", parent=None):
+    def __init__(self, options: list, body: str = "", parent=None,
+                 default=None):
         super().__init__(parent)
         self.setWindowTitle("날짜 선택")
         self.setStyleSheet(theme.BASE_QSS)
-        self.setMinimumWidth(420)
         self.checks: list[QCheckBox] = []
         self._options = list(options)
+        self._rows: list[_OptionRow] = []
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 18, 20, 16)
@@ -169,35 +239,17 @@ class DatePickDialog(QDialog):
             f"font-size:{theme.FONT_LG}px;font-weight:bold;color:{theme.TEXT}")
         lay.addWidget(head)
 
-        sub = QLabel("쪽지에서 찾은 날짜예요. 여러 개 고르면 각각 등록돼요.")
+        sub = QLabel("쪽지에서 찾은 날짜예요. 여러 개 고르면 각각 등록돼요. "
+                     "날짜를 누르면 오른쪽 쪽지에서 그 자리를 보여줘요.")
         sub.setWordWrap(True)
         sub.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
         lay.addWidget(sub)
 
-        for i, c in enumerate(self._options):
-            cb = QCheckBox(option_label(c))
-            cb.setChecked(i == 0)          # 예전 자동 선택값을 기본으로
-            cb.setCursor(Qt.CursorShape.PointingHandCursor)
-            cb.setStyleSheet(
-                f"QCheckBox{{font-size:{theme.FONT_MD}px;color:{theme.TEXT};"
-                f"padding:6px 8px;border-radius:{theme.RADIUS_SM}px}}"
-                f"QCheckBox:hover{{background:{theme.CARD_TINT}}}")
-            self.checks.append(cb)
-            lay.addWidget(cb)
-
-        if body:
-            text = body.strip()
-            if len(text) > self.PREVIEW_CHARS:
-                text = text[:self.PREVIEW_CHARS] + " …"
-            view = QTextEdit()
-            view.setPlainText(text)
-            view.setReadOnly(True)
-            view.setFixedHeight(110)
-            view.setStyleSheet(
-                f"QTextEdit{{background:{theme.CARD_TINT};border:1px solid "
-                f"{theme.BORDER_SUBTLE};border-radius:{theme.RADIUS_MD}px;"
-                f"padding:8px;font-size:{theme.FONT_SM}px;color:{theme.TEXT}}}")
-            lay.addWidget(view)
+        cols = QHBoxLayout()
+        cols.setSpacing(14)
+        cols.addWidget(self._date_column(default), stretch=0)
+        cols.addWidget(self._body_column(body), stretch=1)
+        lay.addLayout(cols, stretch=1)
 
         hint = QLabel("아무것도 고르지 않으면 오늘 날짜로 등록해요.")
         hint.setWordWrap(True)
@@ -219,9 +271,162 @@ class DatePickDialog(QDialog):
         row.addWidget(ok)
         lay.addLayout(row)
 
+        self.resize(820, 460)
+
+    # ── 왼쪽: 날짜 선택지 ────────────────────────────────────
+    def _date_column(self, default) -> QWidget:
+        """날짜순 선택지 목록. 개수가 많아도 창이 커지지 않게 스크롤."""
+        holder = QWidget()
+        holder.setFixedWidth(330)
+        col = QVBoxLayout(holder)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(6)
+        col.addWidget(_column_title("날짜 (빠른 순서)"))
+
+        inner = QWidget()
+        rows = QVBoxLayout(inner)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(4)
+        for i, c in enumerate(self._options):
+            row = _OptionRow()
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.setStyleSheet(
+                f"_OptionRow{{background:{theme.CARD_TINT};border:1px solid "
+                f"{theme.BORDER_SUBTLE};border-radius:{theme.RADIUS_MD}px}}"
+                f"_OptionRow:hover{{background:{theme.PRIMARY_LIGHT}}}")
+            box = QVBoxLayout(row)
+            box.setContentsMargins(8, 6, 8, 6)
+            box.setSpacing(2)
+            cb = QCheckBox(option_label(c))
+            # 예전에 자동 등록되던 날짜를 기본으로 — 날짜순 정렬 뒤에도
+            # 그 후보를 그대로 따라간다(첫 줄이 아닐 수 있다)
+            cb.setChecked(c is default if default is not None else i == 0)
+            cb.setCursor(Qt.CursorShape.PointingHandCursor)
+            cb.setStyleSheet(
+                f"QCheckBox{{font-size:{theme.FONT_MD}px;color:{theme.TEXT};"
+                f"font-weight:bold;background:transparent}}")
+            box.addWidget(cb)
+            ctx = source_context(c)
+            if ctx:
+                note = QLabel(ctx)
+                note.setWordWrap(True)
+                note.setStyleSheet(
+                    f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;"
+                    f"background:transparent")
+                box.addWidget(note)
+            row.clicked.connect(
+                lambda _i=i: self._on_row_clicked(_i))
+            self.checks.append(cb)
+            self._rows.append(row)
+            rows.addWidget(row)
+        rows.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidget(inner)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea{background:transparent}"
+                             "QScrollArea>QWidget>QWidget{background:transparent}")
+        col.addWidget(scroll, stretch=1)
+        return holder
+
+    def _on_row_clicked(self, i: int) -> None:
+        """줄을 누르면 체크를 토글하고, 오른쪽 본문에서 그 자리를 보여준다."""
+        cb = self.checks[i]
+        cb.setChecked(not cb.isChecked())
+        self.show_in_body(i)
+
+    # ── 오른쪽: 쪽지 내용 그대로 ─────────────────────────────
+    def _body_column(self, body: str) -> QWidget:
+        holder = QWidget()
+        col = QVBoxLayout(holder)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(6)
+        col.addWidget(_column_title("쪽지 내용"))
+
+        # 후보가 들고 있는 원문(제목+본문)을 그대로 — 파서가 본 것과 같은
+        # 글자수라야 source_span으로 짚는 자리가 어긋나지 않는다
+        text = ""
+        if self._options:
+            text = source_text_of(self._options[0])
+        if not text:
+            text = (body or "").replace("\r", " ")
+        self._body_text = text[:self.BODY_CHARS]
+
+        view = QTextEdit()
+        view.setPlainText(self._body_text)
+        view.setReadOnly(True)
+        view.setStyleSheet(
+            f"QTextEdit{{background:{theme.CARD_TINT};border:1px solid "
+            f"{theme.BORDER_SUBTLE};border-radius:{theme.RADIUS_MD}px;"
+            f"padding:10px;font-size:{theme.FONT_MD}px;color:{theme.TEXT}}}")
+        self.body_view = view
+        col.addWidget(view, stretch=1)
+        return holder
+
+    def show_in_body(self, i: int) -> bool:
+        """i번째 날짜가 적힌 자리로 스크롤하고 노랗게 표시한다."""
+        view = getattr(self, "body_view", None)
+        if view is None or not (0 <= i < len(self._options)):
+            return False
+        span = getattr(self._options[i], "source_span", None)
+        if span is None:
+            return False
+        s, e = span
+        if not (0 <= s < e <= len(self._body_text)):
+            return False        # 아주 긴 쪽지라 잘려 나간 뒤쪽 날짜
+        cursor = view.textCursor()
+        cursor.setPosition(s)
+        cursor.setPosition(e, QTextCursor.MoveMode.KeepAnchor)
+        view.setTextCursor(cursor)
+        view.ensureCursorVisible()
+        sel = QTextEdit.ExtraSelection()
+        sel.cursor = cursor
+        sel.format.setBackground(QColor(theme.SIGNATURE_SOFT))
+        view.setExtraSelections([sel])
+        return True
+
     def chosen(self) -> list:
         """체크된 날짜 후보들. 아무것도 안 골랐으면 빈 리스트(=오늘)."""
         return [c for c, cb in zip(self._options, self.checks) if cb.isChecked()]
+
+    # ── 뜨는 자리: 바탕화면 한가운데 ─────────────────────────
+    def showEvent(self, ev):
+        """펭귄 옆이 아니라 화면 가운데에 띄운다 (2026-09-03 사용자 요청).
+
+        펭귄은 보통 화면 가장자리에 있어서, 그 옆에 뜨면 창이 구석에 붙어
+        본문을 읽기 불편했다.
+        """
+        super().showEvent(ev)
+        self._center_on_screen()
+        self.raise_()
+        self.activateWindow()
+        for i, cb in enumerate(self.checks):      # 미리 체크된 자리를 보여준다
+            if cb.isChecked() and self.show_in_body(i):
+                break
+
+    def _center_on_screen(self) -> None:
+        scr = None
+        parent = self.parent()
+        if parent is not None:
+            try:
+                from ui.widget_base import screen_at
+                scr = screen_at(parent.frameGeometry().center())
+            except Exception:
+                scr = None
+        scr = scr or self.screen() or QApplication.primaryScreen()
+        if scr is None:
+            return
+        g = scr.availableGeometry()
+        self.move(g.center().x() - self.width() // 2,
+                  g.center().y() - self.height() // 2)
+
+
+def _column_title(text: str) -> QLabel:
+    lab = QLabel(text)
+    lab.setStyleSheet(
+        f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px;font-weight:bold")
+    return lab
 
 
 def ask_dates(owner, cands, msg, body: str = ""):
@@ -229,7 +434,9 @@ def ask_dates(owner, cands, msg, body: str = ""):
     options = date_options(cands)
     if not options:
         return []                          # 찾은 날짜가 없으면 물을 것도 없다
-    dlg = DatePickDialog(options, body, owner)
+    # cands[0] = 이 기능이 생기기 전 자동으로 등록되던 날짜 → 기본 체크
+    default = cands[0] if cands else None
+    dlg = DatePickDialog(options, body, owner, default=default)
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return None
     return dlg.chosen()

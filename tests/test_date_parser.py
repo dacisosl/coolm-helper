@@ -80,6 +80,25 @@ class TestRangeAndDeadline(unittest.TestCase):
         evs = extract_events("7월 21일 회의. 다시 안내: 7월 21일 회의", BASE)
         self.assertEqual(len(evs), 1)
 
+    def test_time_belongs_to_its_own_date(self):
+        """뒷 날짜의 시간을 앞 날짜가 가져가지 않는다 (2026-09-03).
+
+        "7월 21일까지 제출 / 7월 15일 오후 3시 협의회"에서 30자 창이 줄을
+        넘어가 21일에 오후 3시가 붙던 버그.
+        """
+        evs = extract_events(
+            "원고는 7월 21일까지 제출해 주세요.\n7월 15일 오후 3시 협의회입니다.",
+            BASE)
+        by_day = {e.start.date().day: e for e in evs}
+        self.assertTrue(by_day[21].all_day)          # 마감일엔 시간이 없다
+        self.assertEqual(by_day[21].start.hour, 0)
+        self.assertEqual(by_day[15].start.hour, 15)  # 시간은 제 날짜에
+
+    def test_time_on_next_line_still_attaches(self):
+        """줄이 나뉘어도 사이에 다른 날짜가 없으면 그 날짜의 시간이다."""
+        evs = extract_events("일시: 7월 21일\n시간: 오후 3시", BASE)
+        self.assertEqual(evs[0].start.hour, 15)
+
 
 class TestHelpers(unittest.TestCase):
     def test_normalize_fullwidth(self):
