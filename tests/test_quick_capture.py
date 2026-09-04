@@ -381,6 +381,36 @@ class TestDatePickLayout(unittest.TestCase):
         dlg._on_row_clicked(1)
         self.assertEqual(dlg.chosen(), [opts[0]])
 
+    def _duplicate_title_msg(self):
+        """제목이 본문 줄과 똑같은 쪽지 — 부재중 쪽지가 이렇게 온다 (2026-09-04)."""
+        line = "빈칸 작성하셔서 다음주 화요일까지 보내주세요~!"
+        msg = Message(-1, "교무기획부", datetime(2026, 9, 4, 9, 0), line,
+                      "\n" + line)
+        return msg, candidates_from_message(msg, set())
+
+    def test_display_text_drops_duplicated_title(self):
+        msg, cands = self._duplicate_title_msg()
+        text, to_body = self.qc.display_text(cands[0])
+        self.assertEqual(text.count("빈칸 작성하셔서"), 1)      # 한 번만
+        # 제목에 있던 위치가 본문의 같은 문장으로 옮겨진다
+        title_pos = msg.title.index("다음주")
+        self.assertEqual(text[to_body(title_pos):to_body(title_pos) + 3], "다음주")
+
+    def test_display_text_keeps_distinct_title(self):
+        text, to_body = self.qc.display_text(self.cands[0])
+        self.assertIn("정기시험 출제 안내", text)                 # 제목 그대로
+        self.assertEqual(to_body(7), 7)                           # 위치도 그대로
+
+    def test_body_pane_shows_duplicated_line_once(self):
+        from PyQt6.QtWidgets import QTextEdit
+        msg, cands = self._duplicate_title_msg()
+        dlg = self.qc.DatePickDialog(self.qc.date_options(cands))
+        text = dlg.findChildren(QTextEdit)[0].toPlainText()
+        self.assertEqual(text.count("빈칸 작성하셔서"), 1)
+        # 제목에서 찾은 날짜라도 본문 쪽에 하이라이트가 남아야 한다
+        self.assertTrue(dlg.show_in_body(0))
+        self.assertIn("화요일", dlg.body_view.textCursor().selectedText())
+
     def test_opens_at_screen_center(self):
         from PyQt6.QtWidgets import QApplication
         opts = self.qc.date_options(self.cands)
