@@ -413,6 +413,40 @@ def _describe_element(el, type_names: dict) -> str:
     return " ".join(parts) + rect + (f" [{','.join(pats)}]" if pats else "") + hidden
 
 
+LVM_GETITEMCOUNT = 0x1004      # SysListView32 항목 수 (포인터 없이 안전)
+HDM_GETITEMCOUNT = 0x1200      # SysHeader32 열 수
+
+
+def _classic_controls(kids: dict[str, list[int]]) -> list[str]:
+    """표준 부품의 글자·크기를 WM_GETTEXT/LVM 메시지로 읽어 요약한다 (읽기 전용)."""
+    out: list[str] = []
+    user32 = ctypes.windll.user32
+    for cls, hs in kids.items():
+        up = cls.upper()
+        if up in ("BUTTON", "STATIC", "EDIT") or up.startswith("RICHEDIT"):
+            texts = []
+            for h in hs[:60]:
+                t = _gettext(h, 120).replace("\n", " ").strip()
+                vis = user32.IsWindowVisible(h)
+                if t:
+                    texts.append(f"'{t}'" + ("" if vis else "(숨김)"))
+            if texts:
+                out.append(f"  {cls} 글자: " + ", ".join(texts))
+        elif up == "SYSLISTVIEW32":
+            for h in hs:
+                n = user32.SendMessageW(h, LVM_GETITEMCOUNT, 0, 0)
+                r = wintypes.RECT()
+                user32.GetWindowRect(h, ctypes.byref(r))
+                out.append(f"  목록(SysListView32) hwnd={h}: 항목 {n}개, "
+                           f"위치 ({r.left},{r.top},{r.right},{r.bottom}), "
+                           f"{'보임' if user32.IsWindowVisible(h) else '숨김'}")
+        elif up == "SYSHEADER32":
+            for h in hs:
+                n = user32.SendMessageW(h, HDM_GETITEMCOUNT, 0, 0)
+                out.append(f"  목록 머리(SysHeader32) hwnd={h}: 열 {n}개")
+    return out
+
+
 def dump_ui_tree(max_depth: int = 40, max_nodes: int = 6000) -> str:
     """쿨메신저 창들의 UI 자동화(접근성) 트리를 글로 뽑는다 — 읽기 전용.
 
@@ -451,6 +485,11 @@ def dump_ui_tree(max_depth: int = 40, max_nodes: int = 6000) -> str:
         kids = _children_by_class(hwnd)
         lines.append("자식 창 클래스: " + (", ".join(
             f"{c}×{len(h)}" for c, h in kids.items()) or "없음"))
+        # 표준 윈도우 부품(버튼·글상자·목록)은 UIA 없이도 글자를 읽을 수 있다.
+        # 2026-09-04 사용자 진단에서 쿨메신저 쪽지 창이 Button×35·SysListView32×2
+        # 같은 표준 부품으로 돼 있음을 확인 — '회신' 버튼 이름과 목록 크기를
+        # 여기서 바로 본다 (UIA가 놓치는 경우의 보험).
+        lines.extend(_classic_controls(kids))
         try:
             root = _uia.iuia.ElementFromHandle(hwnd)
         except Exception as e:
