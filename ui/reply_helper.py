@@ -12,7 +12,9 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+import threading
+
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit,
     QVBoxLayout,
@@ -74,7 +76,7 @@ class SourceMessageDialog(QDialog):
 
     BODY_CHARS = 8000
 
-    def __init__(self, event, msg, spans, near=None):
+    def __init__(self, event, msg, spans, near=None, reason: str = ""):
         super().__init__(None)
         self.setWindowFlags(Qt.WindowType.Dialog
                             | Qt.WindowType.WindowStaysOnTopHint)
@@ -91,7 +93,8 @@ class SourceMessageDialog(QDialog):
 
         if msg is not None:
             head_text = f"{sender_name(msg.sender)} 선생님이 보낸 쪽지"
-            sub_text = "이 일정은 아래 쪽지에서 등록됐어요."
+            sub_text = ("쿨메신저에서 이 쪽지를 자동으로 열지 못해 여기에 보여드려요. "
+                        "이 일정은 아래 쪽지에서 등록됐어요.")
             when = kr_date(msg.received) + msg.received.strftime(" %H:%M")
             chip_text = f"📌 {when}    {(msg.title or '').strip()}"
             body_html = highlight_html((msg.body or "")[:self.BODY_CHARS], spans)
@@ -139,7 +142,8 @@ class SourceMessageDialog(QDialog):
         hint.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
         lay.addWidget(hint)
 
-        self.status = QLabel("")
+        self.status = QLabel(reason or "")
+        self.status.setWordWrap(True)
         self.status.setStyleSheet(
             f"color:{theme.PRIMARY_DARK};font-size:{theme.FONT_SM}px")
         lay.addWidget(self.status)
@@ -210,8 +214,39 @@ class SourceMessageDialog(QDialog):
                   g.center().y() - self.height() // 2)
 
 
+class _Opener(QObject):
+    """쿨메신저 관리함에서 쪽지 열기 — 몇 초 걸릴 수 있어 백그라운드에서."""
+    done = pyqtSignal(bool, str)
+
+    def __init__(self, msg, parent=None):
+        super().__init__(parent)
+        self.msg = msg
+
+    def start(self) -> None:
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self) -> None:
+        try:
+            import coolm_control
+            ok, why = coolm_control.open_message(self.msg)
+        except Exception as e:
+            ok, why = False, str(e)
+        self.done.emit(bool(ok), why or "")
+
+
+def _show_fallback(note, msg, spans, near, reason: str) -> None:
+    dlg = SourceMessageDialog(note.event, msg, spans, near=near, reason=reason)
+    note._source_dlg = dlg                 # GC 방지
+    dlg.exec()
+
+
 def open_source_message(note) -> None:
-    """포스트잇(PostItWidget)에서 부른다 — 원본을 찾아 창을 띄운다."""
+    """포스트잇(PostItWidget)에서 부른다.
+
+    원본 쪽지를 찾으면 **쿨메신저 관리함에서 그 쪽지를 열어 준다**(2026-09-08
+    사용자 결정 — 거기서 '메시지 회신'을 직접 누른다). 못 열면(쿨메신저 꺼짐,
+    목록에 없음 등) 이유와 함께 원본 내용을 보여주는 대체 창을 띄운다.
+    """
     app = QApplication.instance()
     if app is not None:
         app.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -225,6 +260,23 @@ def open_source_message(note) -> None:
         near = note.frameGeometry().center()
     except Exception:
         pass
-    dlg = SourceMessageDialog(note.event, msg, spans, near=near)
-    note._source_dlg = dlg                 # GC 방지
-    dlg.exec()
+    note._source_result = None
+    if msg is None:
+        note._source_result = (False, "")
+        _show_fallback(note, msg, spans, near, "")
+        return
+
+    if app is not None:
+        app.setOverrideCursor(Qt.CursorShape.WaitCursor)
+    opener = _Opener(msg, parent=note)
+
+    def _finish(ok: bool, why: str) -> None:
+        if app is not None:
+            app.restoreOverrideCursor()
+        note._source_result = (ok, why)
+        if not ok:
+            _show_fallback(note, msg, spans, near, why)
+
+    opener.done.connect(_finish)
+    note._source_opener = opener           # GC 방지
+    opener.start()

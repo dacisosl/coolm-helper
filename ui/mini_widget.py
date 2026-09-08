@@ -312,7 +312,7 @@ class MiniWidget(WidgetBase):
         box.setStyleSheet(theme.BASE_QSS)
         box.exec()
 
-    def _dump_ui_structure(self) -> None:
+    def _dump_ui_structure(self, dump_fn=None) -> None:
         """쿨메신저 화면 구조(UI 트리)를 파일로 저장 — '제출 → 실제 쪽지 열기' 준비.
 
         몇 초 걸릴 수 있어 백그라운드에서 읽고, 끝나면 저장 위치를 알려준다.
@@ -322,20 +322,30 @@ class MiniWidget(WidgetBase):
         import threading
         from PyQt6.QtCore import QTimer
         from PyQt6.QtWidgets import QMessageBox
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout
         path = os.path.join(self.base_dir, "coolm_ui_dump.txt")
-        wait = QMessageBox(self)
+        # 버튼 없는 QMessageBox는 close()가 무시돼 팝업이 안 닫혔다(2026-09-08 사용자
+        # 보고) — Qt가 "닫기 버튼이 없으니 닫을 수 없다"고 본다. 평범한 QDialog로.
+        wait = QDialog(self)
         wait.setWindowTitle("쿨메신저 화면 구조 진단")
-        wait.setText("쿨메신저 화면을 읽는 중이에요… 몇 초 걸릴 수 있어요.\n"
-                     "(쿨메신저에서 쪽지 하나를 열어 둔 상태면 더 좋아요)")
-        wait.setStandardButtons(QMessageBox.StandardButton.NoButton)
         wait.setStyleSheet(theme.BASE_QSS)
+        wlay = QVBoxLayout(wait)
+        wlay.setContentsMargins(24, 18, 24, 18)
+        wlab = QLabel("쿨메신저 화면을 읽는 중이에요… 몇 초 걸릴 수 있어요.\n"
+                      "(쿨메신저에서 쪽지 하나를 열어 둔 상태면 더 좋아요)")
+        wlab.setStyleSheet(f"font-size:{theme.FONT_MD}px;color:{theme.TEXT}")
+        wlay.addWidget(wlab)
         wait.show()
+        self._diag_wait = wait                  # 테스트·닫힘 확인용
         result: dict = {}
 
         def work():
             try:
-                import capture
-                result["text"] = capture.dump_ui_tree()
+                if dump_fn is not None:
+                    result["text"] = dump_fn()
+                else:
+                    import capture
+                    result["text"] = capture.dump_ui_tree()
             except Exception as e:
                 result["text"] = f"진단 실행 실패: {e}"
 
@@ -346,7 +356,8 @@ class MiniWidget(WidgetBase):
             if t.is_alive():
                 QTimer.singleShot(200, poll)
                 return
-            wait.close()
+            wait.hide()
+            wait.deleteLater()
             text = result.get("text", "")
             try:
                 with open(path, "w", encoding="utf-8") as f:
