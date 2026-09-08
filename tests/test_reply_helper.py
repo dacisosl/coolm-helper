@@ -121,8 +121,13 @@ class TestDialog(unittest.TestCase):
         except Exception as e:                       # 리눅스에서 import 자체가 안 되면
             self.skipTest(f"capture import 불가: {e}")
         self.assertFalse(capture.bring_to_front())
-        # 화면 구조 진단도 리눅스에서는 안내 문구만 돌려주고 죽지 않는다
-        self.assertIn("윈도우에서만", capture.dump_ui_tree())
+        # 화면 구조 진단도 죽지 않고 안내 문구를 돌려준다. 문구는 환경에 따라
+        # 다르다 — 리눅스는 "윈도우에서만", 쿨메신저 없는 윈도우(빌드 서버)는
+        # "쿨메신저 프로세스를 찾지 못했어요". 둘 중 하나면 정상이다.
+        text = capture.dump_ui_tree()
+        self.assertTrue(
+            "윈도우에서만" in text or "쿨메신저 프로세스를 찾지 못했어요" in text,
+            f"예상 못한 진단 결과: {text[:120]}")
 
 
 if __name__ == "__main__":
