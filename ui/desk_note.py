@@ -24,7 +24,7 @@ from ui.desk_base import DeskWidgetBase
 class PostItWidget(DeskWidgetBase):
     """노란 메모지 한 장. conf는 config["desk_widgets"]["notes"]의 한 항목."""
 
-    MIN_W, MIN_H = 140, 110       # 명함만 하게도 줄일 수 있게
+    MIN_W, MIN_H = 140, 130       # 명함만 하게도 줄일 수 있게 ('제출' 줄 포함)
     OFF_LABEL = "포스트잇 내리기 (일정은 그대로)"
 
     def __init__(self, store: EventStore, config: dict, base_dir: str,
@@ -79,9 +79,37 @@ class PostItWidget(DeskWidgetBase):
         self.memo_edit.textChanged.connect(self._on_memo_changed)
         root.addWidget(self.memo_edit, stretch=1)
 
+        # 오른쪽 아래 '제출' — 이 일정이 나온 원본 쪽지(누가 보냈는지)를 되찾아
+        # 보여준다 (2026-09-04 사용자 요청, 회신 도우미). 크기 조절 손잡이
+        # (오른쪽 아래 28×28)와 겹치지 않게 오른쪽을 비워 둔다.
+        foot = QHBoxLayout()
+        foot.setContentsMargins(0, 0, 0, 0)
+        foot.addStretch()
+        self.submit_btn = self._make_submit_button()
+        foot.addWidget(self.submit_btn)
+        foot.addSpacing(22)
+        root.addLayout(foot)
+
         self._apply_color()
         self._apply_font()
         self._update_when()
+
+    # ── 제출: 원본 쪽지 보기 ─────────────────────────────────
+    def _make_submit_button(self) -> QPushButton:
+        from PyQt6.QtCore import QSize
+        from ui.icons import icon
+        b = QPushButton(" 제출")
+        b.setIcon(icon("mail", 12))
+        b.setIconSize(QSize(12, 12))
+        b.setFixedHeight(20)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setToolTip("원본 쪽지 보기 — 누가 보낸 쪽지인지 확인하고 회신하러 가요")
+        b.clicked.connect(self._open_source)
+        return b
+
+    def _open_source(self) -> None:
+        from ui.reply_helper import open_source_message
+        open_source_message(self)
 
     # ── 메모지 색 (편집 모드에서 고름) ───────────────────────
     def color_key(self) -> str:
@@ -180,6 +208,12 @@ class PostItWidget(DeskWidgetBase):
         self.memo_edit.setStyleSheet(
             f"QTextEdit{{background:transparent;border:none;padding:0;"
             f"font-size:{fpx(12)}px;color:{theme.TEXT}}}")
+        self.submit_btn.setStyleSheet(
+            f"QPushButton{{background:transparent;border:1px solid {theme.BORDER};"
+            f"border-radius:{theme.RADIUS_SM}px;padding:0 8px;"
+            f"font-size:{fpx(10)}px;color:{fg}}}"
+            f"QPushButton:hover{{background:{theme.PRIMARY_LIGHT}}}"
+            f"QPushButton:pressed{{background:{theme.LIGHT_PRESSED}}}")
 
     def _on_memo_changed(self) -> None:
         # setPlainText(프로그램 갱신)에도 이 시그널이 오므로 값 비교로 거른다

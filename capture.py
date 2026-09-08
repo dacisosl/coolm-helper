@@ -7,6 +7,8 @@
   UIA TextPattern으로 읽는다 (~30ms). 창 전체를 UIA로 순회하면 3초가
   걸리므로 절대 전체 순회하지 않는다.
 키 입력 시뮬레이션·클립보드 조작 없음. 쿨메신저 상태를 바꾸지 않는다.
+유일한 예외는 사용자가 직접 누른 '쿨메신저 창 앞으로'(bring_to_front) —
+창에 포커스만 주고 내용·목록은 건드리지 않는다 (2026-09-04).
 """
 from __future__ import annotations
 
@@ -152,6 +154,28 @@ def _cool_pid() -> int | None:
 
     user32.EnumWindows(cb2, 0)
     return cands[0] if cands else None
+
+
+def bring_to_front() -> bool:
+    """쿨메신저 창을 앞으로 올린다(포커스만). 없거나 실패하면 False.
+
+    포스트잇 '제출' → 원본 쪽지 창의 [쿨메신저 창 앞으로]에서만 부른다.
+    최소화돼 있으면 복원한다. 비Windows·쿨메신저 미실행은 조용히 False.
+    """
+    try:
+        pid = _cool_pid()
+        if not pid:
+            return False
+        wins = _cool_windows(pid)
+        if not wins:
+            return False
+        user32 = ctypes.windll.user32
+        hwnd = wins[0]
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+        return bool(user32.SetForegroundWindow(hwnd))
+    except Exception:
+        return False
 
 
 def _cool_windows(pid: int) -> list[int]:
