@@ -306,6 +306,21 @@ def candidates_from_message(msg: Message, roster: set[str],
     return out
 
 
+SCREEN_SENDER = "(화면에서 가져옴)"   # DB와 매칭 안 된 화면·클립보드 캡처의 가짜 발신자
+
+
+def real_sender(msg) -> str:
+    """일정에 저장할 만한 보낸 사람 이름 — 없거나 자리표시자면 빈 문자열.
+
+    화면에서 읽은 쪽지가 DB와 매칭되지 않으면 sender가 '(화면에서 가져옴)'이다.
+    그걸 이름으로 저장하면 '제출'이 조직도에서 엉뚱한 걸 찾는다 (2026-09-08).
+    """
+    name = (getattr(msg, "sender", "") or "").strip()
+    if not name or name.startswith("("):
+        return ""
+    return name
+
+
 def _normalize_for_match(s: str) -> str:
     return "".join(s.split())
 
@@ -406,7 +421,7 @@ def quick_candidates(base_dir: str, title: str, body: str
     # DB에서 못 찾은 경우: 언제 받은 쪽지인지 알 수 없다. 지금 시각을 기준으로
     # 읽되 지난 날짜도 살리고(오래된 쪽지를 이제 열어볼 수 있으니),
     # '6월 5일'이 내년으로 밀린 경우엔 올해로 당겨 준다.
-    msg = Message(key=-1, sender="(화면에서 가져옴)", received=datetime.now(),
+    msg = Message(key=-1, sender=SCREEN_SENDER, received=datetime.now(),
                   title=title or body.splitlines()[0][:40], body=body)
     cands = candidates_from_message(msg, roster, allow_past=True)
     return [_pull_back_year(c, msg.received) for c in cands], msg, False

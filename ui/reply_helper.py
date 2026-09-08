@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
-"""포스트잇 '제출' 버튼 — 그 일정이 나온 원본 쪽지를 되찾아 보여준다.
+"""포스트잇 '제출' 버튼 — 그 쪽지를 보낸 사람에게 **쪽지 쓰기**를 열어 준다.
+
+(2026-09-08 사용자 재설계) 관리함에서 옛 쪽지를 찾는 방식은 목록에 없는
+쪽지가 많아 자주 실패했다. 이제는 일정에 저장해 둔 **보낸 사람 이름**으로
+쿨메신저 조직도에서 그 사람을 찾아 새 쪽지 창을 연다 — DB도, 관리함 목록도
+필요 없으니 아무리 오래된 포스트잇도 동작한다.
+이름이 저장돼 있지 않은 옛 포스트잇은 한 번 물어보고(NameAskDialog) 기억한다.
+
 
 (2026-09-04 사용자 요청) 회신하러 갈 때 "누가 보낸 쪽지였지?"를 바로 확인하는
 회신 도우미. 쿨메신저를 자동 조작하지는 않는다 — 보낸 사람 이름을 복사해
@@ -16,8 +23,8 @@ import threading
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication, QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit,
-    QVBoxLayout,
+    QApplication, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QTextEdit, QVBoxLayout,
 )
 
 from ui import theme
@@ -161,6 +168,13 @@ class SourceMessageDialog(QDialog):
         self.front_btn.setStyleSheet(theme.TEXT_BTN)
         self.front_btn.clicked.connect(self.bring_coolm_front)
         row.addWidget(self.front_btn)
+        self.find_btn = QPushButton("관리함에서 이 쪽지 찾기")
+        self.find_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.find_btn.setStyleSheet(theme.TEXT_BTN)
+        self.find_btn.setEnabled(msg is not None)
+        self.find_btn.setToolTip("쿨메신저 메시지 관리함에서 이 쪽지를 찾아 열어 봐요")
+        self.find_btn.clicked.connect(self.find_in_manager)
+        row.addWidget(self.find_btn)
         row.addStretch()
         close = QPushButton("닫기")
         close.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -180,6 +194,22 @@ class SourceMessageDialog(QDialog):
         if cb is not None:
             cb.setText(name)
         self.status.setText(f"복사했어요: {name} — 쿨메신저 받는 사람 칸에 붙여 넣으세요.")
+
+    def find_in_manager(self) -> None:
+        """예전 방식 — 관리함 목록에서 이 쪽지를 찾아 연다 (되면 가장 정확하다)."""
+        if self.msg is None:
+            return
+        ok = False
+        why = ""
+        try:
+            import coolm_control
+            ok, why = coolm_control.open_message(self.msg)
+        except Exception as e:
+            why = str(e)
+        if ok:
+            self.accept()
+        else:
+            self.status.setText(why or "관리함에서 찾지 못했어요.")
 
     def bring_coolm_front(self) -> None:
         ok = False
@@ -214,13 +244,112 @@ class SourceMessageDialog(QDialog):
                   g.center().y() - self.height() // 2)
 
 
-class _Opener(QObject):
-    """쿨메신저 관리함에서 쪽지 열기 — 몇 초 걸릴 수 있어 백그라운드에서."""
-    done = pyqtSignal(bool, str)
+class NameAskDialog(QDialog):
+    """보낸 사람이 저장돼 있지 않은 옛 포스트잇 — 이름을 한 번 물어본다.
 
-    def __init__(self, msg, parent=None):
+    (2026-09-08 사용자 결정) 적은 이름으로 바로 쪽지 쓰기를 실행하고,
+    그 이름을 일정에 저장해 다음부터는 묻지 않는다.
+    """
+
+    def __init__(self, event, guess: str = "", parent=None):
+        super().__init__(None)
+        self.setWindowFlags(Qt.WindowType.Dialog
+                            | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowTitle("누구에게 쪽지를 보낼까요?")
+        self.setStyleSheet(theme.BASE_QSS)
+        self.setMinimumWidth(420)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 16)
+        lay.setSpacing(10)
+
+        head = QLabel("누구에게 쪽지를 보낼까요?")
+        head.setStyleSheet(
+            f"font-size:{theme.FONT_LG}px;font-weight:bold;color:{theme.TEXT}")
+        lay.addWidget(head)
+
+        sub = QLabel("이 포스트잇에는 보낸 사람이 저장돼 있지 않아요.\n"
+                     "쿨메신저 조직도에 있는 이름을 적어 주세요. "
+                     "한 번 적으면 이 포스트잇이 기억해요.")
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"color:{theme.SUBTLE};font-size:{theme.FONT_SM}px")
+        lay.addWidget(sub)
+
+        chip = QLabel(f"📌 {(getattr(event, 'title', '') or '').strip()}")
+        chip.setWordWrap(True)
+        chip.setStyleSheet(
+            f"background:{theme.PRIMARY_LIGHT};color:{theme.PRIMARY_DARK};"
+            f"border-radius:{theme.RADIUS_MD}px;padding:8px 10px;"
+            f"font-size:{theme.FONT_MD}px;font-weight:bold")
+        lay.addWidget(chip)
+
+        self.edit = QLineEdit(sender_name(guess))
+        self.edit.setPlaceholderText("예: 정주은")
+        self.edit.setStyleSheet(
+            f"QLineEdit{{background:{theme.CARD};border:1px solid "
+            f"{theme.BORDER};border-radius:{theme.RADIUS_MD}px;padding:8px 10px;"
+            f"font-size:{theme.FONT_MD}px;color:{theme.TEXT}}}")
+        self.edit.returnPressed.connect(self._ok)
+        lay.addWidget(self.edit)
+
+        row = QHBoxLayout()
+        row.addStretch()
+        cancel = QPushButton("취소")
+        cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel.setStyleSheet(theme.TEXT_BTN)
+        cancel.clicked.connect(self.reject)
+        row.addWidget(cancel)
+        ok = QPushButton("쪽지 쓰기")
+        ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        ok.setStyleSheet(theme.PRIMARY_BTN)
+        ok.setDefault(True)
+        ok.clicked.connect(self._ok)
+        row.addWidget(ok)
+        lay.addLayout(row)
+
+    def _ok(self) -> None:
+        if self.name():
+            self.accept()
+
+    def name(self) -> str:
+        return sender_name(self.edit.text())
+
+
+class InfoDialog(QDialog):
+    """사람은 찾았지만 쪽지 창이 안 뜬 경우의 짧은 안내."""
+
+    def __init__(self, text: str):
+        super().__init__(None)
+        self.setWindowFlags(Qt.WindowType.Dialog
+                            | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowTitle("쪽지 쓰기")
+        self.setStyleSheet(theme.BASE_QSS)
+        self.setMinimumWidth(380)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 16)
+        lay.setSpacing(12)
+        lab = QLabel(text)
+        lab.setWordWrap(True)
+        lab.setStyleSheet(f"font-size:{theme.FONT_MD}px;color:{theme.TEXT}")
+        lay.addWidget(lab)
+        row = QHBoxLayout()
+        row.addStretch()
+        ok = QPushButton("확인")
+        ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        ok.setStyleSheet(theme.PRIMARY_BTN)
+        ok.setDefault(True)
+        ok.clicked.connect(self.accept)
+        row.addWidget(ok)
+        lay.addLayout(row)
+
+
+class _Opener(QObject):
+    """조직도에서 사람을 찾아 쪽지 쓰기 — 몇 초 걸릴 수 있어 백그라운드에서."""
+    done = pyqtSignal(str, str)          # (상태, 안내문)
+
+    def __init__(self, name: str, parent=None):
         super().__init__(parent)
-        self.msg = msg
+        self.name = name
 
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True).start()
@@ -228,54 +357,90 @@ class _Opener(QObject):
     def _run(self) -> None:
         try:
             import coolm_control
-            ok, why = coolm_control.open_message(self.msg)
+            state, why = coolm_control.compose_to(self.name)
         except Exception as e:
-            ok, why = False, str(e)
-        self.done.emit(bool(ok), why or "")
+            state, why = "failed", str(e)
+        self.done.emit(state, why or "")
 
 
-def _show_fallback(note, msg, spans, near, reason: str) -> None:
+def remembered_sender(note) -> str:
+    """이 포스트잇이 기억하는 보낸 사람. 없으면 쪽지함에서 찾아 기억한다."""
+    name = (getattr(note.event, "sender", "") or "").strip()
+    if name:
+        return name
+    msg, _spans = find_source_message(note.base_dir, note.config, note.event)
+    if msg is None:
+        return ""
+    name = (msg.sender or "").strip()
+    if name:
+        _remember(note, name)
+    return name
+
+
+def _remember(note, name: str) -> None:
+    """찾은(또는 사용자가 적은) 이름을 일정에 저장 — 다음부터 바로 열린다."""
+    try:
+        note.store.update(note.event.id, sender=name)
+        note.event.sender = name
+    except Exception:
+        pass
+
+
+def _show_fallback(note, reason: str) -> None:
+    """실패했을 때만 — 원본 쪽지 내용을 보여주는 대체 창."""
+    msg, spans = find_source_message(note.base_dir, note.config, note.event)
+    near = None
+    try:
+        near = note.frameGeometry().center()
+    except Exception:
+        pass
     dlg = SourceMessageDialog(note.event, msg, spans, near=near, reason=reason)
     note._source_dlg = dlg                 # GC 방지
     dlg.exec()
 
 
 def open_source_message(note) -> None:
-    """포스트잇(PostItWidget)에서 부른다.
+    """포스트잇 '제출' — 보낸 사람에게 쪽지 쓰기를 연다.
 
-    원본 쪽지를 찾으면 **쿨메신저 관리함에서 그 쪽지를 열어 준다**(2026-09-08
-    사용자 결정 — 거기서 '메시지 회신'을 직접 누른다). 못 열면(쿨메신저 꺼짐,
-    목록에 없음 등) 이유와 함께 원본 내용을 보여주는 대체 창을 띄운다.
+    ① 일정에 저장된 이름 → ② 없으면 쪽지함에서 찾아 기억 →
+    ③ 그래도 없으면 사용자에게 한 번 물어본다(적은 이름을 기억).
+    이름을 알면 쿨메신저 조직도에서 그 사람을 찾아 새 쪽지 창을 연다.
     """
     app = QApplication.instance()
+    note._source_result = None
     if app is not None:
         app.setOverrideCursor(Qt.CursorShape.WaitCursor)
     try:
-        msg, spans = find_source_message(note.base_dir, note.config, note.event)
+        name = remembered_sender(note)
     finally:
         if app is not None:
             app.restoreOverrideCursor()
-    near = None
-    try:
-        near = note.frameGeometry().center()
-    except Exception:
-        pass
-    note._source_result = None
-    if msg is None:
-        note._source_result = (False, "")
-        _show_fallback(note, msg, spans, near, "")
-        return
+
+    if not name:
+        ask = NameAskDialog(note.event, parent=note)
+        note._name_dlg = ask               # GC 방지
+        if ask.exec() != QDialog.DialogCode.Accepted:
+            note._source_result = ("cancelled", "")
+            return
+        name = ask.name()
+        _remember(note, name)
 
     if app is not None:
         app.setOverrideCursor(Qt.CursorShape.WaitCursor)
-    opener = _Opener(msg, parent=note)
+    opener = _Opener(name, parent=note)
 
-    def _finish(ok: bool, why: str) -> None:
+    def _finish(state: str, why: str) -> None:
         if app is not None:
             app.restoreOverrideCursor()
-        note._source_result = (ok, why)
-        if not ok:
-            _show_fallback(note, msg, spans, near, why)
+        note._source_result = (state, why)
+        if state == "opened":
+            return                         # 쪽지 쓰기 창이 떴으니 할 일 없음
+        if state == "selected":
+            info = InfoDialog(why)
+            note._info_dlg = info          # GC 방지
+            info.exec()
+            return
+        _show_fallback(note, why)
 
     opener.done.connect(_finish)
     note._source_opener = opener           # GC 방지

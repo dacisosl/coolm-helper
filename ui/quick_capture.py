@@ -204,9 +204,11 @@ def _add_event(owner, cand, msg, matched: bool):
         end = start + timedelta(hours=1)
     if not title:
         return None
+    from parser.pipeline import real_sender
     return owner.store.add(title=title, start=start, end=end, all_day=all_day,
                            is_deadline=is_deadline,
-                           memo=(msg.body or "").strip(), source_ref=ref)
+                           memo=(msg.body or "").strip(), source_ref=ref,
+                           sender=real_sender(msg))
 
 
 def _register_and_pin(owner, cands, msg, matched: bool, chosen=None) -> int:
