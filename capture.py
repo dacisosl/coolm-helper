@@ -23,6 +23,14 @@ MAIN_WINDOW_CLASS = "CoolMsg50SingleInstance"   # 쿨메신저 고유 창 클래
 # 정확한 이름이 안 맞으면 접두어·실행파일 이름으로도 찾는다 (2026-07-26).
 CLASS_PREFIXES = ("COOLMSG", "COOLMESSENGER")
 PROCESS_HINTS = ("COOLMESSENGER", "COOLMSG")
+# 지역에 따라 메신저 프로그램 이름이 아예 다르다 (2026-09-08 경기도 사례:
+# SSAMBOARD.EXE / Chrome_WidgetWin_1 — 이름·창클래스 어느 힌트에도 안 걸렸다).
+# 그래서 **창 제목**으로도 찾는다. 제목은 그 프로그램의 우리말 화면 글자라
+# 회사·버전이 달라도 같다.
+WINDOW_TITLE_HINTS = ("쪽지 읽기", "쪽지 보내기", "쪽지 쓰기",
+                      "메시지 관리함", "쪽지함", "메시지관리함")
+SELF_EXE_HINT = "COOLMHELPER"      # 우리 앱 — 우리 창을 메신저로 착각하면 안 된다
+_learned_exes: set[str] = set()    # 제목으로 찾아낸 프로그램 이름 (이 실행 동안 기억)
 CHROME_CHILD_CLASS = "Chrome_RenderWidgetHostHWND"
 MIN_BODY_LEN = 10
 WM_GETTEXT, WM_GETTEXTLENGTH = 0x000D, 0x000E
@@ -88,6 +96,104 @@ def prewarm(force: bool = False) -> bool:
     return woke
 
 
+def looks_like_messenger_title(title: str) -> bool:
+    """창 제목이 메신저의 쪽지 창처럼 보이는가 (프로그램 이름과 무관하게)."""
+    t = (title or "").strip()
+    return bool(t) and any(h in t for h in WINDOW_TITLE_HINTS)
+
+
+def _window_title(hwnd: int) -> str:
+    """최상위 창의 제목 — GetWindowTextW로 읽는다.
+
+    _gettext(WM_GETTEXT)는 다른 프로세스에 메시지를 보내 응답을 기다리므로,
+    멈춘 프로그램이 하나라도 있으면 창 목록을 훑다가 같이 멈춘다.
+    GetWindowTextW는 다른 프로세스의 최상위 창 제목을 기다림 없이 준다.
+    """
+    try:
+        buf = ctypes.create_unicode_buffer(256)
+        ctypes.windll.user32.GetWindowTextW(hwnd, buf, 256)
+        return buf.value or ""
+    except Exception:
+        return ""
+
+
+def _is_self(exe: str) -> bool:
+    return SELF_EXE_HINT in (exe or "")
+
+
+def dedupe_windows(rows: list[tuple[str, str, str]], limit: int = 25) -> list[str]:
+    """(실행파일, 창클래스, 제목) 목록을 사람이 읽을 줄로 — 중복은 합친다.
+
+    예전 진단은 **중복을 지우기 전에 12개에서 잘라서**, 탐색기 창 몇 개가
+    자리를 다 먹고 정작 메신저가 목록에 안 나왔다(2026-09-08 경기도 사례).
+    제목도 안 보여줘서 어느 프로그램이 쪽지 창인지 알 수 없었다.
+    이제 중복을 먼저 합치고, **제목이 있는 창을 앞으로** 놓는다.
+    """
+    seen: dict[tuple[str, str], str] = {}
+    for exe, cls, title in rows:
+        if not exe and not cls:
+            continue
+        key = (exe, cls)
+        if seen.get(key):
+            continue                      # 이미 제목까지 있는 줄은 그대로
+        seen[key] = (title or "").strip()
+    out = [(exe, cls, title) for (exe, cls), title in seen.items()]
+    out.sort(key=lambda r: (not r[2], r[0]))      # 제목 있는 것 먼저
+    return [f"{exe} / {cls}" + (f" / '{title[:40]}'" if title else "")
+            for exe, cls, title in out[:limit]]
+
+
+def visible_windows() -> list[tuple[str, str, str]]:
+    """지금 보이는 최상위 창들의 (실행파일, 창클래스, 제목). 우리 앱은 뺀다."""
+    rows: list[tuple[str, str, str]] = []
+    try:
+        user32 = ctypes.windll.user32
+    except Exception:
+        return rows
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+    def cb(h, lparam):
+        if not user32.IsWindowVisible(h):
+            return True
+        exe = _exe_name(_pid_of(h))
+        if _is_self(exe):
+            return True
+        cls = ctypes.create_unicode_buffer(96)
+        user32.GetClassNameW(h, cls, 96)
+        rows.append((exe, cls.value or "", _window_title(h)))
+        return True
+
+    user32.EnumWindows(cb, 0)
+    return rows
+
+
+def _pid_by_title() -> int | None:
+    """④ 창 제목으로 찾기 — 프로그램 이름이 아예 다른 지역 대응."""
+    try:
+        user32 = ctypes.windll.user32
+    except Exception:
+        return None
+    found: list[int] = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+    def cb(h, lparam):
+        if not user32.IsWindowVisible(h):
+            return True
+        if not looks_like_messenger_title(_window_title(h)):
+            return True
+        pid = _pid_of(h)
+        exe = _exe_name(pid)
+        if pid and not _is_self(exe):
+            if exe:
+                _learned_exes.add(exe)     # 다음부터는 이름으로 바로 찾는다
+            found.append(pid)
+            return False
+        return True
+
+    user32.EnumWindows(cb, 0)
+    return found[0] if found else None
+
+
 def _pid_of(hwnd: int) -> int:
     pid = wintypes.DWORD()
     ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
@@ -114,9 +220,11 @@ def _exe_name(pid: int) -> str:
 
 
 def _cool_pid() -> int | None:
-    """쿨메신저 프로세스를 찾는다 — 버전이 달라도 찾도록 3단계로.
+    """쿨메신저 프로세스를 찾는다 — 버전·지역이 달라도 찾도록 4단계로.
 
-    ① 정확한 창 클래스(가장 빠름) ② 클래스 접두어(CoolMsg…) ③ 실행파일 이름.
+    ① 정확한 창 클래스(가장 빠름) ② 클래스 접두어(CoolMsg…) ③ 실행파일 이름
+    ④ **창 제목**('쪽지 읽기' 등) — 지역에 따라 프로그램 이름이 아예 달라서
+      ①~③이 모두 빗나가는 경우가 있다 (2026-09-08 경기도 사례).
     """
     user32 = ctypes.windll.user32
     hwnd = user32.FindWindowW(MAIN_WINDOW_CLASS, None)
@@ -149,13 +257,17 @@ def _cool_pid() -> int | None:
         if not user32.IsWindowVisible(h):
             return True
         pid = _pid_of(h)
-        if pid and any(k in _exe_name(pid) for k in PROCESS_HINTS):
+        exe = _exe_name(pid)
+        hints = tuple(PROCESS_HINTS) + tuple(_learned_exes)
+        if pid and not _is_self(exe) and any(k in exe for k in hints):
             cands.append(pid)
             return False
         return True
 
     user32.EnumWindows(cb2, 0)
-    return cands[0] if cands else None
+    if cands:
+        return cands[0]
+    return _pid_by_title()          # ④ 제목으로 (프로그램 이름이 다른 지역)
 
 
 def bring_to_front() -> bool:
@@ -313,27 +425,24 @@ def diagnose() -> str:
     pid = _cool_pid()
     if pid is None:
         lines.append("② 쿨메신저 프로세스: 못 찾음")
-        lines.append("→ 쿨메신저가 실행 중인지 확인해 주세요. "
-                     "실행 중인데도 이 메시지가 보이면 이 내용을 알려주세요.")
-        # 힌트: 지금 떠 있는 창 클래스 몇 개를 보여준다
-        seen: list[str] = []
-
-        @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-        def cb(h, lparam):
-            if user32.IsWindowVisible(h) and len(seen) < 12:
-                cls = ctypes.create_unicode_buffer(96)
-                user32.GetClassNameW(h, cls, 96)
-                exe = _exe_name(_pid_of(h))
-                if cls.value and exe:
-                    seen.append(f"{exe} / {cls.value}")
-            return True
-
-        user32.EnumWindows(cb, 0)
-        if seen:
-            lines.append("지금 열린 창(참고): " + ", ".join(dict.fromkeys(seen)))
+        lines.append("→ 쿨메신저(또는 학교에서 쓰는 쪽지 프로그램)를 켜고 "
+                     "쪽지 하나를 열어 둔 채 다시 시도해 주세요.")
+        lines.append("→ 그래도 안 되면 아래 '지금 열린 창' 목록을 그대로 "
+                     "알려주세요. 지역마다 프로그램 이름이 달라서 "
+                     "(예: 경기도) 목록을 보면 무엇을 찾아야 할지 알 수 있어요.")
+        rows = visible_windows()
+        titled = [r for r in rows if looks_like_messenger_title(r[2])]
+        if titled:
+            lines.append("쪽지 창처럼 보이는 창: "
+                         + ", ".join(dedupe_windows(titled, 5)))
+        lines.append("지금 열린 창 (실행파일 / 창종류 / 제목):")
+        for row in dedupe_windows(rows):
+            lines.append(f"   - {row}")
         return "\n".join(lines)
 
     lines.append(f"② 쿨메신저 프로세스: 찾음 (실행파일 {_exe_name(pid)})")
+    if _learned_exes:
+        lines.append(f"   (창 제목으로 알아낸 프로그램: {', '.join(sorted(_learned_exes))})")
     wins = _cool_windows(pid)
     lines.append(f"③ 쿨메신저 창: {len(wins)}개")
     try:
@@ -465,7 +574,12 @@ def dump_ui_tree(max_depth: int = 40, max_nodes: int = 6000) -> str:
         return f"윈도우에서만 동작합니다 ({e})"
     pid = _cool_pid()
     if pid is None:
-        return "쿨메신저 프로세스를 찾지 못했어요 — 쿨메신저를 켠 뒤 다시 시도해 주세요."
+        head = ("쿨메신저 프로세스를 찾지 못했어요 — 쪽지 프로그램을 켜고 "
+                "쪽지 하나를 열어 둔 채 다시 시도해 주세요.\n"
+                "아래 목록을 알려주시면 어떤 프로그램인지 찾을 수 있어요.\n"
+                "지금 열린 창 (실행파일 / 창종류 / 제목):")
+        return head + "\n" + "\n".join(
+            f"   - {row}" for row in dedupe_windows(visible_windows()))
     wins = _cool_windows(pid)
     lines.append(f"쿨메신저 실행파일: {_exe_name(pid)} / 보이는 창 {len(wins)}개")
     lines.append("표기: 종류 이름 id class (좌,상,우,하) [지원 패턴]  — 앞에 있던 창부터")
