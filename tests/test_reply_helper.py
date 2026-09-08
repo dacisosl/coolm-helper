@@ -131,61 +131,122 @@ class TestDialog(unittest.TestCase):
 
 
 class TestOpenFlow(unittest.TestCase):
-    """'제출' → 쿨메신저에서 열기를 먼저 시도하고, 실패할 때만 대체 창 (2026-09-08)."""
+    """'제출' → 보낸 사람에게 쪽지 쓰기 (2026-09-08 재설계)."""
 
     def setUp(self):
         import time
         from PyQt6.QtWidgets import QWidget
         self.time = time
         self.tmp = tempfile.mkdtemp()
-        memo = os.path.join(self.tmp, "memo")
-        os.makedirs(memo)
-        make_fake_db(memo, unread=1, read=2)
-        store = EventStore(os.path.join(self.tmp, "store"))
-        ev = store.add("일정", datetime(2026, 7, 20, 9, 0), memo="메모",
-                       source_ref="2|2026-07-20T09:00:00")
+        self.memo = os.path.join(self.tmp, "memo")
+        os.makedirs(self.memo)
+        make_fake_db(self.memo, unread=1, read=2)      # key 2 = 발신자
+        self.store = EventStore(os.path.join(self.tmp, "store"))
 
         class _Note(QWidget):
             pass
 
         self.note = _Note()
-        self.note.base_dir, self.note.event = self.tmp, ev
-        self.note.config = {"memo_dir": memo, "desk_widgets": {"notes": []}}
+        self.note.base_dir = self.tmp
+        self.note.store = self.store
+        self.note.config = {"memo_dir": self.memo, "desk_widgets": {"notes": []}}
 
     def tearDown(self):
         self.note.close()
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _run(self, result):
+    def _event(self, sender="", ref="2|2026-07-20T09:00:00"):
+        ev = self.store.add("일정", datetime(2026, 7, 20, 9, 0), memo="메모",
+                            source_ref=ref, sender=sender)
+        self.note.event = ev
+        return ev
+
+    def _run(self, result, typed=None):
+        """compose_to를 가짜로 바꿔 흐름만 확인. typed면 이름 모달에 그 이름을 적는다."""
         import coolm_control
         import ui.reply_helper as rh
-        created = []
-        real_open, real_exec = coolm_control.open_message, rh.SourceMessageDialog.exec
-        coolm_control.open_message = lambda msg, ui=None: result
-        rh.SourceMessageDialog.exec = lambda self: created.append(self) or 0
+        asked, composed, fallbacks, infos = [], [], [], []
+        real = (coolm_control.compose_to, rh.SourceMessageDialog.exec,
+                rh.NameAskDialog.exec, rh.InfoDialog.exec)
+
+        def _compose(name, ui=None):
+            composed.append(name)
+            return result
+
+        def _ask(dlg):
+            asked.append(dlg)
+            if typed is None:
+                return 0                       # 취소
+            dlg.edit.setText(typed)
+            return 1                           # Accepted
+
+        coolm_control.compose_to = _compose
+        rh.SourceMessageDialog.exec = lambda self: fallbacks.append(self) or 0
+        rh.NameAskDialog.exec = _ask
+        rh.InfoDialog.exec = lambda self: infos.append(self) or 0
         try:
             rh.open_source_message(self.note)
-            for _ in range(300):                 # 백그라운드 → 시그널 대기
+            for _ in range(300):
                 QApplication.processEvents()
                 if self.note._source_result is not None:
                     break
                 self.time.sleep(0.01)
         finally:
-            coolm_control.open_message = real_open
-            rh.SourceMessageDialog.exec = real_exec
-        return created
+            (coolm_control.compose_to, rh.SourceMessageDialog.exec,
+             rh.NameAskDialog.exec, rh.InfoDialog.exec) = real
+        return {"asked": asked, "composed": composed,
+                "fallbacks": fallbacks, "infos": infos}
 
-    def test_opens_in_coolm_without_dialog(self):
-        created = self._run((True, ""))
-        self.assertEqual(self.note._source_result, (True, ""))
-        self.assertEqual(created, [])                # 쿨메신저가 열렸으니 창 없음
+    def test_uses_saved_sender_without_touching_db(self):
+        import ui.reply_helper as rh
+        self._event(sender="정주은(정주은)")
+        real = rh.find_source_message
+        rh.find_source_message = lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("저장된 이름이 있으면 DB를 보지 않아야 한다"))
+        try:
+            out = self._run(("opened", ""))
+        finally:
+            rh.find_source_message = real
+        self.assertEqual(out["composed"], ["정주은(정주은)"])
+        self.assertEqual(out["asked"], [])
+        self.assertEqual(out["fallbacks"], [])
 
-    def test_fallback_dialog_with_reason(self):
-        created = self._run((False, "메시지 관리함을 열지 못했어요."))
-        self.assertEqual(len(created), 1)
-        self.assertIn("관리함을 열지 못했어요", created[0].status.text())
-        self.assertIn("정주은" if False else "발신자", " ".join(
-            w.text() for w in created[0].findChildren(QLabel)))  # 원본 보낸 사람
+    def test_backfills_sender_from_db_and_remembers(self):
+        ev = self._event(sender="")
+        out = self._run(("opened", ""))
+        self.assertEqual(out["composed"], ["발신자"])      # 가짜 DB의 보낸 사람
+        self.assertEqual(out["asked"], [])
+        # 일정에 기억됐다 — 다음부터 DB를 안 본다
+        saved = [e for e in EventStore(
+            os.path.join(self.tmp, "store")).all() if e.id == ev.id][0]
+        self.assertEqual(saved.sender, "발신자")
+
+    def test_asks_name_when_unknown_and_remembers(self):
+        ev = self._event(sender="", ref="")               # DB로도 못 찾음
+        out = self._run(("opened", ""), typed="정주은")
+        self.assertEqual(len(out["asked"]), 1)
+        self.assertEqual(out["composed"], ["정주은"])
+        saved = [e for e in EventStore(
+            os.path.join(self.tmp, "store")).all() if e.id == ev.id][0]
+        self.assertEqual(saved.sender, "정주은")
+
+    def test_cancelling_name_does_nothing(self):
+        self._event(sender="", ref="")
+        out = self._run(("opened", ""), typed=None)
+        self.assertEqual(out["composed"], [])
+        self.assertEqual(self.note._source_result, ("cancelled", ""))
+
+    def test_selected_shows_info(self):
+        self._event(sender="정주은")
+        out = self._run(("selected", "더블클릭하면 열려요"))
+        self.assertEqual(len(out["infos"]), 1)
+        self.assertEqual(out["fallbacks"], [])
+
+    def test_failed_shows_fallback_with_reason(self):
+        self._event(sender="정주은")
+        out = self._run(("failed", "조직도에서 못 찾았어요"))
+        self.assertEqual(len(out["fallbacks"]), 1)
+        self.assertIn("못 찾았어요", out["fallbacks"][0].status.text())
 
 
 if __name__ == "__main__":

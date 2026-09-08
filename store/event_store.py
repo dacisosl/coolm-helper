@@ -34,6 +34,8 @@ class Event:
     demo: bool = False              # 데모 모드에서 등록된 테스트 일정
     order: int = 0                  # 위젯에서 ⠿로 정한 표시 순서 (작을수록 위)
     source_ref: str = ""            # 원본 쪽지 참조 "쪽지key|시작일시" — 등록 표시 유지용
+    sender: str = ""                # 원본 쪽지를 보낸 사람 — 포스트잇 '제출'로
+                                    # 그 사람에게 쪽지 쓰기를 열 때 쓴다 (2026-09-08)
     google_id: str | None = None    # 구글에도 등록한 경우의 이벤트 ID
     created: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -91,12 +93,12 @@ class EventStore:
             all_day: bool = True, is_deadline: bool = False,
             google_id: str | None = None, demo: bool = False,
             memo: str = "", source_ref: str = "",
-            priority: str = "보통") -> Event:
+            priority: str = "보통", sender: str = "") -> Event:
         ev = Event(title=title, start=start.isoformat(),
                    end=end.isoformat() if end else None,
                    all_day=all_day, is_deadline=is_deadline,
                    google_id=google_id, demo=demo, memo=memo,
-                   source_ref=source_ref, priority=priority,
+                   source_ref=source_ref, priority=priority, sender=sender,
                    created=datetime.now().isoformat())
         self._events.append(ev)
         self._save()
