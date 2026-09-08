@@ -71,6 +71,31 @@ class TestWindowListing(unittest.TestCase):
         self.assertEqual(capture.dedupe_windows([("", "", "")]), [])
 
 
+class TestCandidateRows(unittest.TestCase):
+    """진단이 '어느 단계에서 막혔나'를 답하려면 후보를 골라 보여줘야 한다."""
+
+    def test_picks_messenger_like_windows(self):
+        rows = [("EXPLORER.EXE", "Shell_TrayWnd", ""),
+                ("CHROME.EXE", "Chrome_WidgetWin_1", "새 탭"),
+                ("COOLMESSENGER.EXE", "CoolMsg50SingleInstance", ""),
+                ("SSAMBOARD.EXE", "Chrome_WidgetWin_1", "쪽지 읽기"),
+                ("KAKAOTALK.EXE", "EVA_Window_Dblclk", "")]
+        got = {r[0] for r in capture.candidate_rows(rows)}
+        self.assertIn("COOLMESSENGER.EXE", got)     # 이름에 단서
+        self.assertIn("SSAMBOARD.EXE", got)         # 제목에 단서
+        self.assertNotIn("EXPLORER.EXE", got)
+        self.assertNotIn("KAKAOTALK.EXE", got)
+
+    def test_finds_by_class_even_without_name(self):
+        """관리자 권한이면 실행파일 이름을 못 읽는다 — 창 종류로도 잡혀야."""
+        rows = [("", "CoolMsg51SingleInstance", "")]
+        self.assertEqual(len(capture.candidate_rows(rows)), 1)
+
+    def test_empty_when_nothing_matches(self):
+        self.assertEqual(capture.candidate_rows(
+            [("NOTEPAD.EXE", "Notepad", "제목 없음")]), [])
+
+
 class TestQuietOffWindows(unittest.TestCase):
     """리눅스에서도 죽지 않고 조용히 빈 결과·안내 문구를 준다."""
 

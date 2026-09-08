@@ -143,8 +143,17 @@ def dedupe_windows(rows: list[tuple[str, str, str]], limit: int = 25) -> list[st
             for exe, cls, title in out[:limit]]
 
 
-def visible_windows() -> list[tuple[str, str, str]]:
-    """지금 보이는 최상위 창들의 (실행파일, 창클래스, 제목). 우리 앱은 뺀다."""
+# 쪽지 프로그램일 수 있는 이름 조각 — 진단에서 후보를 좁히는 데만 쓴다
+CANDIDATE_KEYS = ("COOL", "MSG", "MESSENGER", "SSAM", "쪽지", "메신저")
+
+
+def visible_windows(include_hidden: bool = False,
+                    with_self: bool = False) -> list[tuple[str, str, str]]:
+    """최상위 창들의 (실행파일, 창클래스, 제목).
+
+    include_hidden=True면 숨은 창도 — 트레이로 내려간 메신저를 찾을 때 필요하다.
+    실행파일 이름을 못 읽으면(권한 등) 빈 문자열로 남는다.
+    """
     rows: list[tuple[str, str, str]] = []
     try:
         user32 = ctypes.windll.user32
@@ -153,10 +162,10 @@ def visible_windows() -> list[tuple[str, str, str]]:
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
     def cb(h, lparam):
-        if not user32.IsWindowVisible(h):
+        if not include_hidden and not user32.IsWindowVisible(h):
             return True
         exe = _exe_name(_pid_of(h))
-        if _is_self(exe):
+        if _is_self(exe) and not with_self:
             return True
         cls = ctypes.create_unicode_buffer(96)
         user32.GetClassNameW(h, cls, 96)
@@ -165,6 +174,16 @@ def visible_windows() -> list[tuple[str, str, str]]:
 
     user32.EnumWindows(cb, 0)
     return rows
+
+
+def candidate_rows(rows: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
+    """쪽지 프로그램일 수 있는 창만 — 이름·창종류·제목에 단서가 있는 것."""
+    out = []
+    for exe, cls, title in rows:
+        blob = f"{exe} {cls} {title}".upper()
+        if any(k.upper() in blob for k in CANDIDATE_KEYS):
+            out.append((exe, cls, title))
+    return out
 
 
 def _pid_by_title() -> int | None:
@@ -430,13 +449,40 @@ def diagnose() -> str:
         lines.append("→ 그래도 안 되면 아래 '지금 열린 창' 목록을 그대로 "
                      "알려주세요. 지역마다 프로그램 이름이 달라서 "
                      "(예: 경기도) 목록을 보면 무엇을 찾아야 할지 알 수 있어요.")
-        rows = visible_windows()
-        titled = [r for r in rows if looks_like_messenger_title(r[2])]
-        if titled:
-            lines.append("쪽지 창처럼 보이는 창: "
-                         + ", ".join(dedupe_windows(titled, 5)))
-        lines.append("지금 열린 창 (실행파일 / 창종류 / 제목):")
-        for row in dedupe_windows(rows):
+        # 어느 단계에서 막혔는지 하나씩 — 이게 없으면 원인을 알 수 없다
+        # (2026-09-08 경기도 제보: 쿨메신저를 쓰는데 '실행 중 아님'이 떴다)
+        allw = visible_windows(include_hidden=True, with_self=True)
+        vis = visible_windows()
+        cls_hits = [r for r in allw
+                    if any(r[1].upper().startswith(p) for p in CLASS_PREFIXES)]
+        exe_hits = [r for r in vis
+                    if any(k in r[0] for k in PROCESS_HINTS)]
+        titled = [r for r in vis if looks_like_messenger_title(r[2])]
+        unknown = sum(1 for r in allw if not r[0])
+        lines.append(f"   ② 창 종류가 CoolMsg…로 시작하는 창: {len(cls_hits)}개"
+                     + (" → " + ", ".join(dedupe_windows(cls_hits, 3))
+                        if cls_hits else ""))
+        lines.append(f"   ③ 실행파일 이름에 COOLMESSENGER/COOLMSG가 있는 창: "
+                     f"{len(exe_hits)}개"
+                     + (" → " + ", ".join(dedupe_windows(exe_hits, 3))
+                        if exe_hits else ""))
+        lines.append(f"   ④ 제목이 쪽지 창 같은 창: {len(titled)}개"
+                     + (" → " + ", ".join(dedupe_windows(titled, 3))
+                        if titled else ""))
+        if unknown:
+            lines.append(f"   ※ 프로그램 이름을 읽지 못한 창 {unknown}개 — "
+                         "관리자 권한으로 실행된 프로그램이면 이름을 못 읽어요.")
+        cands = candidate_rows(allw)
+        if cands:
+            lines.append("쪽지 프로그램으로 보이는 것 (숨은 창까지):")
+            for row in dedupe_windows(cands, 12):
+                lines.append(f"   - {row}")
+        else:
+            lines.append("→ 쪽지 프로그램 후보가 하나도 없어요. "
+                         "지금 쿨메신저가 정말 켜져 있는지, 트레이 아이콘만 "
+                         "있는 상태가 아닌지 확인해 주세요.")
+        lines.append("지금 열린 창 전체 (실행파일 / 창종류 / 제목):")
+        for row in dedupe_windows(vis):
             lines.append(f"   - {row}")
         return "\n".join(lines)
 
@@ -578,8 +624,15 @@ def dump_ui_tree(max_depth: int = 40, max_nodes: int = 6000) -> str:
                 "쪽지 하나를 열어 둔 채 다시 시도해 주세요.\n"
                 "아래 목록을 알려주시면 어떤 프로그램인지 찾을 수 있어요.\n"
                 "지금 열린 창 (실행파일 / 창종류 / 제목):")
-        return head + "\n" + "\n".join(
-            f"   - {row}" for row in dedupe_windows(visible_windows()))
+        allw = visible_windows(include_hidden=True, with_self=True)
+        cands = candidate_rows(allw)
+        out = [head]
+        if cands:
+            out.append("쪽지 프로그램으로 보이는 것 (숨은 창까지):")
+            out += [f"   - {row}" for row in dedupe_windows(cands, 12)]
+        out.append("지금 열린 창 전체:")
+        out += [f"   - {row}" for row in dedupe_windows(visible_windows())]
+        return "\n".join(out)
     wins = _cool_windows(pid)
     lines.append(f"쿨메신저 실행파일: {_exe_name(pid)} / 보이는 창 {len(wins)}개")
     lines.append("표기: 종류 이름 id class (좌,상,우,하) [지원 패턴]  — 앞에 있던 창부터")
