@@ -359,6 +359,133 @@ def diagnose() -> str:
     return "\n".join(lines)
 
 
+# 요소마다 "누를 수 있나(Invoke)·고를 수 있나(SelectionItem)…"를 보는 속성들.
+# 쪽지 목록 항목이 어떤 패턴을 지원하는지가 '실제 쪽지 열기' 자동화의 열쇠다.
+_PATTERN_PROPS = (
+    ("Invoke", "UIA_IsInvokePatternAvailablePropertyId"),
+    ("SelectionItem", "UIA_IsSelectionItemPatternAvailablePropertyId"),
+    ("ExpandCollapse", "UIA_IsExpandCollapsePatternAvailablePropertyId"),
+    ("Toggle", "UIA_IsTogglePatternAvailablePropertyId"),
+    ("Value", "UIA_IsValuePatternAvailablePropertyId"),
+    ("Text", "UIA_IsTextPatternAvailablePropertyId"),
+    ("ScrollItem", "UIA_IsScrollItemPatternAvailablePropertyId"),
+    ("Legacy", "UIA_IsLegacyIAccessiblePatternAvailablePropertyId"),
+)
+
+
+def _describe_element(el, type_names: dict) -> str:
+    """UIA 요소 한 개를 한 줄로: 종류 이름 id 클래스 위치 [패턴]."""
+    def prop(name):
+        try:
+            return getattr(el, name)
+        except Exception:
+            return None
+
+    ct = prop("CurrentControlType")
+    kind = type_names.get(ct, str(ct))
+    name = str(prop("CurrentName") or "").replace("\n", " ")[:60]
+    aid = str(prop("CurrentAutomationId") or "")[:40]
+    cls = str(prop("CurrentClassName") or "")[:30]
+    pats = []
+    for label, pname in _PATTERN_PROPS:
+        pid_ = getattr(_uia.UIA_dll, pname, None)
+        if pid_ is None:
+            continue
+        try:
+            if el.GetCurrentPropertyValue(pid_):
+                pats.append(label)
+        except Exception:
+            pass
+    rect = ""
+    try:
+        r = el.CurrentBoundingRectangle
+        rect = f" ({r.left},{r.top},{r.right},{r.bottom})"
+    except Exception:
+        pass
+    hidden = " [화면밖]" if prop("CurrentIsOffscreen") else ""
+    parts = [kind]
+    if name:
+        parts.append(f"이름='{name}'")
+    if aid:
+        parts.append(f"id='{aid}'")
+    if cls:
+        parts.append(f"class='{cls}'")
+    return " ".join(parts) + rect + (f" [{','.join(pats)}]" if pats else "") + hidden
+
+
+def dump_ui_tree(max_depth: int = 40, max_nodes: int = 6000) -> str:
+    """쿨메신저 창들의 UI 자동화(접근성) 트리를 글로 뽑는다 — 읽기 전용.
+
+    '제출' 버튼이 **실제 쿨메신저 쪽지 창**을 열게 하려면(2026-09-04 사용자
+    결정) 쪽지 목록·버튼이 접근성 트리에서 어떤 이름·종류로 보이는지 알아야
+    한다. 사용자 PC에서 한 번 뽑아 보고 자동화가 가능한지 판단한다.
+    쪽지 제목·사람 이름이 섞여 있을 수 있어 화면에 뿌리지 않고 파일로 준다.
+    쿨메신저 상태는 바꾸지 않는다(조회만).
+    """
+    lines: list[str] = []
+    try:
+        user32 = ctypes.windll.user32
+    except Exception as e:
+        return f"윈도우에서만 동작합니다 ({e})"
+    pid = _cool_pid()
+    if pid is None:
+        return "쿨메신저 프로세스를 찾지 못했어요 — 쿨메신저를 켠 뒤 다시 시도해 주세요."
+    wins = _cool_windows(pid)
+    lines.append(f"쿨메신저 실행파일: {_exe_name(pid)} / 보이는 창 {len(wins)}개")
+    lines.append("표기: 종류 이름 id class (좌,상,우,하) [지원 패턴]  — 앞에 있던 창부터")
+    try:
+        warmup()
+    except Exception as e:
+        lines.append(f"UIA 준비 실패: {e}")
+        return "\n".join(lines)
+    type_names = {v: k for k, v in
+                  getattr(_uia, "known_control_types", {}).items()}
+    walker = _uia.iuia.ControlViewWalker
+    total = 0
+    for i, hwnd in enumerate(wins, 1):
+        cls = ctypes.create_unicode_buffer(128)
+        user32.GetClassNameW(hwnd, cls, 128)
+        title = _gettext(hwnd, 200)
+        lines.append("")
+        lines.append(f"===== 창{i}: class={cls.value} 제목='{title[:60]}' hwnd={hwnd} =====")
+        kids = _children_by_class(hwnd)
+        lines.append("자식 창 클래스: " + (", ".join(
+            f"{c}×{len(h)}" for c, h in kids.items()) or "없음"))
+        try:
+            root = _uia.iuia.ElementFromHandle(hwnd)
+        except Exception as e:
+            lines.append(f"(UIA 루트를 못 얻음: {e})")
+            continue
+        stack = [(root, 0)]
+        count = 0
+        while stack and total < max_nodes:
+            el, depth = stack.pop()
+            count += 1
+            total += 1
+            try:
+                lines.append("  " * depth + _describe_element(el, type_names))
+            except Exception as e:
+                lines.append("  " * depth + f"(요소 설명 실패: {e})")
+            if depth >= max_depth:
+                continue
+            # 자식들을 원래 순서대로 보이게 — 스택이라 뒤집어 넣는다
+            children = []
+            try:
+                child = walker.GetFirstChildElement(el)
+                while child is not None and len(children) < 500:
+                    children.append(child)
+                    child = walker.GetNextSiblingElement(child)
+            except Exception:
+                pass
+            for c in reversed(children):
+                stack.append((c, depth + 1))
+        lines.append(f"(창{i} 요소 {count}개)")
+        if total >= max_nodes:
+            lines.append(f"(요소가 너무 많아 {max_nodes}개에서 멈췄어요)")
+            break
+    return "\n".join(lines)
+
+
 def read_current_message() -> CapturedMessage | None:
     """지금 쿨메신저 화면에 떠 있는 쪽지를 읽는다. 없으면 None."""
     pid = _cool_pid()

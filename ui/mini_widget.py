@@ -312,6 +312,65 @@ class MiniWidget(WidgetBase):
         box.setStyleSheet(theme.BASE_QSS)
         box.exec()
 
+    def _dump_ui_structure(self) -> None:
+        """쿨메신저 화면 구조(UI 트리)를 파일로 저장 — '제출 → 실제 쪽지 열기' 준비.
+
+        몇 초 걸릴 수 있어 백그라운드에서 읽고, 끝나면 저장 위치를 알려준다.
+        내용에 쪽지 제목·이름이 섞일 수 있어 화면에 뿌리지 않고 파일로만 준다.
+        """
+        import os
+        import threading
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtWidgets import QMessageBox
+        path = os.path.join(self.base_dir, "coolm_ui_dump.txt")
+        wait = QMessageBox(self)
+        wait.setWindowTitle("쿨메신저 화면 구조 진단")
+        wait.setText("쿨메신저 화면을 읽는 중이에요… 몇 초 걸릴 수 있어요.\n"
+                     "(쿨메신저에서 쪽지 하나를 열어 둔 상태면 더 좋아요)")
+        wait.setStandardButtons(QMessageBox.StandardButton.NoButton)
+        wait.setStyleSheet(theme.BASE_QSS)
+        wait.show()
+        result: dict = {}
+
+        def work():
+            try:
+                import capture
+                result["text"] = capture.dump_ui_tree()
+            except Exception as e:
+                result["text"] = f"진단 실행 실패: {e}"
+
+        t = threading.Thread(target=work, daemon=True)
+        t.start()
+
+        def poll():
+            if t.is_alive():
+                QTimer.singleShot(200, poll)
+                return
+            wait.close()
+            text = result.get("text", "")
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                where = f"저장했어요:\n{path}"
+            except OSError as e:
+                where = f"파일로 저장하지 못했어요 ({e})"
+            done = QMessageBox(self)
+            done.setWindowTitle("쿨메신저 화면 구조 진단")
+            done.setText(where + "\n\n이 파일 내용을 복사해서 보내 주세요.\n"
+                         "쪽지 제목이나 사람 이름이 들어 있으면 지우고 보내셔도 돼요.")
+            done.setDetailedText(text[:4000] + ("\n…(이하 파일 참고)" if len(text) > 4000 else ""))
+            open_btn = done.addButton("파일 열기", QMessageBox.ButtonRole.ActionRole)
+            done.addButton("닫기", QMessageBox.ButtonRole.RejectRole)
+            done.setStyleSheet(theme.BASE_QSS)
+            done.exec()
+            if done.clickedButton() is open_btn:
+                try:
+                    os.startfile(path)            # Windows 전용 — 메모장 등으로 연다
+                except Exception:
+                    pass
+
+        QTimer.singleShot(200, poll)
+
     def contextMenuEvent(self, ev):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
@@ -336,10 +395,14 @@ class MiniWidget(WidgetBase):
             opacity_acts[a] = pct
         menu.addSeparator()
         act_diag = menu.addAction("쪽지 읽기 진단…")
+        act_dump = menu.addAction("쿨메신저 화면 구조 진단 (파일로 저장)…")
         act_quit = menu.addAction("종료")
         chosen = menu.exec(ev.globalPos())
         if chosen == act_diag:
             self._show_capture_diagnosis()
+            return
+        if chosen == act_dump:
+            self._dump_ui_structure()
             return
         if chosen is not None and chosen == act_quick:
             self.open_quick()

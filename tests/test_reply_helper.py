@@ -121,6 +121,8 @@ class TestDialog(unittest.TestCase):
         except Exception as e:                       # 리눅스에서 import 자체가 안 되면
             self.skipTest(f"capture import 불가: {e}")
         self.assertFalse(capture.bring_to_front())
+        # 화면 구조 진단도 리눅스에서는 안내 문구만 돌려주고 죽지 않는다
+        self.assertIn("윈도우에서만", capture.dump_ui_tree())
 
 
 if __name__ == "__main__":
