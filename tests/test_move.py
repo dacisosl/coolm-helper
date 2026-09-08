@@ -204,6 +204,7 @@ class TestPenguinMove(unittest.TestCase):
         self.assertIn("바로 등록", joined)
         self.assertIn("학사일정", joined)
         self.assertIn("문구 보정", joined)
+        self.assertIn("화면 구조 진단", joined)     # 실제 쪽지 열기 준비용 진단
 
     def test_bar_flips_when_penguin_is_at_left_edge(self):
         g = _screen()

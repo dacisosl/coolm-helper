@@ -7,6 +7,8 @@
   UIA TextPattern으로 읽는다 (~30ms). 창 전체를 UIA로 순회하면 3초가
   걸리므로 절대 전체 순회하지 않는다.
 키 입력 시뮬레이션·클립보드 조작 없음. 쿨메신저 상태를 바꾸지 않는다.
+유일한 예외는 사용자가 직접 누른 '쿨메신저 창 앞으로'(bring_to_front) —
+창에 포커스만 주고 내용·목록은 건드리지 않는다 (2026-09-04).
 """
 from __future__ import annotations
 
@@ -152,6 +154,28 @@ def _cool_pid() -> int | None:
 
     user32.EnumWindows(cb2, 0)
     return cands[0] if cands else None
+
+
+def bring_to_front() -> bool:
+    """쿨메신저 창을 앞으로 올린다(포커스만). 없거나 실패하면 False.
+
+    포스트잇 '제출' → 원본 쪽지 창의 [쿨메신저 창 앞으로]에서만 부른다.
+    최소화돼 있으면 복원한다. 비Windows·쿨메신저 미실행은 조용히 False.
+    """
+    try:
+        pid = _cool_pid()
+        if not pid:
+            return False
+        wins = _cool_windows(pid)
+        if not wins:
+            return False
+        user32 = ctypes.windll.user32
+        hwnd = wins[0]
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+        return bool(user32.SetForegroundWindow(hwnd))
+    except Exception:
+        return False
 
 
 def _cool_windows(pid: int) -> list[int]:
@@ -332,6 +356,172 @@ def diagnose() -> str:
                               if got else "쪽지를 읽지 못함"))
     if not got:
         lines.append("→ 쿨메신저에서 쪽지를 '열어 둔' 상태여야 읽을 수 있어요.")
+    return "\n".join(lines)
+
+
+# 요소마다 "누를 수 있나(Invoke)·고를 수 있나(SelectionItem)…"를 보는 속성들.
+# 쪽지 목록 항목이 어떤 패턴을 지원하는지가 '실제 쪽지 열기' 자동화의 열쇠다.
+_PATTERN_PROPS = (
+    ("Invoke", "UIA_IsInvokePatternAvailablePropertyId"),
+    ("SelectionItem", "UIA_IsSelectionItemPatternAvailablePropertyId"),
+    ("ExpandCollapse", "UIA_IsExpandCollapsePatternAvailablePropertyId"),
+    ("Toggle", "UIA_IsTogglePatternAvailablePropertyId"),
+    ("Value", "UIA_IsValuePatternAvailablePropertyId"),
+    ("Text", "UIA_IsTextPatternAvailablePropertyId"),
+    ("ScrollItem", "UIA_IsScrollItemPatternAvailablePropertyId"),
+    ("Legacy", "UIA_IsLegacyIAccessiblePatternAvailablePropertyId"),
+)
+
+
+def _describe_element(el, type_names: dict) -> str:
+    """UIA 요소 한 개를 한 줄로: 종류 이름 id 클래스 위치 [패턴]."""
+    def prop(name):
+        try:
+            return getattr(el, name)
+        except Exception:
+            return None
+
+    ct = prop("CurrentControlType")
+    kind = type_names.get(ct, str(ct))
+    name = str(prop("CurrentName") or "").replace("\n", " ")[:60]
+    aid = str(prop("CurrentAutomationId") or "")[:40]
+    cls = str(prop("CurrentClassName") or "")[:30]
+    pats = []
+    for label, pname in _PATTERN_PROPS:
+        pid_ = getattr(_uia.UIA_dll, pname, None)
+        if pid_ is None:
+            continue
+        try:
+            if el.GetCurrentPropertyValue(pid_):
+                pats.append(label)
+        except Exception:
+            pass
+    rect = ""
+    try:
+        r = el.CurrentBoundingRectangle
+        rect = f" ({r.left},{r.top},{r.right},{r.bottom})"
+    except Exception:
+        pass
+    hidden = " [화면밖]" if prop("CurrentIsOffscreen") else ""
+    parts = [kind]
+    if name:
+        parts.append(f"이름='{name}'")
+    if aid:
+        parts.append(f"id='{aid}'")
+    if cls:
+        parts.append(f"class='{cls}'")
+    return " ".join(parts) + rect + (f" [{','.join(pats)}]" if pats else "") + hidden
+
+
+LVM_GETITEMCOUNT = 0x1004      # SysListView32 항목 수 (포인터 없이 안전)
+HDM_GETITEMCOUNT = 0x1200      # SysHeader32 열 수
+
+
+def _classic_controls(kids: dict[str, list[int]]) -> list[str]:
+    """표준 부품의 글자·크기를 WM_GETTEXT/LVM 메시지로 읽어 요약한다 (읽기 전용)."""
+    out: list[str] = []
+    user32 = ctypes.windll.user32
+    for cls, hs in kids.items():
+        up = cls.upper()
+        if up in ("BUTTON", "STATIC", "EDIT") or up.startswith("RICHEDIT"):
+            texts = []
+            for h in hs[:60]:
+                t = _gettext(h, 120).replace("\n", " ").strip()
+                vis = user32.IsWindowVisible(h)
+                if t:
+                    texts.append(f"'{t}'" + ("" if vis else "(숨김)"))
+            if texts:
+                out.append(f"  {cls} 글자: " + ", ".join(texts))
+        elif up == "SYSLISTVIEW32":
+            for h in hs:
+                n = user32.SendMessageW(h, LVM_GETITEMCOUNT, 0, 0)
+                r = wintypes.RECT()
+                user32.GetWindowRect(h, ctypes.byref(r))
+                out.append(f"  목록(SysListView32) hwnd={h}: 항목 {n}개, "
+                           f"위치 ({r.left},{r.top},{r.right},{r.bottom}), "
+                           f"{'보임' if user32.IsWindowVisible(h) else '숨김'}")
+        elif up == "SYSHEADER32":
+            for h in hs:
+                n = user32.SendMessageW(h, HDM_GETITEMCOUNT, 0, 0)
+                out.append(f"  목록 머리(SysHeader32) hwnd={h}: 열 {n}개")
+    return out
+
+
+def dump_ui_tree(max_depth: int = 40, max_nodes: int = 6000) -> str:
+    """쿨메신저 창들의 UI 자동화(접근성) 트리를 글로 뽑는다 — 읽기 전용.
+
+    '제출' 버튼이 **실제 쿨메신저 쪽지 창**을 열게 하려면(2026-09-04 사용자
+    결정) 쪽지 목록·버튼이 접근성 트리에서 어떤 이름·종류로 보이는지 알아야
+    한다. 사용자 PC에서 한 번 뽑아 보고 자동화가 가능한지 판단한다.
+    쪽지 제목·사람 이름이 섞여 있을 수 있어 화면에 뿌리지 않고 파일로 준다.
+    쿨메신저 상태는 바꾸지 않는다(조회만).
+    """
+    lines: list[str] = []
+    try:
+        user32 = ctypes.windll.user32
+    except Exception as e:
+        return f"윈도우에서만 동작합니다 ({e})"
+    pid = _cool_pid()
+    if pid is None:
+        return "쿨메신저 프로세스를 찾지 못했어요 — 쿨메신저를 켠 뒤 다시 시도해 주세요."
+    wins = _cool_windows(pid)
+    lines.append(f"쿨메신저 실행파일: {_exe_name(pid)} / 보이는 창 {len(wins)}개")
+    lines.append("표기: 종류 이름 id class (좌,상,우,하) [지원 패턴]  — 앞에 있던 창부터")
+    try:
+        warmup()
+    except Exception as e:
+        lines.append(f"UIA 준비 실패: {e}")
+        return "\n".join(lines)
+    type_names = {v: k for k, v in
+                  getattr(_uia, "known_control_types", {}).items()}
+    walker = _uia.iuia.ControlViewWalker
+    total = 0
+    for i, hwnd in enumerate(wins, 1):
+        cls = ctypes.create_unicode_buffer(128)
+        user32.GetClassNameW(hwnd, cls, 128)
+        title = _gettext(hwnd, 200)
+        lines.append("")
+        lines.append(f"===== 창{i}: class={cls.value} 제목='{title[:60]}' hwnd={hwnd} =====")
+        kids = _children_by_class(hwnd)
+        lines.append("자식 창 클래스: " + (", ".join(
+            f"{c}×{len(h)}" for c, h in kids.items()) or "없음"))
+        # 표준 윈도우 부품(버튼·글상자·목록)은 UIA 없이도 글자를 읽을 수 있다.
+        # 2026-09-04 사용자 진단에서 쿨메신저 쪽지 창이 Button×35·SysListView32×2
+        # 같은 표준 부품으로 돼 있음을 확인 — '회신' 버튼 이름과 목록 크기를
+        # 여기서 바로 본다 (UIA가 놓치는 경우의 보험).
+        lines.extend(_classic_controls(kids))
+        try:
+            root = _uia.iuia.ElementFromHandle(hwnd)
+        except Exception as e:
+            lines.append(f"(UIA 루트를 못 얻음: {e})")
+            continue
+        stack = [(root, 0)]
+        count = 0
+        while stack and total < max_nodes:
+            el, depth = stack.pop()
+            count += 1
+            total += 1
+            try:
+                lines.append("  " * depth + _describe_element(el, type_names))
+            except Exception as e:
+                lines.append("  " * depth + f"(요소 설명 실패: {e})")
+            if depth >= max_depth:
+                continue
+            # 자식들을 원래 순서대로 보이게 — 스택이라 뒤집어 넣는다
+            children = []
+            try:
+                child = walker.GetFirstChildElement(el)
+                while child is not None and len(children) < 500:
+                    children.append(child)
+                    child = walker.GetNextSiblingElement(child)
+            except Exception:
+                pass
+            for c in reversed(children):
+                stack.append((c, depth + 1))
+        lines.append(f"(창{i} 요소 {count}개)")
+        if total >= max_nodes:
+            lines.append(f"(요소가 너무 많아 {max_nodes}개에서 멈췄어요)")
+            break
     return "\n".join(lines)
 
 

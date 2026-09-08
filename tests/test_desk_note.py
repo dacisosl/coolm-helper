@@ -26,6 +26,36 @@ def _make_note(store, ev, base_dir=None):
     return PostItWidget(store, config, base, conf, ev)
 
 
+class TestSubmitButton(unittest.TestCase):
+    """오른쪽 아래 '제출' — 원본 쪽지 보기 (2026-09-04 사용자 요청)."""
+
+    def setUp(self):
+        self.store = EventStore(tempfile.mkdtemp())
+        self.ev = self.store.add("교직원 연수", datetime(2026, 8, 5, 15, 0),
+                                 all_day=False, memo="본문입니다")
+        self.note = _make_note(self.store, self.ev)
+
+    def test_button_sits_below_memo(self):
+        self.note.show()
+        QApplication.processEvents()
+        btn = self.note.submit_btn
+        self.assertIn("제출", btn.text())
+        # 메모 칸 아래에, 그리고 오른쪽에 붙어 있다
+        self.assertGreaterEqual(btn.geometry().top(),
+                                self.note.memo_edit.geometry().bottom())
+        self.assertGreater(btn.geometry().center().x(),
+                           self.note.card.width() // 2)
+        self.note.close()
+
+    def test_lookup_without_memo_dir_is_quiet(self):
+        """테스트 픽스처처럼 memo_dir이 없어도 예외 없이 '못 찾음'으로."""
+        from ui.reply_helper import find_source_message
+        msg, spans = find_source_message(self.note.base_dir, self.note.config,
+                                         self.note.event)
+        self.assertIsNone(msg)
+        self.assertEqual(spans, [])
+
+
 class TestWhenEdit(unittest.TestCase):
     def setUp(self):
         self.store = EventStore(tempfile.mkdtemp())

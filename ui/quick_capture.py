@@ -112,6 +112,46 @@ def source_text_of(c) -> str:
     return text.replace("\r", " ")
 
 
+def display_text(c):
+    """화면에 보여줄 쪽지 내용과, 원문 위치를 그 안의 위치로 옮기는 함수.
+
+    파서가 본 원문은 '제목 + 줄바꿈 + 본문'인데, 쿨메신저 쪽지는 제목이
+    본문의 한 줄과 똑같은 경우가 흔하다(부재중 쪽지 등). 그대로 그리면
+    같은 문장이 두 번 보인다(2026-09-04 사용자 지적) — 그럴 땐 제목 줄을
+    빼고 본문만 보여준다.
+
+    제목 줄을 빼면 글자 위치가 밀리므로, source_span을 그대로 쓸 수 없다.
+    그래서 위치 변환 함수를 같이 돌려준다. 제목 쪽에서 찾은 날짜는 본문의
+    같은 문장으로 옮겨 준다 — 안 그러면 하이라이트가 사라진다.
+    """
+    text = source_text_of(c)
+    same = lambda p: p                       # noqa: E731 (한 줄짜리 항등 변환)
+    if not text:
+        return "", same
+    msg = getattr(c, "message", None)
+    raw_title = getattr(msg, "title", "") or ""
+    body = (getattr(msg, "body", "") or "").replace("\r", " ")
+    title = raw_title.strip()
+    if not title or title not in [ln.strip() for ln in body.splitlines()]:
+        return text, same                    # 제목이 겹치지 않으면 그대로
+
+    # 제목 줄을 뺐으니 본문 맨 앞의 빈 줄도 함께 걷어낸다 (첫 줄이 비어 보임)
+    blank = len(body) - len(body.lstrip("\n"))
+    body = body[blank:]
+    head = len(raw_title) + 1 + blank        # 원문에서 (남긴) 본문이 시작하는 자리
+    lead = len(raw_title) - len(raw_title.lstrip())
+    twin = body.find(title)                  # 본문 안의 같은 문장
+
+    def to_body(p: int):
+        if p >= head:
+            return p - head                  # 본문에 있던 위치
+        if twin >= 0 and lead <= p < lead + len(title):
+            return twin + (p - lead)         # 제목에 있던 위치 → 본문의 같은 자리
+        return None                          # 옮길 데가 없다 (표시 안 함)
+
+    return body, to_body
+
+
 def source_context(c, width: int = 46) -> str:
     """그 날짜가 적혀 있던 대목을 한 줄로 뽑는다 ('…9월 16일까지 제출…').
 
@@ -344,13 +384,15 @@ class DatePickDialog(QDialog):
         col.setSpacing(6)
         col.addWidget(_column_title("쪽지 내용"))
 
-        # 후보가 들고 있는 원문(제목+본문)을 그대로 — 파서가 본 것과 같은
-        # 글자수라야 source_span으로 짚는 자리가 어긋나지 않는다
-        text = ""
+        # 후보가 들고 있는 원문을 그대로 — 글자수가 파서가 본 것과 같아야
+        # source_span으로 짚는 자리가 어긋나지 않는다. 제목이 본문에 이미
+        # 있으면 그만큼 앞이 잘리므로 offset을 받아 하이라이트에서 뺀다.
+        text, self._body_pos = "", (lambda p: p)
         if self._options:
-            text = source_text_of(self._options[0])
+            text, self._body_pos = display_text(self._options[0])
         if not text:
             text = (body or "").replace("\r", " ")
+            self._body_pos = lambda p: p
         self._body_text = text[:self.BODY_CHARS]
 
         view = QTextEdit()
@@ -372,7 +414,11 @@ class DatePickDialog(QDialog):
         span = getattr(self._options[i], "source_span", None)
         if span is None:
             return False
-        s, e = span
+        to_body = getattr(self, "_body_pos", None) or (lambda p: p)
+        s, last = to_body(span[0]), to_body(span[1] - 1)
+        if s is None or last is None:
+            return False        # 화면에 없는 자리 (걸러낸 제목 줄 등)
+        e = last + 1
         if not (0 <= s < e <= len(self._body_text)):
             return False        # 아주 긴 쪽지라 잘려 나간 뒤쪽 날짜
         cursor = view.textCursor()
