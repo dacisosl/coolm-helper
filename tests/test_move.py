@@ -206,6 +206,24 @@ class TestPenguinMove(unittest.TestCase):
         self.assertIn("문구 보정", joined)
         self.assertIn("화면 구조 진단", joined)     # 실제 쪽지 열기 준비용 진단
 
+    def test_diag_wait_popup_closes(self):
+        """진단이 끝나면 '읽는 중' 팝업이 닫혀야 한다 (2026-09-08 사용자 보고)."""
+        import time
+        from PyQt6.QtWidgets import QMessageBox
+        real = QMessageBox.exec
+        QMessageBox.exec = lambda self: 0            # 결과 안내 창은 바로 닫힌 셈
+        try:
+            self.w._dump_ui_structure(dump_fn=lambda: "테스트 덤프")
+            self.assertTrue(self.w._diag_wait.isVisible())
+            for _ in range(200):
+                QApplication.processEvents()
+                if not self.w._diag_wait.isVisible():
+                    break
+                time.sleep(0.01)
+            self.assertFalse(self.w._diag_wait.isVisible())
+        finally:
+            QMessageBox.exec = real
+
     def test_bar_flips_when_penguin_is_at_left_edge(self):
         g = _screen()
         self.w.move(g.left(), g.center().y())

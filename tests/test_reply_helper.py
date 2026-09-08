@@ -130,5 +130,63 @@ class TestDialog(unittest.TestCase):
             f"예상 못한 진단 결과: {text[:120]}")
 
 
+class TestOpenFlow(unittest.TestCase):
+    """'제출' → 쿨메신저에서 열기를 먼저 시도하고, 실패할 때만 대체 창 (2026-09-08)."""
+
+    def setUp(self):
+        import time
+        from PyQt6.QtWidgets import QWidget
+        self.time = time
+        self.tmp = tempfile.mkdtemp()
+        memo = os.path.join(self.tmp, "memo")
+        os.makedirs(memo)
+        make_fake_db(memo, unread=1, read=2)
+        store = EventStore(os.path.join(self.tmp, "store"))
+        ev = store.add("일정", datetime(2026, 7, 20, 9, 0), memo="메모",
+                       source_ref="2|2026-07-20T09:00:00")
+
+        class _Note(QWidget):
+            pass
+
+        self.note = _Note()
+        self.note.base_dir, self.note.event = self.tmp, ev
+        self.note.config = {"memo_dir": memo, "desk_widgets": {"notes": []}}
+
+    def tearDown(self):
+        self.note.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self, result):
+        import coolm_control
+        import ui.reply_helper as rh
+        created = []
+        real_open, real_exec = coolm_control.open_message, rh.SourceMessageDialog.exec
+        coolm_control.open_message = lambda msg, ui=None: result
+        rh.SourceMessageDialog.exec = lambda self: created.append(self) or 0
+        try:
+            rh.open_source_message(self.note)
+            for _ in range(300):                 # 백그라운드 → 시그널 대기
+                QApplication.processEvents()
+                if self.note._source_result is not None:
+                    break
+                self.time.sleep(0.01)
+        finally:
+            coolm_control.open_message = real_open
+            rh.SourceMessageDialog.exec = real_exec
+        return created
+
+    def test_opens_in_coolm_without_dialog(self):
+        created = self._run((True, ""))
+        self.assertEqual(self.note._source_result, (True, ""))
+        self.assertEqual(created, [])                # 쿨메신저가 열렸으니 창 없음
+
+    def test_fallback_dialog_with_reason(self):
+        created = self._run((False, "메시지 관리함을 열지 못했어요."))
+        self.assertEqual(len(created), 1)
+        self.assertIn("관리함을 열지 못했어요", created[0].status.text())
+        self.assertIn("정주은" if False else "발신자", " ".join(
+            w.text() for w in created[0].findChildren(QLabel)))  # 원본 보낸 사람
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
