@@ -86,6 +86,12 @@ def main() -> None:
         autostart.repair(BASE_DIR)
     except Exception:
         pass
+    # 학교마다 쪽지 프로그램이 달라 자동 탐지가 실패하면 설정으로 지정한다
+    try:
+        import capture
+        capture.set_extra_hints(config.get("messenger_exe", ""))
+    except Exception:
+        pass
     from ui import motion
     motion.set_enabled(bool(config.get("animations_enabled", True)))
     style = config.get("widget_style", "mini")
