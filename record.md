@@ -2001,3 +2001,27 @@ v2.9.2는 두 번째부터 빨랐지만 첫 번째는 "어느 방법이 통하�
 ## 2026-09-09 (5) — v2.9.3 릴리스
 '제출' 첫 번째부터 바로(메시지 더블클릭을 첫 방법으로). 자잘한 개선이라 수 +1
 (2.9.2 → 2.9.3). 382 통과.
+
+## 2026-09-09 (6) — '제출' 직후 "'Toast' object has no attribute '_timer'" 오류
+
+사용자(v2.9.3): 기능은 잘 되는데 오류 창이 뜨고 확인을 눌러야 진행된다.
+
+원인은 `ui/toast.py`의 **초기화 순서**. `Toast.__init__`가 `show()`를 먼저 부르고 그 뒤에
+`_timer`·`_remaining`을 만들었다. 토스트가 마우스 커서 바로 아래에 나타나면 `show()` 도중
+Qt가 `enterEvent`를 즉시 부르고, 거기서 `self._timer`를 읽어 AttributeError. '제출' 대기
+안내(v2.9.2)는 포스트잇 하단에 뜨고 '제출' 버튼이 바로 그 하단이라 커서가 늘 그 자리 —
+그래서 이번에 처음 드러났다. Qt 이벤트 핸들러 안의 예외는 호출한 쪽의 try/except로 오지
+않고 `sys.excepthook`으로 가서 오류 창이 뜨고, 그 모달 창이 UI 스레드를 잡아
+"확인을 눌러야 진행"됐다.
+
+고침: `_closing`·`_remaining`·`_timer` 생성을 `show()` **앞**으로, `start(msec)`만 뒤에.
+enter/leave는 `getattr`로 방어. `tests/test_toast.py`(2개)로 "show 도중 enter/leave" 순서를
+재현해 고정. 384 통과(+2).
+
+배운 점
+- **위젯 상태는 show() 전에 다 만들어 둔다.** show()는 돌아오기 전에 이벤트(enter, resize,
+  paint)를 즉시 발생시킬 수 있다.
+- Qt 핸들러 안의 예외는 파이썬 try/except를 건너뛰어 excepthook으로 간다 — "감싸 놨으니
+  안전"이 아니다.
+- 테스트에서 sip 메서드를 monkeypatch할 땐 `del`로 되돌린다. `Cls.show = 저장해둔값`은
+  바인딩이 깨져 다른 테스트에서 "unbound method must have type QWidget"이 난다.

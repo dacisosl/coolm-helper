@@ -33,29 +33,35 @@ class Toast(QFrame):
                 f"QPushButton:hover{{color:{theme.TOAST_ACTION_HOVER}}}")
             btn.clicked.connect(lambda: (on_action and on_action(), self._dismiss()))
             lay.addWidget(btn)
+        # 타이머 등 상태는 show() **전에** 다 만들어 둔다 — 토스트가 마우스 커서 바로
+        # 아래에 나타나면 show() 도중 enterEvent가 즉시 불리는데, 그때 _timer가 없으면
+        # AttributeError가 excepthook으로 새 나가 오류 창이 뜬다 (v2.9.3 '제출' 보고).
+        self._closing = False
+        self._remaining = msec
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._dismiss)
+
         self.adjustSize()
         self.move((parent.width() - self.width()) // 2,
                   parent.height() - self.height() - 18)
         self.show()
         self.raise_()
         motion.slide_fade_in(self, dy=8, ms=200)
-
-        self._remaining = msec
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self._dismiss)
         self._timer.start(msec)
 
     # 마우스를 올려두면 타이머 정지(되돌리기 누를 시간), 떼면 재개
     def enterEvent(self, ev):
-        if self._timer.isActive():
-            self._remaining = self._timer.remainingTime()
-            self._timer.stop()
+        timer = getattr(self, "_timer", None)
+        if timer is not None and timer.isActive():
+            self._remaining = timer.remainingTime()
+            timer.stop()
         super().enterEvent(ev)
 
     def leaveEvent(self, ev):
-        if not getattr(self, "_closing", False):
-            self._timer.start(max(600, self._remaining))
+        timer = getattr(self, "_timer", None)
+        if timer is not None and not getattr(self, "_closing", False):
+            timer.start(max(600, getattr(self, "_remaining", 600)))
         super().leaveEvent(ev)
 
     def _dismiss(self) -> None:
