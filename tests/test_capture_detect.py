@@ -96,6 +96,84 @@ class TestCandidateRows(unittest.TestCase):
             [("NOTEPAD.EXE", "Notepad", "제목 없음")]), [])
 
 
+# 경기도 선생님 PC에서 실제로 받은 창 목록 (2026-09-09) — GOE메신저.
+# (실행파일, 창종류, 제목, pid)
+GOE_ROWS = [
+    ("", "WindowsForms10.Window.8.app.0.2542b5e_r6_ad1", "MsgWnd", 11),
+    ("ATMESSENGERMOBILEEDITION.EXE", "Afx:00160000:3:00000000:00900010:00000000",
+     "USkinFrameWndBorder", 22),
+    ("ATMESSENGERMOBILEEDITION.EXE", "@Messenger7_Wnd", "쪽지", 22),
+    ("ATMESSENGERMOBILEEDITION.EXE", "@Messenger7_MainWnd", "GOE메신저", 22),
+    ("ATMESSENGERMOBILEEDITION.EXE", "MSCTFIME UI", "MSCTFIME UI", 22),
+    ("CHROME.EXE", "Chrome_WidgetWin_1",
+     "COOL-비서 (쿨메신저 일정관리 도우미) · DoRms - Chrome", 33),
+    ("COOLMHELPER.EXE", "Qt6112QWindowIcon", "쿨메신저 화면 구조 진단", 44),
+    ("COOLMHELPER.EXE", "Qt6112QWindowToolSaveBits", "CoolmHelper", 44),
+]
+
+
+class TestPickMessenger(unittest.TestCase):
+    """지역마다 다른 메신저를 '공통 성질'로 잡는다 (2026-09-09 GOE메신저 확정).
+
+    이전 규칙은 쿨메신저 전용이라 전부 빗나갔다:
+    클래스 `@Messenger7_MainWnd`는 @로 시작해 접두어 검사 실패,
+    실행파일 ATMESSENGERMOBILEEDITION은 COOLMESSENGER/COOLMSG 어느 쪽도 아니고,
+    제목이 딱 '쪽지' 한 단어라 제목 힌트에도 안 걸렸다.
+    """
+
+    def setUp(self):
+        capture._learned_exes.clear()
+        capture._extra_exes.clear()
+
+    def test_picks_goe_messenger(self):
+        got = capture.pick_messenger(GOE_ROWS)
+        self.assertIsNotNone(got)
+        self.assertEqual(got[0], "ATMESSENGERMOBILEEDITION.EXE")
+        self.assertEqual(got[3], 22)
+
+    def test_does_not_pick_browser(self):
+        """제목에 '쿨메신저'가 든 크롬 창을 메신저로 착각하면 안 된다."""
+        rows = [r for r in GOE_ROWS if r[0] in ("CHROME.EXE", "COOLMHELPER.EXE")]
+        self.assertIsNone(capture.pick_messenger(rows))
+
+    def test_does_not_pick_self(self):
+        self.assertEqual(capture.messenger_score(
+            "COOLMHELPER.EXE", "Qt6112QWindowIcon", "쿨메신저 화면 구조 진단"), 0)
+
+    def test_standard_coolmessenger(self):
+        rows = [("COOLMESSENGER.EXE", "CoolMsg50SingleInstance", "", 7)]
+        self.assertEqual(capture.pick_messenger(rows)[3], 7)
+
+    def test_ssamboard_by_title(self):
+        rows = [("SSAMBOARD.EXE", "Chrome_WidgetWin_1", "쪽지 읽기", 9)]
+        self.assertEqual(capture.pick_messenger(rows)[3], 9)
+
+    def test_class_works_without_exe_name(self):
+        """관리자 권한이면 실행파일 이름을 못 읽는다 — 창 종류로도 잡혀야."""
+        rows = [("", "@Messenger7_Wnd", "쪽지", 5)]
+        self.assertEqual(capture.pick_messenger(rows)[3], 5)
+
+    def test_name_beats_title(self):
+        """이름·클래스 일치(3점)가 제목만 맞는 창(2점)보다 확실하다."""
+        self.assertGreater(
+            capture.messenger_score("ATMESSENGERMOBILEEDITION.EXE", "X", ""),
+            capture.messenger_score("UNKNOWN.EXE", "X", "쪽지"))
+
+    def test_plain_apps_score_zero(self):
+        for exe, cls, title in (("EXPLORER.EXE", "Shell_TrayWnd", ""),
+                                ("KAKAOTALK.EXE", "EVA_Window_Dblclk", ""),
+                                ("NOTEPAD.EXE", "Notepad", "제목 없음")):
+            self.assertEqual(capture.messenger_score(exe, cls, title), 0,
+                             f"{exe} {cls} {title}")
+
+    def test_setting_can_name_the_program(self):
+        """자동으로 못 잡는 학교는 설정(messenger_exe)으로 지정할 수 있다."""
+        rows = [("WEIRDCHAT.EXE", "SomeClass", "", 3)]
+        self.assertIsNone(capture.pick_messenger(rows))
+        capture.set_extra_hints("WeirdChat.exe")
+        self.assertEqual(capture.pick_messenger(rows)[3], 3)
+
+
 class TestQuietOffWindows(unittest.TestCase):
     """리눅스에서도 죽지 않고 조용히 빈 결과·안내 문구를 준다."""
 

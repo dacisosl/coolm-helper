@@ -73,6 +73,9 @@ DEFAULT_CONFIG = {
                     "always_on_top": False, "font_scale": 100},
         "notes": [],   # 포스트잇: {event_id, geometry, opacity, always_on_top, font_scale}
     },
+    # 자동으로 쪽지 프로그램을 못 찾는 학교용 — 실행파일 이름을 직접 적는다
+    # (예: "ATMESSENGERMOBILEEDITION.EXE" — 경기도 GOE메신저). 비우면 자동 탐지.
+    "messenger_exe": "",
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "animations_enabled": True,     # 화면 전환 애니메이션 (끄면 즉시 표시)
     "alert_enabled": True,          # 마감 알림 포스트잇 (설정에서 끄고 켬)

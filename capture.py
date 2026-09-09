@@ -21,16 +21,39 @@ from dataclasses import dataclass
 MAIN_WINDOW_CLASS = "CoolMsg50SingleInstance"   # 쿨메신저 고유 창 클래스(5.0)
 # 학교마다 쿨메신저 버전이 달라 창 클래스가 CoolMsg51…처럼 바뀐다.
 # 정확한 이름이 안 맞으면 접두어·실행파일 이름으로도 찾는다 (2026-07-26).
-CLASS_PREFIXES = ("COOLMSG", "COOLMESSENGER")
-PROCESS_HINTS = ("COOLMESSENGER", "COOLMSG")
+# 창 종류·실행파일 이름에서 찾는 조각 — **접두어가 아니라 포함** 검사.
+# 경기도교육청 메신저는 클래스가 '@Messenger7_MainWnd'(앞에 @가 붙어 접두어
+# 검사가 실패했다), 실행파일이 'ATMESSENGERMOBILEEDITION.EXE'다. 제품 이름이
+# 아니라 **공통 성질(MESSENGER)**로 잡아야 지역마다 다른 메신저를 다 잡는다.
+CLASS_PREFIXES = ("COOLMSG", "COOLMESSENGER", "MESSENGER")   # 이름 유지(진단이 쓴다)
+PROCESS_HINTS = ("COOLMESSENGER", "COOLMSG", "MESSENGER")
 # 지역에 따라 메신저 프로그램 이름이 아예 다르다 (2026-09-08 경기도 사례:
 # SSAMBOARD.EXE / Chrome_WidgetWin_1 — 이름·창클래스 어느 힌트에도 안 걸렸다).
 # 그래서 **창 제목**으로도 찾는다. 제목은 그 프로그램의 우리말 화면 글자라
 # 회사·버전이 달라도 같다.
 WINDOW_TITLE_HINTS = ("쪽지 읽기", "쪽지 보내기", "쪽지 쓰기",
                       "메시지 관리함", "쪽지함", "메시지관리함")
+# 제목이 딱 이 단어인 창 — GOE메신저의 쪽지 창 제목이 '쪽지' 한 단어였다
+TITLE_EXACT = ("쪽지", "쪽지함", "메시지", "메신저")
+# 브라우저 제목은 '보고 있는 웹페이지' 이름이라 메신저 판단에 쓰면 안 된다
+# (그 선생님 목록에도 제목에 '쿨메신저'가 든 크롬 창이 있었다)
+BROWSER_HINTS = ("CHROME", "MSEDGE", "EDGE", "WHALE", "FIREFOX", "IEXPLORE",
+                 "OPERA", "BRAVE")
 SELF_EXE_HINT = "COOLMHELPER"      # 우리 앱 — 우리 창을 메신저로 착각하면 안 된다
 _learned_exes: set[str] = set()    # 제목으로 찾아낸 프로그램 이름 (이 실행 동안 기억)
+_extra_exes: set[str] = set()      # 설정(messenger_exe)으로 직접 지정한 이름
+_cached_pid: int | None = None     # 직전에 찾은 프로세스 (몇 초마다 다시 찾지 않게)
+
+
+def set_extra_hints(exe: str = "") -> None:
+    """설정에서 직접 지정한 쪽지 프로그램 이름을 알려 준다 (main.py가 부른다).
+
+    자동으로 못 찾는 학교는 config.json의 messenger_exe에 한 줄
+    (예: "ATMESSENGERMOBILEEDITION.EXE") 적어 두면 그걸로 찾는다.
+    """
+    name = (exe or "").strip().upper()
+    if name:
+        _extra_exes.add(name)
 CHROME_CHILD_CLASS = "Chrome_RenderWidgetHostHWND"
 MIN_BODY_LEN = 10
 WM_GETTEXT, WM_GETTEXTLENGTH = 0x000D, 0x000E
@@ -119,6 +142,47 @@ def _window_title(hwnd: int) -> str:
 
 def _is_self(exe: str) -> bool:
     return SELF_EXE_HINT in (exe or "")
+
+
+def _is_browser(exe: str) -> bool:
+    return any(b in (exe or "") for b in BROWSER_HINTS)
+
+
+def messenger_score(exe: str, cls: str, title: str) -> int:
+    """이 창이 쪽지 프로그램의 것일 가능성 (0=아님, 클수록 확실).
+
+    3 = 창 종류나 실행파일 이름에 MESSENGER/COOLMSG… 가 있다 (가장 확실)
+    2 = 제목이 쪽지 창 같다 (브라우저는 제외 — 제목이 웹페이지 이름이다)
+    """
+    if _is_self(exe):
+        return 0                      # 우리 앱 창 (제목에 '쪽지'가 들어간다)
+    e, c = (exe or "").upper(), (cls or "").upper()
+    hints = tuple(PROCESS_HINTS) + tuple(_learned_exes) + tuple(_extra_exes)
+    if any(k in c for k in CLASS_PREFIXES) or any(k in e for k in hints):
+        return 3
+    if _is_browser(e):
+        return 0
+    t = (title or "").strip()
+    if t in TITLE_EXACT or looks_like_messenger_title(t):
+        return 2
+    return 0
+
+
+def pick_messenger(rows):
+    """(실행파일, 창종류, 제목, pid) 목록에서 쪽지 프로그램 창을 고른다.
+
+    점수가 가장 높은 것, 같으면 제목이 있는 것을 먼저. 없으면 None.
+    """
+    best, best_key = None, (0, 0)
+    for row in rows:
+        exe, cls, title = row[0], row[1], row[2]
+        score = messenger_score(exe, cls, title)
+        if not score:
+            continue
+        key = (score, 1 if (title or "").strip() else 0)
+        if key > best_key:
+            best, best_key = row, key
+    return best
 
 
 def dedupe_windows(rows: list[tuple[str, str, str]], limit: int = 25) -> list[str]:
@@ -239,54 +303,49 @@ def _exe_name(pid: int) -> str:
 
 
 def _cool_pid() -> int | None:
-    """쿨메신저 프로세스를 찾는다 — 버전·지역이 달라도 찾도록 4단계로.
+    """쪽지 프로그램(쿨메신저·GOE메신저 등)의 프로세스를 찾는다.
 
-    ① 정확한 창 클래스(가장 빠름) ② 클래스 접두어(CoolMsg…) ③ 실행파일 이름
-    ④ **창 제목**('쪽지 읽기' 등) — 지역에 따라 프로그램 이름이 아예 달라서
-      ①~③이 모두 빗나가는 경우가 있다 (2026-09-08 경기도 사례).
+    ① 정확한 창 클래스(가장 빠름) ② 직전에 찾은 프로세스가 아직 살아 있으면 그대로
+    ③ 숨은 창까지 한 번 훑어 messenger_score가 가장 높은 창의 프로세스.
+
+    ③을 매번 하면 창마다 OpenProcess를 해서 부담이다(prewarm이 몇 초마다 부른다).
+    그래서 ②로 캐시를 둔다. 학교마다 프로그램이 달라 이름·클래스·제목을 모두
+    본다 (2026-09-09 경기도 GOE메신저 확인).
     """
+    global _cached_pid
     user32 = ctypes.windll.user32
     hwnd = user32.FindWindowW(MAIN_WINDOW_CLASS, None)
     if hwnd:
-        return _pid_of(hwnd) or None
+        pid = _pid_of(hwnd) or None
+        if pid:
+            _cached_pid = pid
+            return pid
 
-    found: list[int] = []
+    if _cached_pid and _exe_name(_cached_pid):      # ② 아직 살아 있나 (한 번만 확인)
+        return _cached_pid
+
+    rows: list[tuple[str, str, str, int]] = []
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
     def cb(h, lparam):
+        pid = _pid_of(h)
+        if not pid:
+            return True
         cls = ctypes.create_unicode_buffer(128)
         user32.GetClassNameW(h, cls, 128)
-        name = (cls.value or "").upper()
-        if any(name.startswith(p) for p in CLASS_PREFIXES):
-            pid = _pid_of(h)
-            if pid:
-                found.append(pid)
-                return False           # 찾았으면 그만
+        rows.append((_exe_name(pid), cls.value or "", _window_title(h), pid))
         return True
 
     user32.EnumWindows(cb, 0)
-    if found:
-        return found[0]
-
-    # ③ 창 클래스가 완전히 달라진 경우: 보이는 창의 실행파일 이름으로 찾기
-    cands: list[int] = []
-
-    @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-    def cb2(h, lparam):
-        if not user32.IsWindowVisible(h):
-            return True
-        pid = _pid_of(h)
-        exe = _exe_name(pid)
-        hints = tuple(PROCESS_HINTS) + tuple(_learned_exes)
-        if pid and not _is_self(exe) and any(k in exe for k in hints):
-            cands.append(pid)
-            return False
-        return True
-
-    user32.EnumWindows(cb2, 0)
-    if cands:
-        return cands[0]
-    return _pid_by_title()          # ④ 제목으로 (프로그램 이름이 다른 지역)
+    best = pick_messenger(rows)
+    if best is None:
+        _cached_pid = None
+        return None
+    exe = best[0]
+    if exe:
+        _learned_exes.add(exe)      # 다음부터는 이름으로 바로 걸린다
+    _cached_pid = best[3]
+    return _cached_pid
 
 
 def bring_to_front() -> bool:
@@ -454,12 +513,12 @@ def diagnose() -> str:
         allw = visible_windows(include_hidden=True, with_self=True)
         vis = visible_windows()
         cls_hits = [r for r in allw
-                    if any(r[1].upper().startswith(p) for p in CLASS_PREFIXES)]
+                    if any(p in r[1].upper() for p in CLASS_PREFIXES)]
         exe_hits = [r for r in vis
                     if any(k in r[0] for k in PROCESS_HINTS)]
         titled = [r for r in vis if looks_like_messenger_title(r[2])]
         unknown = sum(1 for r in allw if not r[0])
-        lines.append(f"   ② 창 종류가 CoolMsg…로 시작하는 창: {len(cls_hits)}개"
+        lines.append(f"   ② 창 종류에 Messenger/CoolMsg가 든 창: {len(cls_hits)}개"
                      + (" → " + ", ".join(dedupe_windows(cls_hits, 3))
                         if cls_hits else ""))
         lines.append(f"   ③ 실행파일 이름에 COOLMESSENGER/COOLMSG가 있는 창: "
