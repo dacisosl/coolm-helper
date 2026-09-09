@@ -43,8 +43,14 @@ TREE_ID = "3013"               # 조직도 (SysTreeView32)
 MSG_NO_NAME = "보낸 사람 이름을 몰라서 쪽지 쓰기를 열 수 없어요."
 MSG_NO_MAIN = "쿨메신저 기본 창을 찾지 못했어요."
 
-# 활성화 방법 — 조직도 항목엔 Invoke 패턴이 없어(진단 확인) 세 가지를 차례로 쓴다.
-STEPS = ("do_default_action", "press_enter", "double_click")
+# 활성화 방법 — 조직도 항목엔 Invoke 패턴이 없고(진단 확인) 메인 창에 '쪽지 보내기'
+# 버튼도 없어, 사람이 하는 동작인 **이름 더블클릭**이 유일한 길이다.
+# (2026-09-09 사용자: "첫 번째도 빠르게") 시험 순서가 첫 번째를 느리게 했다 —
+# 예전엔 기본동작 → Enter → 더블클릭 순서라 앞의 둘이 안 통하는 PC는 2초+2초를 그냥
+# 기다렸다. 이제 더블클릭을 맨 앞에 둔다. 메시지로 보내는 더블클릭(post_double_click)이
+# 첫 방법: 우리 포스트잇·펭귄이 그 자리를 가려도 트리로 직접 들어가고, 창이 앞에
+# 없어도 되고, 쪽지 창이 모달로 열려도 우리 스레드가 멈추지 않는다(PostMessage).
+STEPS = ("post_double_click", "double_click", "press_enter", "do_default_action")
 # (2026-09-09 사용자: "잘 되는데 너무 느려") 안 통하는 방법마다 4초씩 기다리던 것이
 # 느림의 주범. 통한 방법은 기억해 다음부터 맨 먼저 쓰고(넉넉히 기다림),
 # 아직 모르는 방법을 탐색할 때만 짧게 기다린다 — 쪽지 쓰기 창은 보통 0.5초 안에
@@ -435,35 +441,71 @@ class UiaAdapter:
         self._pattern(el, self.d.UIA_SelectionItemPatternId,
                       self.UIAC.IUIAutomationSelectionItemPattern).Select()
 
-    # 활성화 3단계 — 조직도 항목엔 Invoke 패턴이 없다(진단 확인).
+    # 활성화 방법들 — STEPS 순서로 시도한다 (통한 것은 compose_method로 기억).
+    def _tree_hwnd(self, hwnd) -> int:
+        """조직도(SysTreeView32) 창 핸들 — 컨트롤 ID 3013 우선, 없으면 첫 트리."""
+        import ctypes
+        trees = self.cap._children_by_class(hwnd).get("SysTreeView32", [])
+        if not trees:
+            raise RuntimeError("조직도 창을 찾지 못함")
+        for t in trees:
+            if str(ctypes.windll.user32.GetDlgCtrlID(t)) == TREE_ID:
+                return t
+        return trees[0]
+
+    @staticmethod
+    def _center(el) -> tuple[int, int]:
+        r = el.CurrentBoundingRectangle
+        if r.right <= r.left or r.bottom <= r.top:
+            raise RuntimeError("항목이 화면에 없음")
+        return (r.left + r.right) // 2, (r.top + r.bottom) // 2
+
+    def post_double_click(self, el, hwnd) -> None:
+        """항목 가운데에 더블클릭 **메시지**를 조직도 창으로 직접 보낸다.
+
+        WM_LBUTTONDOWN → UP → DBLCLK → UP을 PostMessage로 (pywinauto double_click과
+        같은 방식). 실제 마우스 입력과 달리 위를 덮은 다른 창(항상 위 포스트잇 등)에
+        가로막히지 않고, 쿨메신저가 앞에 없어도 된다. 앱이 GetCursorPos로 위치를 읽는
+        경우를 대비해 보내는 동안만 커서를 항목 위로 옮기고 되돌린다.
+        """
+        import ctypes
+        from ctypes import wintypes
+        tree = self._tree_hwnd(hwnd)
+        x, y = self._center(el)
+        user32 = ctypes.windll.user32
+        pt = wintypes.POINT(x, y)
+        user32.ScreenToClient(tree, ctypes.byref(pt))
+        lparam = (pt.y & 0xFFFF) << 16 | (pt.x & 0xFFFF)
+        old = wintypes.POINT()
+        user32.GetCursorPos(ctypes.byref(old))
+        try:
+            user32.SetCursorPos(x, y)
+            for msg, wparam in ((0x0201, 1), (0x0202, 0),     # LBUTTONDOWN(MK_LBUTTON)/UP
+                                (0x0203, 1), (0x0202, 0)):    # LBUTTONDBLCLK/UP
+                user32.PostMessageW(tree, msg, wparam, lparam)
+            time.sleep(0.15)         # 앱이 메시지를 처리한 뒤 커서를 되돌린다
+        finally:
+            user32.SetCursorPos(old.x, old.y)
+
     def do_default_action(self, el, hwnd) -> None:
         self._pattern(el, self.d.UIA_LegacyIAccessiblePatternId,
                       self.UIAC.IUIAutomationLegacyIAccessiblePattern).DoDefaultAction()
 
     def press_enter(self, el, hwnd) -> None:
         import ctypes
-        trees = self.cap._children_by_class(hwnd).get("SysTreeView32", [])
-        if not trees:
-            raise RuntimeError("조직도 창을 찾지 못함")
+        t = self._tree_hwnd(hwnd)
         user32 = ctypes.windll.user32
-        for t in trees[:1]:
-            user32.SendMessageW(t, 0x0100, 0x0D, 0)     # WM_KEYDOWN VK_RETURN
-            user32.SendMessageW(t, 0x0101, 0x0D, 0)     # WM_KEYUP
+        user32.SendMessageW(t, 0x0100, 0x0D, 0)         # WM_KEYDOWN VK_RETURN
+        user32.SendMessageW(t, 0x0101, 0x0D, 0)         # WM_KEYUP
         # 기다림은 new_window_after가 한다
 
     def double_click(self, el, hwnd) -> None:
         """항목 가운데를 실제로 더블클릭한다 — 커서는 원래 자리로 되돌린다."""
         import ctypes
-        r = el.CurrentBoundingRectangle
-        if r.right <= r.left or r.bottom <= r.top:
-            raise RuntimeError("항목이 화면에 없음")
-        x, y = (r.left + r.right) // 2, (r.top + r.bottom) // 2
+        from ctypes import wintypes
+        x, y = self._center(el)
         user32 = ctypes.windll.user32
-
-        class _P(ctypes.Structure):
-            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
-
-        old = _P()
+        old = wintypes.POINT()
         user32.GetCursorPos(ctypes.byref(old))
         try:
             user32.SetCursorPos(x, y)
