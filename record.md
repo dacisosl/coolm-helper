@@ -2025,3 +2025,7 @@ enter/leave는 `getattr`로 방어. `tests/test_toast.py`(2개)로 "show 도중 
   안전"이 아니다.
 - 테스트에서 sip 메서드를 monkeypatch할 땐 `del`로 되돌린다. `Cls.show = 저장해둔값`은
   바인딩이 깨져 다른 테스트에서 "unbound method must have type QWidget"이 난다.
+
+## 2026-09-09 (7) — v2.9.4 릴리스
+'제출' 직후 뜨던 "'Toast' object has no attribute '_timer'" 오류 창 제거(토스트 초기화
+순서). 버그 수정이라 수 +1 (2.9.3 → 2.9.4). 384 통과.
