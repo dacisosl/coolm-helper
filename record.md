@@ -1928,3 +1928,42 @@ v2.9.0에서도 못 찾은 이유가 갈래마다 분명했다(검증 스크립�
 GOE메신저(경기도) 인식 수정 배포. 버그 수정이라 수 숫자 +1 (2.9.0 → 2.9.1).
 릴리스 노트에 한계도 적었다 — 쿨메신저가 아닌 프로그램에서는 ⚡ 화면 읽기만
 되고 쪽지 목록·'제출'은 쿨메신저 전용이다. 371 통과.
+
+## 2026-09-09 (3) — '제출' 속도: 통한 방법을 기억하고, 기다림은 필요한 만큼만
+
+사용자: "'제출' 버튼 작동 너무 잘돼. 근데 너무 느려. 오류 없이 시간 최소화해 줘."
++ "기다리는 동안 '제출을 위한 준비중입니다.' 안내 은은하게" + "배포까지".
+
+느린 원인은 코드에 그대로 있었다.
+- **활성화 3단계**(DoDefaultAction → Enter → 더블클릭)에서 안 통하는 방법마다
+  `new_window_after`가 **4초**씩 기다렸다. 2·3번째 방법에서 창이 뜨는 PC면 매번
+  4~8초를 헛되이 기다린다 — "잘 되는데 느리다"와 정확히 맞는 증상.
+- 검색칸(1708)·조직도(3013)를 메인 창 전체 `FindFirst(descendants)`로 **두 번** 훑음.
+  조직도 항목 수백 개를 프로세스 밖에서 하나씩 세는 비용.
+- 항목마다 `CurrentName` + `CurrentIsOffscreen` 두 번 COM 왕복.
+- 고정 sleep 0.4 + 0.3 + 0.3 + 0.2.
+
+고침
+- `coolm_control.compose_to(name, ui, memory)`: `memory["compose_method"]`에 **통한 방법을
+  기록**하고 다음엔 그 방법을 맨 먼저(`step_order`). 기억된 방법은 4초(KNOWN_TIMEOUT),
+  탐색 중인 방법은 2초(PROBE_TIMEOUT) — 쪽지 창은 보통 0.5초 안에 뜨니 안전하고,
+  창이 뜬 뒤 다음 방법을 또 눌러 창이 둘 뜨는 일도 없다. 폴링 0.2 → 0.05초.
+- `UiaAdapter._control(hwnd, cls, id)`: Win32 자식 컨트롤을 `_children_by_class` +
+  `GetDlgCtrlID`로 바로 잡아 `ElementFromHandle` — Win32 컨트롤의 UIA AutomationId는
+  곧 컨트롤 ID다. 못 찾으면 예전 FindFirst 폴백.
+- `_tree_items`: `CreateCacheRequest`(Name, IsOffscreen) + `FindAllBuildCache`로 한 번의
+  왕복. 캐시가 예외를 내면 예전 방식 폴백.
+- `find_person(wait=0.8)`: 고정 sleep 대신 화면에 보이는 '(이름)' 정확 일치가 나올 때까지
+  0.05초 간격 재조회. `_window_titled`는 WM_GETTEXT 대신 `_window_title`(GetWindowTextW).
+- `ui/reply_helper.py`: `_Opener(memory)` → `_finish`(UI 스레드)에서 config에 저장
+  (`_remember_method`, 값이 바뀔 때만 파일 쓰기). 기다리는 동안 포스트잇 위에
+  기존 `ui/toast.py`로 "제출을 위한 준비중입니다." — 끝나면 `_dismiss()`.
+- config 기본값 `compose_method: ""`. 381 통과(+10). v2.9.2로 배포(자잘한 개선 → 수 +1).
+
+배운 점
+- **폴백 사슬은 통한 길을 기억해야 빠르다.** 안전을 위해 쌓은 3단계 폴백이 매번
+  처음부터 돌면 그 자체가 지연이 된다. 기억(+실패 시 재탐색)으로 안전과 속도를 같이 잡는다.
+- **Win32 컨트롤은 UIA 트리 훑기 대신 hwnd로 바로 잡는다.** AutomationId = 컨트롤 ID라는
+  사실 하나로 수백 번의 프로세스 왕복이 한 번으로 줄어든다.
+- 고정 `sleep(n)`은 늘 틀린다 — 빠른 PC엔 낭비, 느린 PC엔 부족. "조건이 될 때까지 짧게
+  폴링 + 상한"으로 바꾼다.

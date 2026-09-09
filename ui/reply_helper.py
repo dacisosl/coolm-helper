@@ -344,12 +344,17 @@ class InfoDialog(QDialog):
 
 
 class _Opener(QObject):
-    """조직도에서 사람을 찾아 쪽지 쓰기 — 몇 초 걸릴 수 있어 백그라운드에서."""
+    """조직도에서 사람을 찾아 쪽지 쓰기 — 몇 초 걸릴 수 있어 백그라운드에서.
+
+    memory({"compose_method": …})는 이 스레드에서만 만지고, 끝난 뒤 UI 스레드가
+    config에 옮겨 저장한다 (통한 방법을 기억해 다음부터 바로 그 방법으로).
+    """
     done = pyqtSignal(str, str)          # (상태, 안내문)
 
-    def __init__(self, name: str, parent=None):
+    def __init__(self, name: str, parent=None, memory: dict | None = None):
         super().__init__(parent)
         self.name = name
+        self.memory = memory if memory is not None else {}
 
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True).start()
@@ -357,10 +362,42 @@ class _Opener(QObject):
     def _run(self) -> None:
         try:
             import coolm_control
-            state, why = coolm_control.compose_to(self.name)
+            state, why = coolm_control.compose_to(self.name, memory=self.memory)
         except Exception as e:
             state, why = "failed", str(e)
         self.done.emit(state, why or "")
+
+
+PREPARING_TEXT = "제출을 위한 준비중입니다."
+
+
+def _show_preparing(note):
+    """기다리는 동안 포스트잇 위에 은은한 안내 (2026-09-09 사용자 요청).
+
+    끝나면 _finish가 지운다. 포스트잇이 없는(테스트) 환경이면 None.
+    """
+    try:
+        from ui.toast import show_toast
+        toast = show_toast(note, PREPARING_TEXT, msec=60000)
+    except Exception:
+        return None
+    note._preparing_toast = toast          # GC 방지
+    return toast
+
+
+def _remember_method(note, memory: dict) -> None:
+    """통한 활성화 방법을 config에 저장 — 다음 '제출'은 그 방법부터 시도한다."""
+    try:
+        from coolm_control import MEMORY_KEY
+        method = memory.get(MEMORY_KEY, "")
+        cfg = getattr(note, "config", None)
+        if not method or cfg is None or cfg.get(MEMORY_KEY, "") == method:
+            return
+        cfg[MEMORY_KEY] = method
+        from parser import pipeline
+        pipeline.save_config(note.base_dir, cfg)
+    except Exception:
+        pass
 
 
 def remembered_sender(note) -> str:
@@ -427,11 +464,21 @@ def open_source_message(note) -> None:
 
     if app is not None:
         app.setOverrideCursor(Qt.CursorShape.WaitCursor)
-    opener = _Opener(name, parent=note)
+    toast = _show_preparing(note)
+    cfg = getattr(note, "config", None) or {}
+    from coolm_control import MEMORY_KEY
+    memory = {MEMORY_KEY: cfg.get(MEMORY_KEY, "") or ""}
+    opener = _Opener(name, parent=note, memory=memory)
 
     def _finish(state: str, why: str) -> None:
         if app is not None:
             app.restoreOverrideCursor()
+        if toast is not None:
+            try:
+                toast._dismiss()
+            except RuntimeError:
+                pass
+        _remember_method(note, memory)
         note._source_result = (state, why)
         if state == "opened":
             return                         # 쪽지 쓰기 창이 떴으니 할 일 없음
