@@ -76,6 +76,9 @@ DEFAULT_CONFIG = {
     # 자동으로 쪽지 프로그램을 못 찾는 학교용 — 실행파일 이름을 직접 적는다
     # (예: "ATMESSENGERMOBILEEDITION.EXE" — 경기도 GOE메신저). 비우면 자동 탐지.
     "messenger_exe": "",
+    # '제출'에서 쪽지 쓰기 창을 여는 데 통한 방법 — 자동으로 채워진다
+    # (coolm_control.STEPS 중 하나). 비우면 처음부터 다시 찾는다.
+    "compose_method": "",
     "demo_mode": False,             # 내장 가짜 쪽지로 테스트 (쿨메신저 불필요)
     "animations_enabled": True,     # 화면 전환 애니메이션 (끄면 즉시 표시)
     "alert_enabled": True,          # 마감 알림 포스트잇 (설정에서 끄고 켬)

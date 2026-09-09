@@ -161,16 +161,25 @@ class TestOpenFlow(unittest.TestCase):
         self.note.event = ev
         return ev
 
-    def _run(self, result, typed=None):
-        """compose_to를 가짜로 바꿔 흐름만 확인. typed면 이름 모달에 그 이름을 적는다."""
+    def _run(self, result, typed=None, learned=""):
+        """compose_to를 가짜로 바꿔 흐름만 확인. typed면 이름 모달에 그 이름을 적는다.
+
+        learned를 주면 가짜 compose_to가 그 방법을 memory에 기록한다.
+        """
         import coolm_control
         import ui.reply_helper as rh
         asked, composed, fallbacks, infos = [], [], [], []
+        memories = []
+        self.memories = memories
         real = (coolm_control.compose_to, rh.SourceMessageDialog.exec,
                 rh.NameAskDialog.exec, rh.InfoDialog.exec)
 
-        def _compose(name, ui=None):
+        def _compose(name, ui=None, memory=None):
             composed.append(name)
+            if memory is not None:
+                memories.append(memory)
+                if learned:
+                    memory["compose_method"] = learned
             return result
 
         def _ask(dlg):
@@ -247,6 +256,35 @@ class TestOpenFlow(unittest.TestCase):
         out = self._run(("failed", "조직도에서 못 찾았어요"))
         self.assertEqual(len(out["fallbacks"]), 1)
         self.assertIn("못 찾았어요", out["fallbacks"][0].status.text())
+
+    # ── 속도 (2026-09-09): 통한 방법을 config에 기억, 기다리는 동안 안내 ──
+    def test_passes_remembered_method_and_saves_winner(self):
+        import json
+        self.note.config["compose_method"] = "press_enter"
+        self._event(sender="정주은")
+        self._run(("opened", ""), learned="double_click")
+        self.assertEqual(self.memories, [{"compose_method": "double_click"}])
+        self.assertEqual(self.memories[0].get("compose_method"), "double_click")
+        # config dict와 config.json 둘 다 갱신
+        self.assertEqual(self.note.config["compose_method"], "double_click")
+        with open(os.path.join(self.tmp, "config.json"), encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["compose_method"], "double_click")
+
+    def test_remembered_method_reaches_compose(self):
+        self.note.config["compose_method"] = "press_enter"
+        self._event(sender="정주은")
+        self._run(("opened", ""))
+        self.assertEqual(self.memories[0]["compose_method"], "press_enter")
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "config.json")))  # 안 바뀌면 안 씀
+
+    def test_preparing_toast_shown_then_dismissed(self):
+        import ui.reply_helper as rh
+        self._event(sender="정주은")
+        self._run(("opened", ""))
+        toast = getattr(self.note, "_preparing_toast", None)
+        self.assertIsNotNone(toast)
+        self.assertIn(rh.PREPARING_TEXT, [w.text() for w in toast.findChildren(QLabel)])
+        self.assertTrue(getattr(toast, "_closing", False))      # 끝나자마자 사라진다
 
 
 if __name__ == "__main__":

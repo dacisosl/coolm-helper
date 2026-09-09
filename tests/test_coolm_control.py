@@ -145,6 +145,7 @@ class FakeTreeUi:
         self.opens_on = opens_on            # 이 방법에서 새 창이 뜬다
         self.fail_steps = set(fail_steps)   # 이 방법은 예외를 던진다
         self.calls, self._opened = [], False
+        self.waits = []                     # new_window_after가 받은 timeout들
 
     def coolm_running(self):
         return self.running
@@ -191,10 +192,15 @@ class FakeTreeUi:
         self._step("dblclick")
 
     def new_window_after(self, before, timeout=4.0):
+        self.waits.append(timeout)
         for h in self.windows():
             if h not in before:
                 return h
         return None
+
+
+KINDS = {"do_default_action": "default", "press_enter": "enter",
+         "double_click": "dblclick"}
 
 
 PEOPLE = [FakePerson("(고선임)연구부/영어/8525"),
@@ -261,6 +267,69 @@ class TestComposeTo(unittest.TestCase):
             self.skipTest("윈도우에서는 실제 UIA를 탄다")
         self.assertEqual(cc.compose_to("정주은"),
                          ("failed", cc.MSG_NOT_WINDOWS))
+
+
+class TestComposeSpeed(unittest.TestCase):
+    """(2026-09-09) '잘 되는데 너무 느려' — 통한 방법을 기억하고, 탐색은 짧게 기다린다."""
+
+    def test_step_order(self):
+        self.assertEqual(cc.step_order(""), list(cc.STEPS))
+        self.assertEqual(cc.step_order("press_enter"),
+                         ["press_enter", "do_default_action", "double_click"])
+        self.assertEqual(cc.step_order("double_click"),
+                         ["double_click", "do_default_action", "press_enter"])
+        self.assertEqual(cc.step_order("없는방법"), list(cc.STEPS))
+
+    def test_probe_waits_are_short_and_remembers_winner(self):
+        ui = FakeTreeUi(PEOPLE, opens_on="dblclick")
+        memory = {}
+        state, _ = cc.compose_to("정주은", ui, memory=memory)
+        self.assertEqual(state, "opened")
+        self.assertEqual([c for c in ui.calls if isinstance(c, str)],
+                         ["default", "enter", "dblclick"])
+        self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT] * 3)       # 모르는 방법은 짧게
+        self.assertEqual(memory, {cc.MEMORY_KEY: "double_click"})
+
+    def test_remembered_method_goes_first_with_long_wait(self):
+        ui = FakeTreeUi(PEOPLE, opens_on="dblclick")
+        memory = {cc.MEMORY_KEY: "double_click"}
+        state, _ = cc.compose_to("정주은", ui, memory=memory)
+        self.assertEqual(state, "opened")
+        self.assertEqual([c for c in ui.calls if isinstance(c, str)], ["dblclick"])
+        self.assertEqual(ui.waits, [cc.KNOWN_TIMEOUT])            # 한 번, 넉넉히
+        self.assertEqual(memory[cc.MEMORY_KEY], "double_click")
+
+    def test_remembered_method_failing_falls_back(self):
+        ui = FakeTreeUi(PEOPLE, opens_on="enter", fail_steps=("dblclick",))
+        memory = {cc.MEMORY_KEY: "double_click"}
+        state, _ = cc.compose_to("정주은", ui, memory=memory)
+        self.assertEqual(state, "opened")
+        self.assertEqual([c for c in ui.calls if isinstance(c, str)],
+                         ["dblclick", "default", "enter"])
+        self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT] * 2)        # 실패한 건 안 기다림
+        self.assertEqual(memory[cc.MEMORY_KEY], "press_enter")    # 새 승자로 갱신
+
+    def test_memory_untouched_when_nothing_opens(self):
+        ui = FakeTreeUi(PEOPLE)
+        memory = {cc.MEMORY_KEY: ""}
+        state, _ = cc.compose_to("정주은", ui, memory=memory)
+        self.assertEqual(state, "selected")
+        self.assertEqual(memory, {cc.MEMORY_KEY: ""})
+
+    def test_memory_optional(self):
+        ui = FakeTreeUi(PEOPLE, opens_on="default")
+        self.assertEqual(cc.compose_to("정주은", ui), ("opened", ""))
+
+    def test_no_fixed_sleeps_left_in_hot_path(self):
+        """고정 sleep은 필요한 만큼만 — 0.2초 이상 sleep은 남기지 않는다."""
+        import inspect
+        import re
+        A = cc.UiaAdapter
+        for fn in (A.search_person, A.find_person, A._tree_items, A._expand_ancestors,
+                   A.select_person, A.press_enter, A.double_click, A.new_window_after):
+            src = inspect.getsource(fn)
+            for m in re.finditer(r"time\.sleep\(([0-9.]+)\)", src):
+                self.assertLess(float(m.group(1)), 0.2, f"{fn.__name__}: {m.group(0)}")
 
 
 if __name__ == "__main__":

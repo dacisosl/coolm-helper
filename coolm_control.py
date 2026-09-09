@@ -43,6 +43,22 @@ TREE_ID = "3013"               # 조직도 (SysTreeView32)
 MSG_NO_NAME = "보낸 사람 이름을 몰라서 쪽지 쓰기를 열 수 없어요."
 MSG_NO_MAIN = "쿨메신저 기본 창을 찾지 못했어요."
 
+# 활성화 방법 — 조직도 항목엔 Invoke 패턴이 없어(진단 확인) 세 가지를 차례로 쓴다.
+STEPS = ("do_default_action", "press_enter", "double_click")
+# (2026-09-09 사용자: "잘 되는데 너무 느려") 안 통하는 방법마다 4초씩 기다리던 것이
+# 느림의 주범. 통한 방법은 기억해 다음부터 맨 먼저 쓰고(넉넉히 기다림),
+# 아직 모르는 방법을 탐색할 때만 짧게 기다린다 — 쪽지 쓰기 창은 보통 0.5초 안에
+# 뜨므로 2초면 안전하고, 창이 뜬 뒤 다음 방법을 또 눌러 창이 둘 뜨는 일도 없다.
+KNOWN_TIMEOUT = 4.0
+PROBE_TIMEOUT = 2.0
+MEMORY_KEY = "compose_method"
+
+
+def step_order(remembered: str = "") -> list[str]:
+    """기억된 방법을 맨 앞에, 나머지는 기본 순서로. 모르는 값은 무시."""
+    rest = [s for s in STEPS if s != remembered]
+    return ([remembered] if remembered in STEPS else []) + rest
+
 
 def msg_no_person(name: str) -> str:
     return (f"쿨메신저 조직도에서 '{name}' 님을 찾지 못했어요 "
@@ -97,7 +113,7 @@ class UiaAdapter:
 
     def _window_titled(self, title: str):
         for h in self._windows():
-            if self.cap._gettext(h, 200).strip() == title:
+            if self.cap._window_title(h).strip() == title:
                 return h
         return None
 
@@ -240,7 +256,7 @@ class UiaAdapter:
             return h
         for cand in self._windows():
             try:
-                if self._search_edit(self._root(cand)) is not None:
+                if self._search_edit(self._root(cand), cand) is not None:
                     return cand
             except Exception:
                 continue
@@ -249,7 +265,33 @@ class UiaAdapter:
     def windows(self) -> list[int]:
         return self._windows()
 
-    def _search_edit(self, root):
+    def _control(self, hwnd, cls: str, ctrl_id: str):
+        """메인 창의 Win32 자식 컨트롤을 hwnd로 바로 잡는다 (UIA 트리 훑기 없이).
+
+        Win32 컨트롤의 UIA AutomationId는 곧 컨트롤 ID(GetDlgCtrlID)다. 조직도
+        항목 수백 개를 프로세스 밖에서 하나씩 세는 FindFirst(descendants)보다
+        수백 배 빠르다. 같은 클래스가 하나뿐이면 ID가 달라도 그것을 쓴다.
+        """
+        if not hwnd:
+            return None
+        import ctypes
+        kids = self.cap._children_by_class(hwnd).get(cls, [])
+        pick = None
+        for h in kids:
+            if str(ctypes.windll.user32.GetDlgCtrlID(h)) == ctrl_id:
+                pick = h
+                break
+        if pick is None and len(kids) == 1:
+            pick = kids[0]
+        return self._root(pick) if pick else None
+
+    def _search_edit(self, root, hwnd=None):
+        try:
+            el = self._control(hwnd, "Edit", SEARCH_EDIT_ID)
+        except Exception:
+            el = None
+        if el is not None:
+            return el
         el = root.FindFirst(self.desc,
                             self._cond(self.d.UIA_AutomationIdPropertyId,
                                        SEARCH_EDIT_ID))
@@ -271,14 +313,20 @@ class UiaAdapter:
 
         필터가 안 걸리는 버전이어도 다음 단계가 트리 전체를 훑으므로 문제없다.
         """
-        edit = self._search_edit(self._root(hwnd))
+        edit = self._search_edit(self._root(hwnd), hwnd)
         if edit is None:
             return
         self._pattern(edit, self.d.UIA_ValuePatternId,
                       self.UIAC.IUIAutomationValuePattern).SetValue(name)
-        time.sleep(0.4)
+        # 고정 sleep 없음 — find_person이 필터 결과가 보일 때까지만 기다린다
 
-    def _tree(self, root):
+    def _tree(self, root, hwnd=None):
+        try:
+            el = self._control(hwnd, "SysTreeView32", TREE_ID)
+        except Exception:
+            el = None
+        if el is not None:
+            return el
         el = root.FindFirst(self.desc,
                             self._cond(self.d.UIA_AutomationIdPropertyId, TREE_ID))
         if el is not None:
@@ -287,36 +335,68 @@ class UiaAdapter:
                                                  self.d.UIA_TreeControlTypeId))
         return arr.GetElement(0) if arr.Length else None
 
-    def find_person(self, hwnd, name: str):
+    def _tree_items(self, tree) -> list[tuple[object, str, bool]]:
+        """(요소, 이름, 화면밖) 목록 — CacheRequest로 한 번의 왕복에 읽는다.
+
+        항목마다 CurrentName·CurrentIsOffscreen을 따로 부르면 수백×2 회 프로세스
+        왕복이다. 캐시가 안 되는 환경이면 예전 방식으로 폴백.
+        """
+        cond = self._cond(self.d.UIA_ControlTypePropertyId,
+                          self.d.UIA_TreeItemControlTypeId)
+        out = []
+        try:
+            cache = self.uia.iuia.CreateCacheRequest()
+            cache.AddProperty(self.d.UIA_NamePropertyId)
+            cache.AddProperty(self.d.UIA_IsOffscreenPropertyId)
+            arr = tree.FindAllBuildCache(self.desc, cond, cache)
+            for i in range(arr.Length):
+                el = arr.GetElement(i)
+                try:
+                    out.append((el, el.CachedName or "", bool(el.CachedIsOffscreen)))
+                except Exception:
+                    continue
+            return out
+        except Exception:
+            out = []
+        arr = tree.FindAll(self.desc, cond)
+        for i in range(arr.Length):
+            el = arr.GetElement(i)
+            try:
+                out.append((el, el.CurrentName or "", bool(el.CurrentIsOffscreen)))
+            except Exception:
+                continue
+        return out
+
+    def find_person(self, hwnd, name: str, wait: float = 0.8):
         """조직도에서 그 사람의 항목. 항목 이름은 '(정주은)3-1/수학/8531' 꼴.
 
         '(이름)' 정확 일치를 먼저, 없으면 이름 포함으로 완화한다. 화면에
         보이는 항목을 우선하고, 접혀 있는 항목이면 부모를 펼쳐서 꺼낸다.
+        검색 필터가 걸리는 데 시간이 조금 걸리므로 화면에 보이는 정확 일치가
+        나올 때까지 짧게(0.05초 간격, 최대 wait초) 다시 읽는다 — 고정 0.4초
+        sleep 대신 필요한 만큼만 기다린다.
         """
-        tree = self._tree(self._root(hwnd))
+        tree = self._tree(self._root(hwnd), hwnd)
         if tree is None:
             return None
-        arr = tree.FindAll(self.desc,
-                           self._cond(self.d.UIA_ControlTypePropertyId,
-                                      self.d.UIA_TreeItemControlTypeId))
         exact, loose = f"({name})", name
+        deadline = time.monotonic() + wait
         best = {}
-        for i in range(arr.Length):
-            el = arr.GetElement(i)
-            try:
-                label = el.CurrentName or ""
-                off = bool(el.CurrentIsOffscreen)
-            except Exception:
-                continue
-            if exact in label:
-                rank = 0 if not off else 1
-            elif loose in label:
-                rank = 2 if not off else 3
-            else:
-                continue
-            best.setdefault(rank, el)
-            if rank == 0:
+        while True:
+            best = {}
+            for el, label, off in self._tree_items(tree):
+                if exact in label:
+                    rank = 0 if not off else 1
+                elif loose in label:
+                    rank = 2 if not off else 3
+                else:
+                    continue
+                best.setdefault(rank, el)
+                if rank == 0:
+                    break
+            if 0 in best or time.monotonic() >= deadline:
                 break
+            time.sleep(0.05)
         for rank in (0, 1, 2, 3):
             el = best.get(rank)
             if el is None:
@@ -344,7 +424,7 @@ class UiaAdapter:
                               self.UIAC.IUIAutomationExpandCollapsePattern).Expand()
             except Exception:
                 continue
-        time.sleep(0.2)
+        time.sleep(0.05)
 
     def select_person(self, el) -> None:
         try:
@@ -369,7 +449,7 @@ class UiaAdapter:
         for t in trees[:1]:
             user32.SendMessageW(t, 0x0100, 0x0D, 0)     # WM_KEYDOWN VK_RETURN
             user32.SendMessageW(t, 0x0101, 0x0D, 0)     # WM_KEYUP
-        time.sleep(0.3)
+        # 기다림은 new_window_after가 한다
 
     def double_click(self, el, hwnd) -> None:
         """항목 가운데를 실제로 더블클릭한다 — 커서는 원래 자리로 되돌린다."""
@@ -390,7 +470,7 @@ class UiaAdapter:
             for _ in range(2):
                 user32.mouse_event(0x0002, 0, 0, 0, 0)   # LEFTDOWN
                 user32.mouse_event(0x0004, 0, 0, 0, 0)   # LEFTUP
-            time.sleep(0.3)
+            time.sleep(0.1)          # 클릭이 큐에 들어간 뒤 커서를 되돌린다
         finally:
             user32.SetCursorPos(old.x, old.y)
 
@@ -401,7 +481,7 @@ class UiaAdapter:
             for h in self._windows():
                 if h not in before:
                     return h
-            time.sleep(0.2)
+            time.sleep(0.05)
         return None
 
     def front(self, hwnd) -> bool:
@@ -438,12 +518,15 @@ def open_message(msg, ui=None) -> tuple[bool, str]:
         return False, f"쿨메신저를 다루는 중 문제가 생겼어요: {e}"
 
 
-def compose_to(name: str, ui=None) -> tuple[str, str]:
+def compose_to(name: str, ui=None, memory: dict | None = None) -> tuple[str, str]:
     """그 사람에게 **새 쪽지 쓰기** 창을 열어 준다 (2026-09-08 사용자 재설계).
 
     관리함에서 옛 쪽지를 찾는 방식은 목록에 없는 쪽지가 많아 자주 실패했다.
     이제는 조직도에서 사람을 찾아 쪽지 쓰기를 연다 — 쪽지가 아무리 오래돼도
     보낸 사람 이름만 알면 된다. 내용 작성·전송은 하지 않는다.
+
+    memory: {"compose_method": …} 꼴 dict. 통한 활성화 방법을 여기에 기록하고,
+    다음 호출에서는 그 방법을 맨 먼저 쓴다 (호출부가 config에 저장해 준다).
 
     반환 (상태, 안내문):
       "opened"   — 쪽지 쓰기 창이 떴다 (할 일 없음)
@@ -453,6 +536,7 @@ def compose_to(name: str, ui=None) -> tuple[str, str]:
     person = name_only(name)
     if not person:
         return "failed", MSG_NO_NAME
+    remembered = (memory or {}).get(MEMORY_KEY, "") or ""
     try:
         if ui is None:
             if sys.platform != "win32":
@@ -470,12 +554,15 @@ def compose_to(name: str, ui=None) -> tuple[str, str]:
             return "failed", msg_no_person(person)
         ui.select_person(item)
         before = set(ui.windows())
-        for step in ("do_default_action", "press_enter", "double_click"):
+        for step in step_order(remembered):
             try:
                 getattr(ui, step)(item, hwnd)
             except Exception:
                 continue          # 이 버전에서 안 통하는 방법 → 다음 방법으로
-            if ui.new_window_after(before):
+            wait = KNOWN_TIMEOUT if step == remembered else PROBE_TIMEOUT
+            if ui.new_window_after(before, timeout=wait):
+                if memory is not None:
+                    memory[MEMORY_KEY] = step
                 return "opened", ""
         return "selected", msg_selected(person)
     except Exception as e:
