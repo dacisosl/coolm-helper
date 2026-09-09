@@ -182,6 +182,9 @@ class FakeTreeUi:
         if self.opens_on == kind:
             self._opened = True
 
+    def post_double_click(self, el, hwnd):
+        self._step("post")
+
     def do_default_action(self, el, hwnd):
         self._step("default")
 
@@ -199,8 +202,9 @@ class FakeTreeUi:
         return None
 
 
-KINDS = {"do_default_action": "default", "press_enter": "enter",
-         "double_click": "dblclick"}
+KINDS = {"post_double_click": "post", "do_default_action": "default",
+         "press_enter": "enter", "double_click": "dblclick"}
+DEFAULT_ORDER = ["post", "dblclick", "enter", "default"]
 
 
 PEOPLE = [FakePerson("(고선임)연구부/영어/8525"),
@@ -212,19 +216,25 @@ class TestComposeTo(unittest.TestCase):
     """'제출' = 그 사람에게 쪽지 쓰기 (2026-09-08 사용자 재설계)."""
 
     def test_opens_on_first_method(self):
-        ui = FakeTreeUi(PEOPLE, opens_on="default")
+        """첫 번째 '제출'도 시험 없이 — 메시지 더블클릭 한 번으로 열린다."""
+        ui = FakeTreeUi(PEOPLE, opens_on="post")
         state, why = cc.compose_to("정주은(정주은)", ui)
         self.assertEqual((state, why), ("opened", ""))
         self.assertIn(("select", "(정주은)3-1/수학/8531"), ui.calls)
         self.assertIn(("search", "정주은"), ui.calls)
-        self.assertNotIn("enter", ui.calls)        # 첫 방법에서 됐으니 그만
+        self.assertEqual([c for c in ui.calls if isinstance(c, str)], ["post"])
+        self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT])
+
+    def test_default_order_is_most_human_first(self):
+        self.assertEqual([KINDS[s] for s in cc.STEPS], DEFAULT_ORDER)
 
     def test_falls_back_through_methods(self):
-        ui = FakeTreeUi(PEOPLE, opens_on="dblclick", fail_steps=("default",))
+        ui = FakeTreeUi(PEOPLE, opens_on="enter", fail_steps=("post",))
         state, _ = cc.compose_to("정주은", ui)
         self.assertEqual(state, "opened")
         self.assertEqual([c for c in ui.calls if isinstance(c, str)],
-                         ["default", "enter", "dblclick"])
+                         ["post", "dblclick", "enter"])
+        self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT] * 2)        # 예외 난 건 안 기다림
 
     def test_selected_when_no_window_opens(self):
         ui = FakeTreeUi(PEOPLE)                    # 어느 방법으로도 안 뜸
@@ -241,7 +251,7 @@ class TestComposeTo(unittest.TestCase):
 
     def test_exact_match_wins(self):
         """'(정주은)…' 항목이 '정주은 관련 그룹'보다 먼저."""
-        ui = FakeTreeUi(list(reversed(PEOPLE)), opens_on="default")
+        ui = FakeTreeUi(list(reversed(PEOPLE)), opens_on="post")
         cc.compose_to("정주은", ui)
         self.assertIn(("select", "(정주은)3-1/수학/8531"), ui.calls)
 
@@ -275,20 +285,21 @@ class TestComposeSpeed(unittest.TestCase):
     def test_step_order(self):
         self.assertEqual(cc.step_order(""), list(cc.STEPS))
         self.assertEqual(cc.step_order("press_enter"),
-                         ["press_enter", "do_default_action", "double_click"])
+                         ["press_enter", "post_double_click", "double_click",
+                          "do_default_action"])
         self.assertEqual(cc.step_order("double_click"),
-                         ["double_click", "do_default_action", "press_enter"])
+                         ["double_click", "post_double_click", "press_enter",
+                          "do_default_action"])
         self.assertEqual(cc.step_order("없는방법"), list(cc.STEPS))
 
     def test_probe_waits_are_short_and_remembers_winner(self):
-        ui = FakeTreeUi(PEOPLE, opens_on="dblclick")
+        ui = FakeTreeUi(PEOPLE, opens_on="default")
         memory = {}
         state, _ = cc.compose_to("정주은", ui, memory=memory)
         self.assertEqual(state, "opened")
-        self.assertEqual([c for c in ui.calls if isinstance(c, str)],
-                         ["default", "enter", "dblclick"])
-        self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT] * 3)       # 모르는 방법은 짧게
-        self.assertEqual(memory, {cc.MEMORY_KEY: "double_click"})
+        self.assertEqual([c for c in ui.calls if isinstance(c, str)], DEFAULT_ORDER)
+        self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT] * 4)       # 모르는 방법은 짧게
+        self.assertEqual(memory, {cc.MEMORY_KEY: "do_default_action"})
 
     def test_remembered_method_goes_first_with_long_wait(self):
         ui = FakeTreeUi(PEOPLE, opens_on="dblclick")
@@ -305,7 +316,7 @@ class TestComposeSpeed(unittest.TestCase):
         state, _ = cc.compose_to("정주은", ui, memory=memory)
         self.assertEqual(state, "opened")
         self.assertEqual([c for c in ui.calls if isinstance(c, str)],
-                         ["dblclick", "default", "enter"])
+                         ["dblclick", "post", "enter"])
         self.assertEqual(ui.waits, [cc.PROBE_TIMEOUT] * 2)        # 실패한 건 안 기다림
         self.assertEqual(memory[cc.MEMORY_KEY], "press_enter")    # 새 승자로 갱신
 
@@ -317,7 +328,7 @@ class TestComposeSpeed(unittest.TestCase):
         self.assertEqual(memory, {cc.MEMORY_KEY: ""})
 
     def test_memory_optional(self):
-        ui = FakeTreeUi(PEOPLE, opens_on="default")
+        ui = FakeTreeUi(PEOPLE, opens_on="post")
         self.assertEqual(cc.compose_to("정주은", ui), ("opened", ""))
 
     def test_no_fixed_sleeps_left_in_hot_path(self):
@@ -326,7 +337,8 @@ class TestComposeSpeed(unittest.TestCase):
         import re
         A = cc.UiaAdapter
         for fn in (A.search_person, A.find_person, A._tree_items, A._expand_ancestors,
-                   A.select_person, A.press_enter, A.double_click, A.new_window_after):
+                   A.select_person, A.press_enter, A.double_click,
+                   A.post_double_click, A.new_window_after):
             src = inspect.getsource(fn)
             for m in re.finditer(r"time\.sleep\(([0-9.]+)\)", src):
                 self.assertLess(float(m.group(1)), 0.2, f"{fn.__name__}: {m.group(0)}")
