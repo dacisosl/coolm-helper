@@ -358,20 +358,30 @@ def bring_to_front() -> bool:
         pid = _cool_pid()
         if not pid:
             return False
-        wins = _cool_windows(pid)
-        if not wins:
-            return False
         user32 = ctypes.windll.user32
-        hwnd = wins[0]
-        if user32.IsIconic(hwnd):
-            user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+        wins = _cool_windows(pid)
+        if wins:
+            hwnd = wins[0]
+        else:                                    # 트레이에 들어가 숨은 기본 창
+            hwnd = user32.FindWindowW(MAIN_WINDOW_CLASS, None) or 0
+            if not hwnd:
+                hidden = _cool_windows(pid, include_hidden=True)
+                hwnd = hidden[0] if hidden else 0
+            if not hwnd:
+                return False
+        if user32.IsIconic(hwnd) or not user32.IsWindowVisible(hwnd):
+            user32.ShowWindow(hwnd, 9)          # SW_RESTORE — 숨김·최소화 둘 다 복원
         return bool(user32.SetForegroundWindow(hwnd))
     except Exception:
         return False
 
 
-def _cool_windows(pid: int) -> list[int]:
-    """쿨메신저의 보이는 최상위 창 — 포커스된 창을 맨 앞으로."""
+def _cool_windows(pid: int, include_hidden: bool = False) -> list[int]:
+    """쿨메신저의 보이는 최상위 창 — 포커스된 창을 맨 앞으로.
+
+    include_hidden=True면 숨은 창(트레이로 들어간 기본 창)도 포함한다 — '제출'이
+    트레이 상태의 쿨메신저를 복원해 쓸 때만 쓴다 (2026-09-15 사용자 요청).
+    """
     user32 = ctypes.windll.user32
     result: list[int] = []
 
@@ -379,7 +389,7 @@ def _cool_windows(pid: int) -> list[int]:
     def cb(hwnd, lparam):
         wpid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(wpid))
-        if wpid.value == pid and user32.IsWindowVisible(hwnd):
+        if wpid.value == pid and (include_hidden or user32.IsWindowVisible(hwnd)):
             result.append(hwnd)
         return True
 

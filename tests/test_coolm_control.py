@@ -139,9 +139,10 @@ class FakeTreeUi:
     """compose_to용 가짜 어댑터. steps에 적은 방법에서만 창이 뜬다."""
 
     def __init__(self, people=(), running=True, main=99, opens_on=None,
-                 fail_steps=()):
+                 fail_steps=(), main_hidden=False):
         self.people = list(people)
         self.running, self._main = running, main
+        self.hidden = main_hidden           # 트레이 상태: front() 전엔 항목 좌표 없음
         self.opens_on = opens_on            # 이 방법에서 새 창이 뜬다
         self.fail_steps = set(fail_steps)   # 이 방법은 예외를 던진다
         self.calls, self._opened = [], False
@@ -155,12 +156,15 @@ class FakeTreeUi:
 
     def front(self, hwnd):
         self.calls.append(("front", hwnd))
+        self.hidden = False                 # 복원
         return True
 
     def search_person(self, hwnd, name):
         self.calls.append(("search", name))
 
     def find_person(self, hwnd, name):
+        if self.hidden:
+            return None                     # 숨은 창의 항목은 화면에 없다
         for p in self.people:
             if f"({name})" in p.label:
                 return p
@@ -277,6 +281,34 @@ class TestComposeTo(unittest.TestCase):
             self.skipTest("윈도우에서는 실제 UIA를 탄다")
         self.assertEqual(cc.compose_to("정주은"),
                          ("failed", cc.MSG_NOT_WINDOWS))
+
+
+class TestComposeFromTray(unittest.TestCase):
+    """(2026-09-15) 쿨메신저가 트레이(숨김)에 있어도 '제출'이 된다."""
+
+    def test_restores_main_before_searching(self):
+        ui = FakeTreeUi(PEOPLE, opens_on="post", main_hidden=True)
+        state, why = cc.compose_to("정주은", ui)
+        self.assertEqual((state, why), ("opened", ""))
+        names = [c[0] if isinstance(c, tuple) else c for c in ui.calls]
+        self.assertLess(names.index("front"), names.index("search"))
+        self.assertLess(names.index("front"), names.index("select"))
+
+    def test_capture_can_list_hidden_windows(self):
+        import inspect
+        import capture
+        sig = inspect.signature(capture._cool_windows)
+        self.assertIn("include_hidden", sig.parameters)
+        self.assertIs(sig.parameters["include_hidden"].default, False)
+        adapter_sig = inspect.signature(cc.UiaAdapter._windows)
+        self.assertIn("include_hidden", adapter_sig.parameters)
+
+    def test_main_hwnd_looks_at_hidden_windows(self):
+        """보이는 창에서 못 찾으면 숨은 창(include_hidden=True)까지 본다 — 코드로 고정."""
+        import inspect
+        src = inspect.getsource(cc.UiaAdapter.main_hwnd)
+        self.assertIn("include_hidden=hidden", src)
+        self.assertIn("MAIN_WINDOW_CLASS", src)
 
 
 class TestComposeSpeed(unittest.TestCase):
