@@ -2029,3 +2029,29 @@ enter/leave는 `getattr`로 방어. `tests/test_toast.py`(2개)로 "show 도중 
 ## 2026-09-09 (7) — v2.9.4 릴리스
 '제출' 직후 뜨던 "'Toast' object has no attribute '_timer'" 오류 창 제거(토스트 초기화
 순서). 버그 수정이라 수 +1 (2.9.3 → 2.9.4). 384 통과.
+
+## 2026-09-15 — 쿨메신저가 트레이에 있어도 '제출'이 된다
+
+사용자: "쿨메신저가 트레이에 있는 상태에서는 제출을 눌러도 쪽지 보내기가 안 뜬다."
+
+원인: 트레이로 들어간 기본 창은 **숨김(hidden)** 상태인데 `capture._cool_windows(pid)`가
+`IsWindowVisible`인 창만 모았다. `coolm_running()`은 True(`FindWindowW`는 숨은 창도 찾음)인데
+`main_hwnd()`가 None → "쿨메신저 기본 창을 찾지 못했어요". 설령 찾아도 숨은 창의 조직도
+항목은 좌표가 (0,0,0,0)이라 더블클릭이 안 된다.
+
+고침
+- `capture._cool_windows(pid, include_hidden=False)` — 기본값은 그대로(prewarm·진단·⚡ 영향 없음).
+  `bring_to_front()`도 보이는 창이 없으면 숨은 기본 창을 복원해 앞으로.
+- `UiaAdapter.main_hwnd()`: 보이는 창 → 숨은 창 포함(제목·`FindWindowW(MAIN_WINDOW_CLASS)`·검색칸)
+  순서로 찾고, `front()`가 `IsIconic`뿐 아니라 **`not IsWindowVisible`도 `SW_RESTORE`**로 복원한 뒤
+  창이 보일 때까지 최대 0.5초 대기. 나머지는 `find_person`의 '보이는 정확 일치' 폴링이 흡수.
+- 복원한 기본 창은 다시 트레이로 넣지 않는다 — 자동으로 숨기면 사용자가 놀란다.
+- `FakeTreeUi(main_hidden=True)`로 "front가 search·select보다 먼저" 순서를 고정. 387 통과(+3).
+
+배운 점
+- **트레이 = 숨은 창.** 존재 확인(FindWindow)은 되지만 좌표·클릭 같은 조작은 복원 뒤에만 된다.
+  "실행 중"과 "조작 가능"은 다른 상태다.
+
+## 2026-09-15 (2) — v2.9.5 릴리스
+트레이에 숨은 쿨메신저도 '제출'로 복원해 쪽지 쓰기 창을 연다. 버그 수정이라 수 +1
+(2.9.4 → 2.9.5). 387 통과.

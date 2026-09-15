@@ -113,12 +113,12 @@ class UiaAdapter:
         self.kids = self.uia.tree_scope["children"]
 
     # ── 창 ──────────────────────────────────────────────────
-    def _windows(self) -> list[int]:
+    def _windows(self, include_hidden: bool = False) -> list[int]:
         pid = self.cap._cool_pid()
-        return self.cap._cool_windows(pid) if pid else []
+        return self.cap._cool_windows(pid, include_hidden) if pid else []
 
-    def _window_titled(self, title: str):
-        for h in self._windows():
+    def _window_titled(self, title: str, include_hidden: bool = False):
+        for h in self._windows(include_hidden):
             if self.cap._window_title(h).strip() == title:
                 return h
         return None
@@ -256,16 +256,28 @@ class UiaAdapter:
 
     # ── 사람에게 쪽지 쓰기 ──────────────────────────────────
     def main_hwnd(self):
-        """쿨메신저 기본 창 — 제목이 다른 버전은 검색칸이 있는 창으로 찾는다."""
-        h = self._window_titled(MAIN_TITLE)
-        if h is not None:
-            return h
-        for cand in self._windows():
-            try:
-                if self._search_edit(self._root(cand), cand) is not None:
-                    return cand
-            except Exception:
-                continue
+        """쿨메신저 기본 창 — 제목이 다른 버전은 검색칸이 있는 창으로 찾는다.
+
+        트레이로 들어간 기본 창은 **숨김** 상태라 보이는 창에서는 안 나온다
+        (2026-09-15 사용자: "트레이에 있으면 제출이 안 된다"). 보이는 창에서 못
+        찾으면 숨은 창까지 본다 — 이후 front()가 복원한다.
+        """
+        for hidden in (False, True):
+            h = self._window_titled(MAIN_TITLE, include_hidden=hidden)
+            if h is not None:
+                return h
+            if hidden:
+                import ctypes
+                exact = ctypes.windll.user32.FindWindowW(
+                    self.cap.MAIN_WINDOW_CLASS, None)
+                if exact:
+                    return exact
+            for cand in self._windows(include_hidden=hidden):
+                try:
+                    if self._search_edit(self._root(cand), cand) is not None:
+                        return cand
+                except Exception:
+                    continue
         return None
 
     def windows(self) -> list[int]:
@@ -527,10 +539,22 @@ class UiaAdapter:
         return None
 
     def front(self, hwnd) -> bool:
+        """창을 앞으로. 트레이(숨김)·최소화 상태면 먼저 복원한다.
+
+        복원 직후엔 조직도 항목 좌표가 아직 0일 수 있어, 복원한 경우에만 창이
+        보이게 될 때까지 짧게(최대 0.5초) 기다린다. 나머지는 find_person의
+        '화면에 보이는 정확 일치' 폴링이 흡수한다. 복원한 창을 다시 트레이로
+        넣지는 않는다 — 자동으로 숨기면 사용자가 놀란다.
+        """
         import ctypes
         user32 = ctypes.windll.user32
-        if user32.IsIconic(hwnd):
+        if user32.IsIconic(hwnd) or not user32.IsWindowVisible(hwnd):
             user32.ShowWindow(hwnd, 9)                # SW_RESTORE
+            deadline = time.monotonic() + 0.5
+            while time.monotonic() < deadline:
+                if user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd):
+                    break
+                time.sleep(0.05)
         return bool(user32.SetForegroundWindow(hwnd))
 
 
