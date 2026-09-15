@@ -1,6 +1,6 @@
 {
-  "version": "2.9.4",
-  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.9.4/CoolmHelper-Setup.exe",
-  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.9.4/CoolmHelper-Setup.zip",
-  "notes": "- 포스트잇의 **'제출'** 을 누르면 기능은 잘 되는데 \"예상치 못한 오류 — 'Toast' object has no attribute '_timer'\" 창이 뜨고, 확인을 눌러야 진행되던 문제를 고쳤습니다.\r\n- 원인은 \"제출을 위한 준비중입니다.\" 안내가 마우스 커서 바로 아래에 나타날 때 생기던 순서 문제였어요. 안내가 화면에 보이기 전에 필요한 준비를 모두 마치도록 바꿨습니다.\r\n- 이제 '제출'을 누르면 안내만 은은하게 뜨고 바로 쪽지 쓰기 창이 열립니다."
+  "version": "2.9.5",
+  "url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.9.5/CoolmHelper-Setup.exe",
+  "zip_url": "https://github.com/dacisosl/coolm-helper/releases/download/v2.9.5/CoolmHelper-Setup.zip",
+  "notes": "- 쿨메신저를 **트레이(작업표시줄 오른쪽 아이콘)** 로 넣어 둔 상태에서 포스트잇의 '제출'을 누르면 쪽지 쓰기 창이 안 뜨던 문제를 고쳤습니다. 숨어 있는 쿨메신저 창을 찾아 먼저 화면에 다시 꺼낸 뒤, 그 사람을 찾아 쪽지 쓰기 창을 엽니다.\r\n- 다시 꺼낸 쿨메신저 창은 그대로 두어요. 쪽지 창을 쓰는 동안 뒤에 있어도 문제없고, 자동으로 다시 숨기면 오히려 헷갈릴 수 있어서요.\r\n- 이 경우에는 창을 꺼내는 시간 때문에 평소보다 0.5초쯤 더 걸릴 수 있습니다.\r\n- 회신 내용을 쓰거나 보내는 일은 여전히 하지 않아요 — 쪽지 쓰기 창을 열어 드리는 데서 멈춥니다."
 }
