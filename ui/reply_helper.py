@@ -355,6 +355,7 @@ class _Opener(QObject):
         super().__init__(parent)
         self.name = name
         self.memory = memory if memory is not None else {}
+        self.trace: list[str] = []          # 어디까지 됐는지 (실패 창에 표시)
 
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True).start()
@@ -362,10 +363,21 @@ class _Opener(QObject):
     def _run(self) -> None:
         try:
             import coolm_control
-            state, why = coolm_control.compose_to(self.name, memory=self.memory)
+            state, why = coolm_control.compose_to(
+                self.name, memory=self.memory, trace=self.trace)
         except Exception as e:
-            state, why = "failed", str(e)
+            state, why = "failed", f"{type(e).__name__}: {e}"
+        if state != "opened":
+            why = with_trace(why, self.trace)
         self.done.emit(state, why or "")
+
+
+def with_trace(why: str, trace: list) -> str:
+    """실패·미완 안내문에 '어디까지 됐나' 한 줄을 붙인다 — 원격 진단용."""
+    steps = " → ".join(str(s) for s in trace if s)
+    if not steps:
+        return why or "이유를 알 수 없어요."
+    return f"{why or '이유를 알 수 없어요.'}\n어디까지 됐나: {steps}"
 
 
 PREPARING_TEXT = "제출을 위한 준비중입니다."
