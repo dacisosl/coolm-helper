@@ -174,8 +174,10 @@ class TestOpenFlow(unittest.TestCase):
         real = (coolm_control.compose_to, rh.SourceMessageDialog.exec,
                 rh.NameAskDialog.exec, rh.InfoDialog.exec)
 
-        def _compose(name, ui=None, memory=None):
+        def _compose(name, ui=None, memory=None, trace=None):
             composed.append(name)
+            if trace is not None:
+                trace.extend(["프로세스 ✓", "기본 창 ✗"])
             if memory is not None:
                 memories.append(memory)
                 if learned:
@@ -255,7 +257,14 @@ class TestOpenFlow(unittest.TestCase):
         self._event(sender="정주은")
         out = self._run(("failed", "조직도에서 못 찾았어요"))
         self.assertEqual(len(out["fallbacks"]), 1)
-        self.assertIn("못 찾았어요", out["fallbacks"][0].status.text())
+        text = out["fallbacks"][0].status.text()
+        self.assertIn("못 찾았어요", text)
+        self.assertIn("어디까지 됐나: 프로세스 ✓ → 기본 창 ✗", text)   # 진단 한 줄
+
+    def test_empty_reason_still_explains(self):
+        import ui.reply_helper as rh
+        self.assertEqual(rh.with_trace("", []), "이유를 알 수 없어요.")
+        self.assertIn("이유를 알 수 없어요.\n어디까지 됐나: a", rh.with_trace("", ["a"]))
 
     # ── 속도 (2026-09-09): 통한 방법을 config에 기억, 기다리는 동안 안내 ──
     def test_passes_remembered_method_and_saves_winner(self):

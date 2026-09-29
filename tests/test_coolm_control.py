@@ -162,7 +162,11 @@ class FakeTreeUi:
     def search_person(self, hwnd, name):
         self.calls.append(("search", name))
 
-    def find_person(self, hwnd, name):
+    def window_hidden(self, hwnd):
+        return self.hidden
+
+    def find_person(self, hwnd, name, wait=0.8):
+        self.find_waits = getattr(self, "find_waits", []) + [wait]
         if self.hidden:
             return None                     # 숨은 창의 항목은 화면에 없다
         for p in self.people:
@@ -294,6 +298,25 @@ class TestComposeFromTray(unittest.TestCase):
         self.assertLess(names.index("front"), names.index("search"))
         self.assertLess(names.index("front"), names.index("select"))
 
+    def test_hidden_main_gets_longer_person_wait_and_trace(self):
+        ui = FakeTreeUi(PEOPLE, opens_on="post", main_hidden=True)
+        trace = []
+        cc.compose_to("정주은", ui, trace=trace)
+        self.assertEqual(ui.find_waits, [1.5])
+        self.assertIn("기본 창 ✓(숨김→복원)", trace)
+        self.assertEqual(trace[-1], "post_double_click ✓")
+
+    def test_trace_explains_failures(self):
+        trace = []
+        cc.compose_to("없는사람", FakeTreeUi(PEOPLE), trace=trace)
+        self.assertEqual(trace, ["프로세스 ✓", "기본 창 ✓", "조직도에서 사람 ✗"])
+        trace = []
+        ui = FakeTreeUi(PEOPLE, fail_steps=("post",))       # 아무 방법도 안 뜸
+        state, _ = cc.compose_to("정주은", ui, trace=trace)
+        self.assertEqual(state, "selected")
+        self.assertTrue(trace[3].startswith("post_double_click 예외"))
+        self.assertIn("double_click 창 안 뜸", trace)
+
     def test_capture_can_list_hidden_windows(self):
         import inspect
         import capture
@@ -308,7 +331,9 @@ class TestComposeFromTray(unittest.TestCase):
         import inspect
         src = inspect.getsource(cc.UiaAdapter.main_hwnd)
         self.assertIn("include_hidden=hidden", src)
-        self.assertIn("MAIN_WINDOW_CLASS", src)
+        # 'CoolMsg50SingleInstance'는 크기 0의 보조 창 — 기본 창으로 잡으면 안 된다
+        self.assertNotIn("MAIN_WINDOW_CLASS", src)
+        self.assertIn("_has_org_tree", src)
 
 
 class TestComposeSpeed(unittest.TestCase):

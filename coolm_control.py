@@ -264,21 +264,39 @@ class UiaAdapter:
         """
         for hidden in (False, True):
             h = self._window_titled(MAIN_TITLE, include_hidden=hidden)
-            if h is not None:
+            if h is not None and (not hidden or self._has_org_tree(h)):
                 return h
-            if hidden:
-                import ctypes
-                exact = ctypes.windll.user32.FindWindowW(
-                    self.cap.MAIN_WINDOW_CLASS, None)
-                if exact:
-                    return exact
             for cand in self._windows(include_hidden=hidden):
+                # 숨은 창 중엔 'CoolMsg50SingleInstance' 같은 크기 0의 보조 창도 있다
+                # (진단 확인) — 조직도·검색칸이 있는 창만 기본 창으로 친다.
                 try:
-                    if self._search_edit(self._root(cand), cand) is not None:
+                    if self._has_org_tree(cand):
+                        return cand
+                    if not hidden and self._search_edit(self._root(cand), cand) is not None:
                         return cand
                 except Exception:
                     continue
         return None
+
+    def _has_org_tree(self, hwnd) -> bool:
+        """Win32 자식에 조직도(SysTreeView32)나 검색칸(Edit 1708)이 있는가 — UIA 없이."""
+        try:
+            kids = self.cap._children_by_class(hwnd)
+        except Exception:
+            return False
+        if kids.get("SysTreeView32"):
+            return True
+        import ctypes
+        for h in kids.get("Edit", []):
+            if str(ctypes.windll.user32.GetDlgCtrlID(h)) == SEARCH_EDIT_ID:
+                return True
+        return False
+
+    def window_hidden(self, hwnd) -> bool:
+        """트레이(숨김) 또는 최소화 상태인가 — 진단·대기 시간 조절용."""
+        import ctypes
+        user32 = ctypes.windll.user32
+        return bool(user32.IsIconic(hwnd)) or not bool(user32.IsWindowVisible(hwnd))
 
     def windows(self) -> list[int]:
         return self._windows()
@@ -547,12 +565,20 @@ class UiaAdapter:
         넣지는 않는다 — 자동으로 숨기면 사용자가 놀란다.
         """
         import ctypes
+        from ctypes import wintypes
         user32 = ctypes.windll.user32
-        if user32.IsIconic(hwnd) or not user32.IsWindowVisible(hwnd):
+        if self.window_hidden(hwnd):
+            # ① 바깥에서 보이게 하고 ② 창 자신에게 '복원' 명령도 보낸다 — 트레이로
+            # 넣은 프로그램은 자기 복원 코드(SC_RESTORE 처리)를 거쳐야 제대로 돌아온다.
             user32.ShowWindow(hwnd, 9)                # SW_RESTORE
-            deadline = time.monotonic() + 0.5
+            user32.ShowWindow(hwnd, 5)                # SW_SHOW
+            user32.PostMessageW(hwnd, 0x0112, 0xF120, 0)   # WM_SYSCOMMAND SC_RESTORE
+            deadline = time.monotonic() + 1.0
+            rect = wintypes.RECT()
             while time.monotonic() < deadline:
-                if user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd):
+                user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                if (user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd)
+                        and rect.right > rect.left and rect.bottom > rect.top):
                     break
                 time.sleep(0.05)
         return bool(user32.SetForegroundWindow(hwnd))
@@ -584,7 +610,8 @@ def open_message(msg, ui=None) -> tuple[bool, str]:
         return False, f"쿨메신저를 다루는 중 문제가 생겼어요: {e}"
 
 
-def compose_to(name: str, ui=None, memory: dict | None = None) -> tuple[str, str]:
+def compose_to(name: str, ui=None, memory: dict | None = None,
+               trace: list | None = None) -> tuple[str, str]:
     """그 사람에게 **새 쪽지 쓰기** 창을 열어 준다 (2026-09-08 사용자 재설계).
 
     관리함에서 옛 쪽지를 찾는 방식은 목록에 없는 쪽지가 많아 자주 실패했다.
@@ -593,12 +620,15 @@ def compose_to(name: str, ui=None, memory: dict | None = None) -> tuple[str, str
 
     memory: {"compose_method": …} 꼴 dict. 통한 활성화 방법을 여기에 기록하고,
     다음 호출에서는 그 방법을 맨 먼저 쓴다 (호출부가 config에 저장해 준다).
+    trace: 주면 "어디까지 됐는지"를 한 줄씩 적어 준다 — 실패 창에 보여서
+    원격으로도 원인을 짚을 수 있게 (2026-09-29 트레이 재보고).
 
     반환 (상태, 안내문):
       "opened"   — 쪽지 쓰기 창이 떴다 (할 일 없음)
       "selected" — 사람은 찾아 선택했지만 창이 안 떴다 (더블클릭 안내)
       "failed"   — 못 했다 (이유를 안내문에)
     """
+    t = trace if trace is not None else []
     person = name_only(name)
     if not person:
         return "failed", MSG_NO_NAME
@@ -609,27 +639,42 @@ def compose_to(name: str, ui=None, memory: dict | None = None) -> tuple[str, str
                 return "failed", MSG_NOT_WINDOWS
             ui = UiaAdapter()
         if not ui.coolm_running():
+            t.append("프로세스 ✗")
             return "failed", MSG_NO_COOLM
+        t.append("프로세스 ✓")
         hwnd = ui.main_hwnd()
         if not hwnd:
+            t.append("기본 창 ✗")
             return "failed", MSG_NO_MAIN
+        hidden = False
+        try:
+            hidden = bool(ui.window_hidden(hwnd))
+        except Exception:
+            pass
+        t.append("기본 창 ✓" + ("(숨김→복원)" if hidden else ""))
         ui.front(hwnd)
         ui.search_person(hwnd, person)
-        item = ui.find_person(hwnd, person)
+        item = ui.find_person(hwnd, person, wait=1.5 if hidden else 0.8)
         if item is None:
+            t.append("조직도에서 사람 ✗")
             return "failed", msg_no_person(person)
+        t.append("사람 ✓")
         ui.select_person(item)
         before = set(ui.windows())
         for step in step_order(remembered):
             try:
                 getattr(ui, step)(item, hwnd)
-            except Exception:
+            except Exception as e:
+                t.append(f"{step} 예외({type(e).__name__}: {e})"[:120])
                 continue          # 이 버전에서 안 통하는 방법 → 다음 방법으로
             wait = KNOWN_TIMEOUT if step == remembered else PROBE_TIMEOUT
             if ui.new_window_after(before, timeout=wait):
+                t.append(f"{step} ✓")
                 if memory is not None:
                     memory[MEMORY_KEY] = step
                 return "opened", ""
+            t.append(f"{step} 창 안 뜸")
         return "selected", msg_selected(person)
     except Exception as e:
-        return "failed", f"쿨메신저를 다루는 중 문제가 생겼어요: {e}"
+        t.append(f"예외 {type(e).__name__}: {e}"[:160])
+        return "failed", f"쿨메신저를 다루는 중 문제가 생겼어요: {type(e).__name__}: {e}"

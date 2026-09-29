@@ -371,6 +371,8 @@ def bring_to_front() -> bool:
                 return False
         if user32.IsIconic(hwnd) or not user32.IsWindowVisible(hwnd):
             user32.ShowWindow(hwnd, 9)          # SW_RESTORE — 숨김·최소화 둘 다 복원
+            user32.ShowWindow(hwnd, 5)          # SW_SHOW
+            user32.PostMessageW(hwnd, 0x0112, 0xF120, 0)   # WM_SYSCOMMAND SC_RESTORE
         return bool(user32.SetForegroundWindow(hwnd))
     except Exception:
         return False
