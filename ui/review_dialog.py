@@ -475,7 +475,8 @@ class ReviewDialog(motion.FadeInMixin, QDialog):
                     end=_dt.fromisoformat(e.end) if e.end else None,
                     all_day=e.all_day, is_deadline=e.is_deadline,
                     demo=e.demo, memo=e.memo, source_ref=e.source_ref,
-                    sender=e.sender)        # 되살릴 때 보낸 사람도 지키기
+                    sender=e.sender,        # 되살릴 때 보낸 사람·쪽지 지문도 지키기
+                    msg_received=e.msg_received, msg_title=e.msg_title)
 
         if removed:
             from ui.toast import show_toast
@@ -508,12 +509,13 @@ class ReviewDialog(motion.FadeInMixin, QDialog):
                 QMessageBox.warning(self, "구글 등록 실패",
                                     f"로컬에만 저장합니다.\n{e}")
 
-        from parser.pipeline import real_sender
+        from parser.pipeline import msg_fingerprint, real_sender
         self.store.add(title=title, start=start, end=end, all_day=all_day,
                        is_deadline=self._is_deadline,
                        google_id=google_id, demo=(self.source == "demo"),
                        memo=self.body_edit.toPlainText().strip(),
-                       source_ref=cand_ref(c), sender=real_sender(c.message))
+                       source_ref=cand_ref(c), sender=real_sender(c.message),
+                       **msg_fingerprint(c.message))
 
     def _reload(self) -> None:
         if not self.loader:

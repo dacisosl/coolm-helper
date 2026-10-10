@@ -54,6 +54,46 @@ class TestSenderField(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].title, "옛 일정")
         self.assertEqual(events[0].sender, "")        # 기본값으로 채워진다
+        self.assertEqual(events[0].msg_received, "")  # 지문도 (2026-10-10)
+        self.assertEqual(events[0].msg_title, "")
+
+    def test_fingerprint_saved_and_reloaded(self):
+        ev = self.store.add("일정", datetime(2026, 9, 8, 9, 0), sender="정주은",
+                            msg_received="2026/09/08 11:02:36", msg_title="친목회")
+        again = [e for e in EventStore(self.tmp).all() if e.id == ev.id][0]
+        self.assertEqual((again.msg_received, again.msg_title),
+                         ("2026/09/08 11:02:36", "친목회"))
+
+
+class TestFingerprint(unittest.TestCase):
+    """등록할 때 남기는 원본 쪽지 지문 (2026-10-10)."""
+
+    def test_db_message_gives_manager_date_format(self):
+        from parser.pipeline import msg_fingerprint
+        m = Message(42, "정주은(정주은)", datetime(2026, 9, 8, 11, 2, 36), " 친목회 ", "본문")
+        self.assertEqual(msg_fingerprint(m), {"msg_received": "2026/09/08 11:02:36",
+                                              "msg_title": "친목회"})
+
+    def test_screen_capture_has_no_fingerprint(self):
+        from parser.pipeline import msg_fingerprint
+        m = Message(-1, SCREEN_SENDER, datetime.now(), "제목", "본문")
+        self.assertEqual(msg_fingerprint(m), {"msg_received": "", "msg_title": ""})
+        self.assertEqual(msg_fingerprint(None), {"msg_received": "", "msg_title": ""})
+
+    def test_quick_capture_fills_only_when_matched(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from ui.quick_capture import _add_event
+        tmp = tempfile.mkdtemp()
+        try:
+            class _Owner:
+                store = EventStore(tmp)
+            m = Message(7, "정주은(정주은)", datetime(2026, 9, 8, 11, 2, 36), "친목회", "본문")
+            ev = _add_event(_Owner, None, m, matched=True)
+            self.assertEqual(ev.msg_received, "2026/09/08 11:02:36")
+            ev2 = _add_event(_Owner, None, m, matched=False)
+            self.assertEqual(ev2.msg_received, "")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class TestRealSender(unittest.TestCase):

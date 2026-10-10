@@ -155,24 +155,35 @@ class TestOpenFlow(unittest.TestCase):
         self.note.close()
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _event(self, sender="", ref="2|2026-07-20T09:00:00"):
+    def _event(self, sender="", ref="2|2026-07-20T09:00:00", received="",
+               title=""):
         ev = self.store.add("일정", datetime(2026, 7, 20, 9, 0), memo="메모",
-                            source_ref=ref, sender=sender)
+                            source_ref=ref, sender=sender,
+                            msg_received=received, msg_title=title)
         self.note.event = ev
         return ev
 
-    def _run(self, result, typed=None, learned=""):
-        """compose_to를 가짜로 바꿔 흐름만 확인. typed면 이름 모달에 그 이름을 적는다.
+    def _run(self, result, typed=None, learned="",
+             reply=("not_found", "관리함 ✗")):
+        """compose_to·reply_to를 가짜로 바꿔 흐름만 확인. typed면 이름 모달에 적는다.
 
         learned를 주면 가짜 compose_to가 그 방법을 memory에 기록한다.
+        reply는 가짜 reply_to의 결과 (상태, trace에 남길 한 줄).
         """
         import coolm_control
         import ui.reply_helper as rh
         asked, composed, fallbacks, infos = [], [], [], []
-        memories = []
+        memories, replies = [], []
         self.memories = memories
         real = (coolm_control.compose_to, rh.SourceMessageDialog.exec,
-                rh.NameAskDialog.exec, rh.InfoDialog.exec)
+                rh.NameAskDialog.exec, rh.InfoDialog.exec,
+                coolm_control.reply_to)
+
+        def _reply(sender, received, title="", ui=None, trace=None):
+            replies.append((sender, received, title))
+            if trace is not None and reply[1]:
+                trace.append(reply[1])
+            return reply[0], ""
 
         def _compose(name, ui=None, memory=None, trace=None):
             composed.append(name)
@@ -192,6 +203,7 @@ class TestOpenFlow(unittest.TestCase):
             return 1                           # Accepted
 
         coolm_control.compose_to = _compose
+        coolm_control.reply_to = _reply
         rh.SourceMessageDialog.exec = lambda self: fallbacks.append(self) or 0
         rh.NameAskDialog.exec = _ask
         rh.InfoDialog.exec = lambda self: infos.append(self) or 0
@@ -204,20 +216,22 @@ class TestOpenFlow(unittest.TestCase):
                 self.time.sleep(0.01)
         finally:
             (coolm_control.compose_to, rh.SourceMessageDialog.exec,
-             rh.NameAskDialog.exec, rh.InfoDialog.exec) = real
-        return {"asked": asked, "composed": composed,
+             rh.NameAskDialog.exec, rh.InfoDialog.exec,
+             coolm_control.reply_to) = real
+        return {"asked": asked, "composed": composed, "replies": replies,
                 "fallbacks": fallbacks, "infos": infos}
 
     def test_uses_saved_sender_without_touching_db(self):
         import ui.reply_helper as rh
-        self._event(sender="정주은(정주은)")
-        real = rh.find_source_message
-        rh.find_source_message = lambda *a, **k: (_ for _ in ()).throw(
-            AssertionError("저장된 이름이 있으면 DB를 보지 않아야 한다"))
+        self._event(sender="정주은(정주은)", received="2026/07/10 01:02:00")
+        real = (rh.find_source_message, rh._db_message)
+        boom = lambda *a, **k: (_ for _ in ()).throw(          # noqa: E731
+            AssertionError("이름·지문이 다 있으면 DB를 보지 않아야 한다"))
+        rh.find_source_message = rh._db_message = boom
         try:
             out = self._run(("opened", ""))
         finally:
-            rh.find_source_message = real
+            rh.find_source_message, rh._db_message = real
         self.assertEqual(out["composed"], ["정주은(정주은)"])
         self.assertEqual(out["asked"], [])
         self.assertEqual(out["fallbacks"], [])
@@ -259,7 +273,45 @@ class TestOpenFlow(unittest.TestCase):
         self.assertEqual(len(out["fallbacks"]), 1)
         text = out["fallbacks"][0].status.text()
         self.assertIn("못 찾았어요", text)
-        self.assertIn("어디까지 됐나: 프로세스 ✓ → 기본 창 ✗", text)   # 진단 한 줄
+        # 회신 경로 → 새 쪽지 경로 순서가 한 줄에 다 보인다
+        self.assertIn("어디까지 됐나: 관리함 ✗ → → 새 쪽지로 → 프로세스 ✓ → 기본 창 ✗",
+                      text)
+
+    # ── 회신 창 (2026-10-10): 지문으로 관리함에서 찾아 [메시지 회신] ──
+    def test_reply_window_first_when_fingerprint(self):
+        self._event(sender="정주은", received="2026/07/10 01:02:00", title="제목")
+        out = self._run(("opened", ""), reply=("replied", "회신 창 ✓"))
+        self.assertEqual(out["replies"], [("정주은", "2026/07/10 01:02:00", "제목")])
+        self.assertEqual(out["composed"], [])              # 새 쪽지는 안 연다
+        self.assertEqual(self.note._source_result, ("replied", ""))
+        self.assertEqual(out["fallbacks"] + out["infos"], [])
+
+    def test_reply_not_found_falls_back_to_new_message(self):
+        import ui.reply_helper as rh
+        self._event(sender="정주은", received="2026/07/10 01:02:00")
+        out = self._run(("opened", ""))
+        self.assertEqual(out["composed"], ["정주은"])
+        self.assertEqual(self.note._source_result, ("opened_new", ""))
+        toast = getattr(self.note, "_fallback_toast", None)
+        self.assertIsNotNone(toast)
+        self.assertIn(rh.FELL_BACK_TEXT,
+                      [w.text() for w in toast.findChildren(QLabel)])
+
+    def test_no_fingerprint_skips_reply(self):
+        self._event(sender="정주은", ref="")               # 화면에서만 등록한 쪽지
+        out = self._run(("opened", ""))
+        self.assertEqual(out["replies"], [])
+        self.assertEqual(self.note._source_result, ("opened", ""))
+
+    def test_backfills_fingerprint_from_db_for_old_note(self):
+        ev = self._event(sender="정주은")                  # 이름은 있고 지문만 없음
+        out = self._run(("opened", ""), reply=("replied", ""))
+        sender, received, _title = out["replies"][0]
+        self.assertEqual(sender, "정주은")                 # 저장된 이름은 그대로
+        self.assertTrue(received.startswith("2026/07/10 "))
+        saved = [e for e in EventStore(
+            os.path.join(self.tmp, "store")).all() if e.id == ev.id][0]
+        self.assertEqual(saved.msg_received, received)     # 기억돼서 다음엔 DB 안 봄
 
     def test_empty_reason_still_explains(self):
         import ui.reply_helper as rh
