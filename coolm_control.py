@@ -40,6 +40,19 @@ MSG_NOT_FOUND = ("관리함 목록에서 이 쪽지를 찾지 못했어요 "
 # 사람에게 쪽지 쓰기 (2026-09-08 사용자 재설계 — 쪽지를 찾는 대신 사람을 찾는다)
 SEARCH_EDIT_ID = "1708"        # 메인 창의 '이름(아이디) 또는 그룹명 검색' 칸
 TREE_ID = "3013"               # 조직도 (SysTreeView32)
+# 회신 창 열기 (2026-10-10 사용자 아이디어: 등록 때 남긴 지문으로 관리함 검색)
+# 진단(사용자 PC, 관리함에서 이름 검색): 검색칸은 관리함의 Edit, 실행은 글자가
+# 정확히 '검색'인 버튼. 이름 일부로 검색하면 한 달 전 쪽지까지 목록에 나온다 —
+# 예전 '목록 훑기'(open_message)가 못 찾던 범위. 결과엔 본문에 그 이름이 든
+# 남의 쪽지도 섞이므로 최종 판정은 반드시 보낸사람 + 날짜(초)로 한다.
+SEARCH_BTN_TEXT = "검색"
+REPLY_BTN_ID, REPLY_BTN_TEXT = "3314", "메시지 회신"
+SEARCH_WAIT = 1.5             # 검색 결과가 목록에 반영되길 기다리는 최대 시간
+REPLY_WAIT = 3.0              # 회신 창이 뜨길 기다리는 시간
+MSG_NO_FINGERPRINT = "이 포스트잇엔 원본 쪽지의 받은 시각이 없어 회신 창을 찾을 수 없어요."
+MSG_NO_MANAGER_SEARCH = "메시지 관리함의 검색칸을 찾지 못했어요."
+MSG_REPLY_NOT_FOUND = "메시지 관리함에서 이 쪽지를 찾지 못했어요."
+MSG_NO_REPLY_WINDOW = "쪽지는 찾았지만 회신 창이 뜨지 않았어요."
 MSG_NO_NAME = "보낸 사람 이름을 몰라서 쪽지 쓰기를 열 수 없어요."
 MSG_NO_MAIN = "쿨메신저 기본 창을 찾지 못했어요."
 
@@ -93,6 +106,54 @@ def row_matches(sender_text: str, date_text: str, msg) -> bool:
     return name_only(sender_text) == name_only(getattr(msg, "sender", ""))
 
 
+def fp_row_matches(sender_text: str, date_text: str, person: str,
+                   received: str) -> bool:
+    """관리함 한 줄이 그 쪽지인가 — 보낸사람 이름 + 받은 시각(초까지)."""
+    if not received or not (date_text or "").strip().startswith(received.strip()):
+        return False
+    return name_only(sender_text) == name_only(person)
+
+
+def _norm(s: str) -> str:
+    return "".join((s or "").split())
+
+
+def title_close(row_title: str, title: str) -> bool:
+    """목록 제목 칸(잘려 보임)과 저장한 제목이 같은 쪽지인가 — 공백 무시 앞부분 비교."""
+    a, b = _norm(row_title), _norm(title)
+    if not a or not b:
+        return True                    # 비교할 게 없으면 거르지 않는다
+    n = min(len(a), len(b), 15)
+    return a[:n] == b[:n]
+
+
+def search_queries(person: str, title: str = "") -> list:
+    """관리함 검색어 순서. None = 검색하지 않고 지금 목록에서 먼저 찾기."""
+    out = [None, person]
+    head = (title or "").strip()[:10].strip()
+    if head and head != person:
+        out.append(head)
+    return out
+
+
+def pick_search_edit(btn_rect, edits):
+    """'검색' 버튼과 같은 줄에 있고 바로 왼쪽에 있는 입력칸.
+
+    btn_rect·edits의 사각형은 (좌, 상, 우, 하). edits = [(hwnd, rect), ...] (보이는 것만).
+    진단에서 검색칸 id가 안 잡혀 위치로 고른다 — 쪽지 제목이 담긴 다른 Edit는
+    목록 아래 미리보기 쪽에 있어 같은 줄이 아니다.
+    """
+    bl, bt, br, bb = btn_rect
+    best, best_right = None, None
+    for h, (l, t, r, b) in edits:
+        overlap = min(b, bb) - max(t, bt)
+        if overlap <= 0 or r > bl + 8 or r <= l:
+            continue
+        if best_right is None or r > best_right:
+            best, best_right = h, r
+    return best
+
+
 @dataclass
 class Row:
     sender: str
@@ -127,13 +188,20 @@ class UiaAdapter:
         return self.cap._cool_pid() is not None
 
     def manager_hwnd(self):
-        return self._window_titled(MANAGER_TITLE)
+        """메시지 관리함 창 — 숨어 있으면(트레이) 숨은 것도. front()가 복원한다."""
+        return (self._window_titled(MANAGER_TITLE)
+                or self._window_titled(MANAGER_TITLE, include_hidden=True))
 
     def open_manager(self, timeout: float = 6.0):
         """메인 창의 '메시지관리함 열기'를 눌러 관리함이 뜰 때까지 기다린다."""
-        main = self._window_titled(MAIN_TITLE)
+        main = self.main_hwnd()           # 트레이에 숨어 있어도 찾는다
         btn = None
         if main is not None:
+            try:
+                if self.window_hidden(main):
+                    self.front(main)      # 숨은 창의 버튼은 눌러도 반응이 없다
+            except Exception:
+                pass
             btn = self._find_button(self._root(main), OPEN_MANAGER_BTN_ID,
                                     OPEN_MANAGER_BTN_TEXT)
         if btn is None:                    # 제목이 다른 버전: 버튼이 있는 창을 찾는다
@@ -230,8 +298,8 @@ class UiaAdapter:
             except Exception:
                 continue
 
-    def row_date(self, row: Row) -> str:
-        """보낸사람이 맞는 행에서만 부른다 — 자식 Text 가운데 날짜 꼴(yyyy/mm/dd …)."""
+    def row_texts(self, row: Row) -> list:
+        """한 줄의 칸 글자들 — 보낸사람 / 제목 / 날짜 (진단 확인)."""
         arr = row.handle.FindAll(self.kids, self._cond(self.d.UIA_ControlTypePropertyId,
                                                        self.d.UIA_TextControlTypeId))
         texts = []
@@ -240,6 +308,15 @@ class UiaAdapter:
                 texts.append(arr.GetElement(i).CurrentName or "")
             except Exception:
                 texts.append("")
+        return texts
+
+    def row_title(self, row: Row) -> str:
+        texts = self.row_texts(row)
+        return texts[1] if len(texts) >= 3 else ""
+
+    def row_date(self, row: Row) -> str:
+        """보낸사람이 맞는 행에서만 부른다 — 자식 Text 가운데 날짜 꼴(yyyy/mm/dd …)."""
+        texts = self.row_texts(row)
         for t in reversed(texts):                     # 날짜는 마지막 칸
             if len(t) >= 19 and t[4] == "/" and t[7] == "/":
                 return t
@@ -253,6 +330,84 @@ class UiaAdapter:
             pass
         self._pattern(row.handle, self.d.UIA_SelectionItemPatternId,
                       self.UIAC.IUIAutomationSelectionItemPattern).Select()
+
+    # ── 관리함 검색·회신 (2026-10-10) ───────────────────────
+    @staticmethod
+    def _rect(h):
+        import ctypes
+        from ctypes import wintypes
+        r = wintypes.RECT()
+        ctypes.windll.user32.GetWindowRect(h, ctypes.byref(r))
+        return (r.left, r.top, r.right, r.bottom)
+
+    def _visible_kids(self, hwnd, cls: str) -> list:
+        import ctypes
+        user32 = ctypes.windll.user32
+        return [h for h in self.cap._children_by_class(hwnd).get(cls, [])
+                if user32.IsWindowVisible(h)]
+
+    def _button_by_text(self, hwnd, want, exact: bool = True):
+        for b in self._visible_kids(hwnd, "Button"):
+            t = self.cap._gettext(b, 60).strip()
+            if (t == want) if exact else (want in t):
+                return b
+        return None
+
+    def _click(self, btn) -> None:
+        """버튼 클릭을 **부모 창에 WM_COMMAND로 올려 보낸다**(PostMessage).
+
+        UIA Invoke는 버튼이 모달 창을 열면 그 창이 닫힐 때까지 돌아오지 않는다.
+        Post는 바로 돌아오고, MFC 대화상자는 BN_CLICKED를 그대로 처리한다.
+        """
+        import ctypes
+        user32 = ctypes.windll.user32
+        parent = user32.GetParent(btn)
+        ctrl = user32.GetDlgCtrlID(btn) & 0xFFFF
+        if not parent or not ctrl:
+            raise RuntimeError("버튼 정보를 못 읽음")
+        user32.PostMessageW(parent, 0x0111, ctrl, btn)     # WM_COMMAND, BN_CLICKED(0)
+
+    def search_manager(self, hwnd, text: str) -> bool:
+        """관리함 검색칸에 text를 넣고 [검색]. 검색칸·버튼을 못 찾으면 False."""
+        import ctypes
+        user32 = ctypes.windll.user32
+        btn = self._button_by_text(hwnd, SEARCH_BTN_TEXT)
+        if btn is None:
+            return False
+        edits = [(h, self._rect(h)) for h in self._visible_kids(hwnd, "Edit")]
+        edit = pick_search_edit(self._rect(btn), edits)
+        if edit is None:
+            return False
+        lists = self._visible_kids(hwnd, "SysListView32")
+        LVM_GETITEMCOUNT = 0x1004
+        before = user32.SendMessageW(lists[0], LVM_GETITEMCOUNT, 0, 0) if lists else -1
+        try:
+            el = self._root(edit)
+            self._pattern(el, self.d.UIA_ValuePatternId,
+                          self.UIAC.IUIAutomationValuePattern).SetValue(text)
+        except Exception:
+            user32.SendMessageW(edit, 0x000C, 0, ctypes.c_wchar_p(text))   # WM_SETTEXT
+        self._click(btn)
+        deadline = time.monotonic() + SEARCH_WAIT
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            if lists and user32.SendMessageW(lists[0], LVM_GETITEMCOUNT, 0, 0) != before:
+                time.sleep(0.1)                   # 줄 내용이 다 그려질 짧은 여유
+                break
+        return True
+
+    def press_reply(self, hwnd, method: str = "command") -> None:
+        """[메시지 회신] — command: WM_COMMAND Post(기본), invoke: UIA Invoke(예비)."""
+        if method == "command":
+            btn = self._button_by_text(hwnd, REPLY_BTN_TEXT, exact=False)
+            if btn is None or "전체" in self.cap._gettext(btn, 60):
+                raise RuntimeError("회신 버튼을 찾지 못함")
+            self._click(btn)
+            return
+        el = self._find_button(self._root(hwnd), REPLY_BTN_ID, REPLY_BTN_TEXT)
+        if el is None:
+            raise RuntimeError("회신 버튼을 찾지 못함")
+        self._invoke(el)
 
     # ── 사람에게 쪽지 쓰기 ──────────────────────────────────
     def main_hwnd(self):
@@ -608,6 +763,87 @@ def open_message(msg, ui=None) -> tuple[bool, str]:
         return False, MSG_NOT_FOUND
     except Exception as e:                         # 어디서 깨져도 대체 경로로
         return False, f"쿨메신저를 다루는 중 문제가 생겼어요: {e}"
+
+
+def _find_row(ui, hwnd, person: str, received: str, title: str):
+    """지금 목록에서 그 쪽지 한 줄. 다른 사람 줄은 칸을 읽지 않는다(빠르게)."""
+    hits = []
+    for row in ui.rows(hwnd):
+        if name_only(row.sender) != person:
+            continue
+        if fp_row_matches(row.sender, ui.row_date(row), person, received):
+            hits.append(row)
+    if len(hits) > 1 and title:                    # 같은 초에 두 통 — 제목으로 가린다
+        close = [r for r in hits if title_close(ui.row_title(r), title)]
+        hits = close or hits
+    return hits[0] if hits else None
+
+
+def reply_to(sender: str, received: str, title: str = "", ui=None,
+             trace: list | None = None) -> tuple[str, str]:
+    """그 쪽지의 **회신 창**을 연다 (2026-10-10 사용자 아이디어).
+
+    등록 때 남긴 지문(보낸사람·받은 시각·제목)으로 메시지 관리함에서 쪽지를 찾아
+    선택하고 [메시지 회신]을 누른다. 오래된 쪽지는 목록에 없으므로 관리함 **검색**
+    으로 좁힌 뒤 보낸사람 + 날짜(초)로 정확히 한 줄을 고른다.
+    회신 내용 작성·전송은 하지 않는다 — 창을 여는 데서 멈춘다.
+
+    반환: ("replied", "") 또는 ("not_found", 이유). 호출부는 not_found면
+    compose_to(사람에게 새 쪽지)로 내려간다.
+    """
+    t = trace if trace is not None else []
+    person = name_only(sender)
+    received = (received or "").strip()
+    if not person or not received:
+        t.append("쪽지 지문 없음")
+        return "not_found", MSG_NO_FINGERPRINT
+    try:
+        if ui is None:
+            if sys.platform != "win32":
+                return "not_found", MSG_NOT_WINDOWS
+            ui = UiaAdapter()
+        if not ui.coolm_running():
+            t.append("프로세스 ✗")
+            return "not_found", MSG_NO_COOLM
+        hwnd = ui.manager_hwnd() or ui.open_manager()
+        if not hwnd:
+            t.append("관리함 ✗")
+            return "not_found", MSG_NO_MANAGER
+        ui.front(hwnd)
+        ui.ensure_received(hwnd)
+        t.append("관리함 ✓")
+        row = None
+        for query in search_queries(person, title):
+            if query is not None and not ui.search_manager(hwnd, query):
+                t.append("검색칸 ✗")
+                return "not_found", MSG_NO_MANAGER_SEARCH
+            row = _find_row(ui, hwnd, person, received, title)
+            if row is not None:
+                t.append("쪽지 ✓" + (f"(검색 {len(query)}자)" if query else "(목록)"))
+                break
+        if row is None:
+            t.append("검색해도 쪽지 ✗")
+            return "not_found", MSG_REPLY_NOT_FOUND
+        ui.select(row)
+        time.sleep(0.1)                 # 선택이 관리함 오른쪽 내용에 반영될 여유
+        before = set(ui.windows())
+        # 버튼을 못 눌렀을 때만 예비 방법으로. 눌렀는데 창이 늦게 뜨는 경우 또
+        # 누르면 회신 창이 두 개 뜨므로, 한 번 누른 뒤엔 다른 방법을 쓰지 않는다.
+        for method in ("command", "invoke"):
+            try:
+                ui.press_reply(hwnd, method)
+            except Exception as e:
+                t.append(f"회신 버튼({method}) 예외 {type(e).__name__}")
+                continue
+            if ui.new_window_after(before, timeout=REPLY_WAIT):
+                t.append("회신 창 ✓")
+                return "replied", ""
+            t.append(f"회신 창 안 뜸({method})")
+            break
+        return "not_found", MSG_NO_REPLY_WINDOW
+    except Exception as e:
+        t.append(f"예외 {type(e).__name__}: {e}"[:160])
+        return "not_found", f"쿨메신저를 다루는 중 문제가 생겼어요: {type(e).__name__}: {e}"
 
 
 def compose_to(name: str, ui=None, memory: dict | None = None,

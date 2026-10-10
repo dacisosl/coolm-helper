@@ -351,25 +351,44 @@ class _Opener(QObject):
     """
     done = pyqtSignal(str, str)          # (상태, 안내문)
 
-    def __init__(self, name: str, parent=None, memory: dict | None = None):
+    def __init__(self, name: str, parent=None, memory: dict | None = None,
+                 fp: dict | None = None):
         super().__init__(parent)
         self.name = name
         self.memory = memory if memory is not None else {}
+        self.fp = fp or {}                  # 원본 쪽지 지문 — 있으면 회신 창부터
         self.trace: list[str] = []          # 어디까지 됐는지 (실패 창에 표시)
 
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self) -> None:
+        """① 지문이 있으면 그 쪽지의 회신 창 → ② 안 되면 그 사람에게 새 쪽지."""
+        import coolm_control
+        tried_reply = False
+        received = (self.fp.get("msg_received") or "").strip()
+        if received:
+            tried_reply = True
+            try:
+                state, _why = coolm_control.reply_to(
+                    self.name, received, self.fp.get("msg_title", ""),
+                    trace=self.trace)
+            except Exception as e:
+                state = "not_found"
+                self.trace.append(f"예외 {type(e).__name__}")
+            if state == "replied":
+                self.done.emit("replied", "")
+                return
+            self.trace.append("→ 새 쪽지로")
         try:
-            import coolm_control
             state, why = coolm_control.compose_to(
                 self.name, memory=self.memory, trace=self.trace)
         except Exception as e:
             state, why = "failed", f"{type(e).__name__}: {e}"
-        if state != "opened":
-            why = with_trace(why, self.trace)
-        self.done.emit(state, why or "")
+        if state == "opened":
+            self.done.emit("opened_new" if tried_reply else "opened", "")
+            return
+        self.done.emit(state, with_trace(why, self.trace) or "")
 
 
 def with_trace(why: str, trace: list) -> str:
@@ -381,6 +400,7 @@ def with_trace(why: str, trace: list) -> str:
 
 
 PREPARING_TEXT = "제출을 위한 준비중입니다."
+FELL_BACK_TEXT = "원본 쪽지를 못 찾아 새 쪽지 창으로 열었어요."
 
 
 def _show_preparing(note):
@@ -412,17 +432,54 @@ def _remember_method(note, memory: dict) -> None:
         pass
 
 
+def _db_message(base_dir: str, config: dict, event):
+    """일정의 원본 쪽지 한 통만 읽는다 (개인정보 탐지 없이 — 지문 보정용).
+
+    원본(udb)은 읽기 전용으로만 연다 (CLAUDE.md 절대 규칙).
+    """
+    key = parse_source_key(getattr(event, "source_ref", "") or "")
+    memo_dir = (config or {}).get("memo_dir")
+    if key is None or not memo_dir:
+        return None
+    from parser.db_reader import DbReader
+    for direct in (True, False):
+        try:
+            with DbReader(memo_dir, direct=direct) as reader:
+                return reader.get_message(key)
+        except Exception:
+            continue
+    return None
+
+
 def remembered_sender(note) -> str:
-    """이 포스트잇이 기억하는 보낸 사람. 없으면 쪽지함에서 찾아 기억한다."""
-    name = (getattr(note.event, "sender", "") or "").strip()
-    if name:
+    """이 포스트잇이 기억하는 보낸 사람. 없으면 쪽지함에서 찾아 기억한다.
+
+    (2026-10-10) 원본 쪽지의 지문(받은 시각·제목)이 비어 있는 옛 포스트잇도
+    쪽지함에서 한 번 읽어 함께 채워 둔다 — '제출'이 회신 창을 찾을 수 있게.
+    이름과 지문이 다 있으면 쪽지함을 열지 않는다.
+    """
+    ev = note.event
+    name = (getattr(ev, "sender", "") or "").strip()
+    need_fp = not (getattr(ev, "msg_received", "") or "").strip()
+    if name and not need_fp:
         return name
-    msg, _spans = find_source_message(note.base_dir, note.config, note.event)
+    msg = _db_message(note.base_dir, note.config, ev)
     if msg is None:
-        return ""
-    name = (msg.sender or "").strip()
-    if name:
-        _remember(note, name)
+        return name
+    if not name:
+        name = (msg.sender or "").strip()
+        if name:
+            _remember(note, name)
+    if need_fp:
+        from parser.pipeline import msg_fingerprint
+        fp = msg_fingerprint(msg)
+        if fp.get("msg_received"):
+            try:
+                note.store.update(ev.id, **fp)
+                for k, v in fp.items():
+                    setattr(ev, k, v)
+            except Exception:
+                pass
     return name
 
 
@@ -449,11 +506,12 @@ def _show_fallback(note, reason: str) -> None:
 
 
 def open_source_message(note) -> None:
-    """포스트잇 '제출' — 보낸 사람에게 쪽지 쓰기를 연다.
+    """포스트잇 '제출' — 그 쪽지의 **회신 창**, 안 되면 보낸 사람에게 새 쪽지.
 
     ① 일정에 저장된 이름 → ② 없으면 쪽지함에서 찾아 기억 →
     ③ 그래도 없으면 사용자에게 한 번 물어본다(적은 이름을 기억).
-    이름을 알면 쿨메신저 조직도에서 그 사람을 찾아 새 쪽지 창을 연다.
+    원본 쪽지 지문(받은 시각)이 있으면 메시지 관리함에서 그 쪽지를 찾아 회신 창을
+    열고(2026-10-10), 못 찾으면 조직도에서 그 사람을 찾아 새 쪽지 창을 연다.
     """
     app = QApplication.instance()
     note._source_result = None
@@ -480,7 +538,9 @@ def open_source_message(note) -> None:
     cfg = getattr(note, "config", None) or {}
     from coolm_control import MEMORY_KEY
     memory = {MEMORY_KEY: cfg.get(MEMORY_KEY, "") or ""}
-    opener = _Opener(name, parent=note, memory=memory)
+    fp = {"msg_received": getattr(note.event, "msg_received", "") or "",
+          "msg_title": getattr(note.event, "msg_title", "") or ""}
+    opener = _Opener(name, parent=note, memory=memory, fp=fp)
 
     def _finish(state: str, why: str) -> None:
         if app is not None:
@@ -492,8 +552,15 @@ def open_source_message(note) -> None:
                 pass
         _remember_method(note, memory)
         note._source_result = (state, why)
-        if state == "opened":
-            return                         # 쪽지 쓰기 창이 떴으니 할 일 없음
+        if state in ("opened", "replied"):
+            return                         # 회신·쪽지 쓰기 창이 떴으니 할 일 없음
+        if state == "opened_new":          # 회신 창은 못 찾아 새 쪽지로 열었다
+            try:
+                from ui.toast import show_toast
+                note._fallback_toast = show_toast(note, FELL_BACK_TEXT, msec=4000)
+            except Exception:
+                pass
+            return
         if state == "selected":
             info = InfoDialog(why)
             note._info_dlg = info          # GC 방지

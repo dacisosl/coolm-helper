@@ -36,6 +36,11 @@ class Event:
     source_ref: str = ""            # 원본 쪽지 참조 "쪽지key|시작일시" — 등록 표시 유지용
     sender: str = ""                # 원본 쪽지를 보낸 사람 — 포스트잇 '제출'로
                                     # 그 사람에게 쪽지 쓰기를 열 때 쓴다 (2026-09-08)
+    # 원본 쪽지의 지문 — '제출'이 관리함 검색으로 그 쪽지를 찾아 회신 창을 열 때
+    # 쓴다 (2026-10-10). 받은 시각은 관리함 날짜 칸과 같은 'yyyy/mm/dd HH:MM:SS'.
+    # DB와 매칭된 쪽지만 채운다 — 화면에서만 읽은 쪽지는 받은 시각을 모른다.
+    msg_received: str = ""
+    msg_title: str = ""
     google_id: str | None = None    # 구글에도 등록한 경우의 이벤트 ID
     created: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -93,12 +98,14 @@ class EventStore:
             all_day: bool = True, is_deadline: bool = False,
             google_id: str | None = None, demo: bool = False,
             memo: str = "", source_ref: str = "",
-            priority: str = "보통", sender: str = "") -> Event:
+            priority: str = "보통", sender: str = "",
+            msg_received: str = "", msg_title: str = "") -> Event:
         ev = Event(title=title, start=start.isoformat(),
                    end=end.isoformat() if end else None,
                    all_day=all_day, is_deadline=is_deadline,
                    google_id=google_id, demo=demo, memo=memo,
                    source_ref=source_ref, priority=priority, sender=sender,
+                   msg_received=msg_received, msg_title=msg_title,
                    created=datetime.now().isoformat())
         self._events.append(ev)
         self._save()

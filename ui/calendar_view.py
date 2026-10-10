@@ -380,7 +380,8 @@ class EventItemCard(QFrame):
                 end=_dt.fromisoformat(e.end) if e.end else None,
                 all_day=e.all_day, is_deadline=e.is_deadline,
                 demo=e.demo, memo=e.memo, source_ref=e.source_ref,
-                priority=e.priority)
+                priority=e.priority, sender=e.sender,
+                msg_received=e.msg_received, msg_title=e.msg_title)
 
         if win is not None and win.isVisible():
             from ui.toast import show_toast

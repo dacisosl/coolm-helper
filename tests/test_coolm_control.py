@@ -401,5 +401,197 @@ class TestComposeSpeed(unittest.TestCase):
                 self.assertLess(float(m.group(1)), 0.2, f"{fn.__name__}: {m.group(0)}")
 
 
+class FakeManagerUi:
+    """reply_to용 가짜 관리함. 처음 목록은 visible, 검색하면 results[검색어]로 바뀐다."""
+
+    def __init__(self, visible=(), results=None, running=True, manager=500,
+                 opens=None, search_ok=True, reply_opens=True, reply_fail=()):
+        self.list = list(visible)
+        self.results = results or {}
+        self.running, self._manager, self._opens = running, manager, opens
+        self.search_ok, self.reply_opens = search_ok, reply_opens
+        self.reply_fail = set(reply_fail)
+        self.calls, self.searches, self._opened = [], [], False
+
+    def coolm_running(self):
+        return self.running
+
+    def manager_hwnd(self):
+        return self._manager
+
+    def open_manager(self, timeout=6.0):
+        self.calls.append("open")
+        return self._opens
+
+    def front(self, hwnd):
+        self.calls.append(("front", hwnd))
+        return True
+
+    def ensure_received(self, hwnd):
+        self.calls.append("received")
+
+    def search_manager(self, hwnd, text):
+        self.searches.append(text)
+        if not self.search_ok:
+            return False
+        self.list = list(self.results.get(text, []))
+        return True
+
+    def rows(self, hwnd):
+        yield from self.list
+
+    def row_date(self, row):
+        return row._date
+
+    def row_title(self, row):
+        return getattr(row, "title", "")
+
+    def select(self, row):
+        self.calls.append(("select", row.sender, row._date, row_title_of(row)))
+
+    def windows(self):
+        return [self._manager, 900] if self._opened else [self._manager]
+
+    def press_reply(self, hwnd, method="command"):
+        self.calls.append(("reply", method))
+        if method in self.reply_fail:
+            raise RuntimeError("버튼 없음")
+        if self.reply_opens:
+            self._opened = True
+
+    def new_window_after(self, before, timeout=4.0):
+        for h in self.windows():
+            if h not in before:
+                return h
+        return None
+
+
+def row_title_of(row):
+    return getattr(row, "title", "")
+
+
+def _mrow(sender, date, title=""):
+    r = cc.Row(sender=sender, handle=None, _date=date)
+    r.title = title
+    return r
+
+
+TARGET = "2026/09/08 11:02:36"
+RECENT = [_mrow("고선임(고선임)", "2026/10/08 09:45:23 (목)")]
+SEARCHED = [                                    # 이름 검색 결과 — 남의 쪽지도 섞인다
+    _mrow("윤현준(윤현준)", "2026/09/23 10:01:25 (수)"),
+    _mrow("김종문(김종문)", "2026/09/08 11:02:36 (화)"),   # 같은 초, 다른 사람
+    _mrow("정주은(정주은)", "2026/09/08 11:02:36 (화)", "친목회 안내"),
+]
+
+
+class TestReplyHelpers(unittest.TestCase):
+    def test_fp_row_matches(self):
+        self.assertTrue(cc.fp_row_matches("정주은(정주은)", TARGET + " (화)", "정주은", TARGET))
+        self.assertFalse(cc.fp_row_matches("김종문(김종문)", TARGET + " (화)", "정주은", TARGET))
+        self.assertFalse(cc.fp_row_matches("정주은", "2026/09/08 11:02:37 (화)", "정주은", TARGET))
+        self.assertFalse(cc.fp_row_matches("정주은", TARGET, "정주은", ""))
+
+    def test_search_queries(self):
+        self.assertEqual(cc.search_queries("정주은", "친목회에서 안내드립니다. 지난"),
+                         [None, "정주은", "친목회에서 안내드립"])
+        self.assertEqual(cc.search_queries("정주은", ""), [None, "정주은"])
+
+    def test_title_close(self):
+        self.assertTrue(cc.title_close("안녕하세요? 바쁘실 와중에 친목회에서 안내드립니다. 지",
+                                       "안녕하세요?  바쁘실 와중에 친목회에서 안내드립니다. 지난번"))
+        self.assertFalse(cc.title_close("완료되면 알려주세요~", "동의서 같은걸 받지는"))
+        self.assertTrue(cc.title_close("", "아무거나"))
+
+    def test_pick_search_edit_uses_same_row_left_of_button(self):
+        """진단 좌표 꼴: 검색 버튼 줄의 입력칸을 고르고, 아래쪽 제목 칸은 고르지 않는다."""
+        btn = (-280, 500, -230, 530)
+        edits = [(11, (-600, 503, -285, 528)),        # 검색칸 (같은 줄, 왼쪽)
+                 (12, (-960, 1100, -100, 1130)),      # 미리보기 제목 칸 (다른 줄)
+                 (13, (-200, 503, -100, 528))]        # 같은 줄이지만 버튼 오른쪽
+        self.assertEqual(cc.pick_search_edit(btn, edits), 11)
+        self.assertIsNone(cc.pick_search_edit(btn, edits[1:2]))
+
+
+class TestReplyTo(unittest.TestCase):
+    """'제출' → 그 쪽지의 회신 창 (2026-10-10 사용자 아이디어)."""
+
+    def test_found_in_current_list_without_searching(self):
+        ui = FakeManagerUi(visible=SEARCHED)
+        state, why = cc.reply_to("정주은(정주은)", TARGET, ui=ui)
+        self.assertEqual((state, why), ("replied", ""))
+        self.assertEqual(ui.searches, [])                      # 검색칸은 안 건드림
+        self.assertIn(("select", "정주은(정주은)", TARGET + " (화)", "친목회 안내"), ui.calls)
+        self.assertIn(("reply", "command"), ui.calls)
+
+    def test_old_message_found_by_search(self):
+        ui = FakeManagerUi(visible=RECENT, results={"정주은": SEARCHED})
+        trace = []
+        state, _ = cc.reply_to("정주은", TARGET, ui=ui, trace=trace)
+        self.assertEqual(state, "replied")
+        self.assertEqual(ui.searches, ["정주은"])
+        self.assertIn("회신 창 ✓", trace)
+        selected = [c for c in ui.calls if isinstance(c, tuple) and c[0] == "select"]
+        self.assertEqual(selected[0][1], "정주은(정주은)")    # 같은 초 다른 사람은 무시
+
+    def test_title_search_when_name_search_misses(self):
+        ui = FakeManagerUi(visible=RECENT,
+                           results={"정주은": [], "친목회 안내": SEARCHED})
+        state, _ = cc.reply_to("정주은", TARGET, "친목회 안내", ui=ui)
+        self.assertEqual(state, "replied")
+        self.assertEqual(ui.searches, ["정주은", "친목회 안내"])
+
+    def test_same_second_two_messages_picks_by_title(self):
+        rows = [_mrow("정주은", TARGET + " (화)", "다른 쪽지 제목"),
+                _mrow("정주은", TARGET + " (화)", "친목회 안내 드립니다")]
+        ui = FakeManagerUi(visible=rows)
+        cc.reply_to("정주은", TARGET, "친목회 안내 드립니다", ui=ui)
+        selected = [c for c in ui.calls if isinstance(c, tuple) and c[0] == "select"]
+        self.assertEqual(selected[0][3], "친목회 안내 드립니다")
+
+    def test_not_found_never_presses_reply(self):
+        ui = FakeManagerUi(visible=RECENT, results={"정주은": RECENT})
+        state, why = cc.reply_to("정주은", TARGET, ui=ui)
+        self.assertEqual((state, why), ("not_found", cc.MSG_REPLY_NOT_FOUND))
+        self.assertFalse(any(c[0] == "reply" for c in ui.calls if isinstance(c, tuple)))
+
+    def test_no_fingerprint(self):
+        state, why = cc.reply_to("정주은", "", ui=FakeManagerUi())
+        self.assertEqual((state, why), ("not_found", cc.MSG_NO_FINGERPRINT))
+
+    def test_opens_manager_when_closed(self):
+        ui = FakeManagerUi(visible=SEARCHED, manager=None, opens=501)
+        ui._manager = None
+        state, _ = cc.reply_to("정주은", TARGET, ui=ui)
+        self.assertIn("open", ui.calls)
+        self.assertIn(("front", 501), ui.calls)
+
+    def test_search_box_missing(self):
+        ui = FakeManagerUi(visible=RECENT, search_ok=False)
+        self.assertEqual(cc.reply_to("정주은", TARGET, ui=ui),
+                         ("not_found", cc.MSG_NO_MANAGER_SEARCH))
+
+    def test_reply_pressed_once_even_if_window_slow(self):
+        """창이 안 떠도 회신 버튼을 두 번 누르지 않는다 (회신 창 두 개 방지)."""
+        ui = FakeManagerUi(visible=SEARCHED, reply_opens=False)
+        state, why = cc.reply_to("정주은", TARGET, ui=ui)
+        self.assertEqual((state, why), ("not_found", cc.MSG_NO_REPLY_WINDOW))
+        self.assertEqual([c for c in ui.calls if isinstance(c, tuple) and c[0] == "reply"],
+                         [("reply", "command")])
+
+    def test_invoke_only_when_command_cannot_press(self):
+        ui = FakeManagerUi(visible=SEARCHED, reply_fail=("command",))
+        state, _ = cc.reply_to("정주은", TARGET, ui=ui)
+        self.assertEqual(state, "replied")
+        self.assertEqual([c for c in ui.calls if isinstance(c, tuple) and c[0] == "reply"],
+                         [("reply", "command"), ("reply", "invoke")])
+
+    def test_default_adapter_off_windows(self):
+        if sys.platform == "win32":
+            self.skipTest("윈도우에서는 실제 UIA를 탄다")
+        self.assertEqual(cc.reply_to("정주은", TARGET),
+                         ("not_found", cc.MSG_NOT_WINDOWS))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

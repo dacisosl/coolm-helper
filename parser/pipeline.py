@@ -327,6 +327,22 @@ def real_sender(msg) -> str:
     return name
 
 
+def msg_fingerprint(msg) -> dict:
+    """일정에 남길 원본 쪽지 지문 — store.add(**...)에 그대로 넘긴다.
+
+    '제출'이 메시지 관리함에서 그 쪽지를 **보낸사람 + 받은 시각(초까지)**으로
+    찾아 회신 창을 연다 (2026-10-10 사용자 아이디어). 관리함 날짜 칸이
+    '2026/10/08 09:45:23 (목)' 꼴이라 같은 형식으로 남긴다.
+    DB와 매칭되지 않은 쪽지(key<=0, 화면·클립보드)는 받은 시각을 모르므로 빈 값.
+    """
+    key = getattr(msg, "key", -1) or -1
+    received = getattr(msg, "received", None)
+    if msg is None or key <= 0 or received is None:
+        return {"msg_received": "", "msg_title": ""}
+    return {"msg_received": received.strftime("%Y/%m/%d %H:%M:%S"),
+            "msg_title": (getattr(msg, "title", "") or "").strip()[:200]}
+
+
 def _normalize_for_match(s: str) -> str:
     return "".join(s.split())
 

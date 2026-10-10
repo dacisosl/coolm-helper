@@ -255,14 +255,18 @@ class QuickDialog(QDialog):
         if self.matched and 0 <= idx < len(self.candidates):
             ref = cand_ref(self.candidates[idx])
         sender = ""
+        from parser.pipeline import msg_fingerprint
+        fp = msg_fingerprint(None)
         if 0 <= idx < len(self.candidates):
             from parser.pipeline import real_sender
             sender = real_sender(self.candidates[idx].message)
+            if self.matched:
+                fp = msg_fingerprint(self.candidates[idx].message)
         self.store.add(title=title, start=start, end=end, all_day=all_day,
                        is_deadline=self._is_deadline,
                        google_id=google_id,
                        memo=self.body_edit.toPlainText().strip(),
-                       source_ref=ref, sender=sender)
+                       source_ref=ref, sender=sender, **fp)
         self.accept()
 
     def _open_full(self) -> None:
