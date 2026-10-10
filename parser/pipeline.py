@@ -347,29 +347,75 @@ def _normalize_for_match(s: str) -> str:
     return "".join(s.split())
 
 
-def match_captured(messages: list[Message], title: str, body: str) -> Message | None:
-    """화면에서 읽은 제목/본문으로 DB의 원본 쪽지를 찾는다.
+def match_captured_ex(messages: list[Message], title: str, body: str
+                      ) -> tuple[Message | None, bool]:
+    """화면에서 읽은 제목/본문으로 DB의 원본 쪽지를 찾는다. (쪽지, 정확 일치 여부).
 
     포함 비교는 양쪽 모두 충분히 길 때만 한다 —
     본문이 짧거나 빈 쪽지가 아무 텍스트와나 매칭되는 오탐 방지.
+    (2026-10-10) **정확 일치(본문 앞 60자 같음)를 모든 쪽지에서 먼저** 본다.
+    쿨메신저 회신은 원문을 '○○님이 보낸글 >>' 아래에 인용하므로, 나중에 온 회신
+    쪽지가 옛 원문을 '포함'한다 — 포함 비교를 먼저 하면 원문 대신 회신 쪽지가 잡힌다.
     """
     MIN = 20
     nb = _normalize_for_match(body)
     nt = _normalize_for_match(title)
-    for m in messages:
-        mb = _normalize_for_match(m.body)
-        if len(nb) >= MIN and len(mb) >= MIN:
-            if mb[:60] == nb[:60] or nb[:40] in mb or mb[:40] in nb:
-                return m
-    if len(nt) >= 6:
+    bodies = [(m, _normalize_for_match(m.body)) for m in messages]
+    if len(nb) >= MIN:
+        for m, mb in bodies:                       # ① 정확 일치
+            if len(mb) >= MIN and mb[:60] == nb[:60]:
+                return m, True
+        for m, mb in bodies:                       # ② 한쪽이 다른 쪽을 포함
+            if len(mb) >= MIN and (nb[:40] in mb or mb[:40] in nb):
+                return m, False
+    if len(nt) >= 6:                               # ③ 제목 (본문을 못 읽었을 때)
         for m in messages:
             mt = _normalize_for_match(m.title)
             if len(mt) >= 6 and mt[:40] == nt[:40]:
-                return m
-    return None
+                return m, False
+    return None, False
+
+
+def match_captured(messages: list[Message], title: str, body: str) -> Message | None:
+    """화면에서 읽은 제목/본문으로 DB의 원본 쪽지를 찾는다 (match_captured_ex 참고)."""
+    return match_captured_ex(messages, title, body)[0]
 
 
 _quick_cache: dict = {}   # 매칭용 축약 쪽지 + 명단 캐시 (DB 변경 감지로 무효화)
+
+# ⚡ 간편 등록이 화면 쪽지와 대조하는 최근 쪽지 수 (2026-10-10 사용자 결정 50 → 300).
+# 미리 읽어 두므로 ⚡ 순간엔 대조만(300통 ≈ 2ms). 여기서 못 찾으면 그때만 쪽지함
+# 전체에서 한 번 더 찾는다(_match_whole_db) — 오래된 쪽지도 받은 시각을 알아야
+# '제출'이 회신 창을 찾을 수 있다.
+QUICK_MATCH_COUNT = 300
+
+
+def _match_possible(title: str, body: str) -> bool:
+    """match_captured가 맞출 수 있을 만큼 글자가 있는가 — 없으면 전체 조회도 헛수고."""
+    return (len(_normalize_for_match(body)) >= 20
+            or len(_normalize_for_match(title)) >= 6)
+
+
+def _match_whole_db(config: dict, title: str, body: str, seen: set,
+                    exact_only: bool = False):
+    """최근 쪽지에서 못 찾았거나 '포함'으로만 찾았을 때 — 쪽지함 전체(지운 것 제외).
+
+    원본은 읽기 전용(직접 읽기 → 복사 폴백, CLAUDE.md 절대 규칙).
+    이미 대조한 key(seen)는 건너뛴다. exact_only면 정확 일치만 돌려준다
+    (최근 쪽지의 '포함' 일치보다 옛 원문의 정확 일치가 진짜 원본이다).
+    """
+    if not _match_possible(title, body):
+        return None
+    for direct in (True, False):
+        try:
+            with DbReader(config["memo_dir"], direct=direct) as reader:
+                rows = [m for m in reader.match_rows(everything=True)
+                        if m.key not in seen]
+            found, exact = match_captured_ex(rows, title, body)
+            return found if (exact or not exact_only) else None
+        except Exception:
+            continue
+    return None
 
 
 def _db_stamp(config: dict):
@@ -397,7 +443,7 @@ def _quick_rows(base_dir: str, config: dict):
     for direct in (True, False):   # 직접 읽기 → 복사 폴백
         try:
             with DbReader(config["memo_dir"], direct=direct) as reader:
-                rows = reader.match_rows(50)
+                rows = reader.match_rows(QUICK_MATCH_COUNT)
                 roster = build_roster(base_dir, config, reader)
             break
         except Exception:
@@ -426,7 +472,13 @@ def quick_candidates(base_dir: str, title: str, body: str
     """
     config = load_config(base_dir)
     rows, roster = _quick_rows(base_dir, config)
-    matched_row = match_captured(rows, title, body)
+    matched_row, exact = match_captured_ex(rows, title, body)
+    if not exact and config.get("memo_dir"):
+        # 최근 300통에 없거나 '포함'으로만 걸렸으면 쪽지함 전체에서 정확한 원본을 찾는다
+        whole = _match_whole_db(config, title, body, {m.key for m in rows},
+                                exact_only=matched_row is not None)
+        if whole is not None:
+            matched_row = whole
     matched = None
     if matched_row is not None:
         # 축약본으로 매칭했으니 전문은 한 건만 빠르게 가져온다

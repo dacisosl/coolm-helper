@@ -104,15 +104,22 @@ class DbReader:
 
     UNREAD_CAP = 200   # 안읽은 쪽지 안전 상한 (사실상 무제한)
 
-    def match_rows(self, limit: int = 50) -> list[Message]:
+    def match_rows(self, limit: int = 50, everything: bool = False) -> list[Message]:
         """간편 등록 매칭 전용 고속 조회 — 본문을 앞 600자만 가져온다.
 
         본문 전체를 읽으면 큰 DB에서 수 초가 걸리므로, 매칭에 필요한
         만큼만 읽는다. 매칭된 쪽지의 전문은 get_message()로 가져올 것.
+        everything=True면 지운 것만 빼고 전부(최신순) — 최근 쪽지에서 못 찾았을
+        때만 쓰는 폴백(2026-10-10, 실측 6,000통 0.1초).
         """
         cur = self._con.cursor()
         cols = ("MessageKey, Sender, ReceiveDate, Title, "
                 "substr(MessageText, 1, 600), IsUnRead")
+        if everything:
+            rows = cur.execute(
+                f"SELECT {cols} FROM tbl_recv WHERE DeletedDate IS NULL "
+                "ORDER BY ReceiveDate DESC").fetchall()
+            return self._match_messages(rows)
         rows = cur.execute(
             f"SELECT {cols} FROM tbl_recv "
             "WHERE DeletedDate IS NULL AND IsUnRead = 1 "
@@ -121,6 +128,10 @@ class DbReader:
             f"SELECT {cols} FROM tbl_recv "
             "WHERE DeletedDate IS NULL AND (IsUnRead IS NULL OR IsUnRead != 1) "
             "ORDER BY ReceiveDate DESC LIMIT ?", (int(limit),)).fetchall()
+        return self._match_messages(rows)
+
+    @staticmethod
+    def _match_messages(rows) -> list[Message]:
         out = []
         for key, sender, rdate, title, body, unread in rows:
             try:
