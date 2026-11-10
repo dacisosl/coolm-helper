@@ -233,6 +233,19 @@ QMenu::item:selected {{ background:{PRIMARY_LIGHT}; color:{PRIMARY_DARK}; }}
 # 포스트잇 위젯 (은은한 노란 메모지)
 POSTIT_BG = "#fff9e6"
 POSTIT_BORDER = "#f0e0b0"
+
+# '일정 · 할 일 보드' 일정별 파스텔 (배경, 테두리, 진한 글자) — 체킹의 민트·하늘·
+# 라벤더·복숭아·장미·청록을 COOL-비서 톤으로 채도를 낮췄다 (2026-11-10).
+# 한 주 안에서 일정 순서대로 돌아가며 써서 이웃한 일정끼리 색이 겹치지 않게 한다.
+BOARD_HUES = (
+    ("#e9f5ee", "#c6e4d3", "#23744f"),   # 민트
+    ("#e8f0fa", "#c6d8ef", "#2c5d97"),   # 하늘
+    ("#efedfa", "#d7d0f0", "#5a47a1"),   # 라벤더
+    ("#fcefe4", "#f0d2ba", "#a15a26"),   # 복숭아
+    ("#faeaf0", "#eeccd8", "#9c3b61"),   # 장미
+    ("#e5f2f3", "#c1dfe2", "#236b74"),   # 청록
+)
+BOARD_LOOSE = (CARD_TINT, BORDER_SUBTLE, SUBTLE)   # '미분류' 회색 묶음
 POSTIT_HEADER = "#8a7a45"
 
 # 포스트잇 색 팔레트 — 편집 모드(🔧)에서 고른다 (2026-08-02 사용자 요청).

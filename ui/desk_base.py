@@ -649,12 +649,14 @@ def _registry() -> dict:
         reg["notes"] = {}
         app._coolm_desk = reg
     reg.setdefault("planner", None)      # 구버전 세션 레지스트리 호환
+    reg.setdefault("board", None)
     return reg
 
 
 def _widget_class(kind: str):
-    from ui import desk_widgets
-    return {"planner": desk_widgets.PlannerWidget,
+    from ui import desk_board, desk_widgets
+    return {"board": desk_board.BoardWidget,
+            "planner": desk_widgets.PlannerWidget,
             "simple": desk_widgets.SimpleTodoWidget,
             "weekly": desk_widgets.WeeklyWidget,
             "today": desk_widgets.TodayTodoWidget}[kind]
