@@ -20,7 +20,7 @@
 - 빌드: `python build.py` → `dist\CoolmHelper\CoolmHelper.exe`
   (바탕화면 바로가기가 이 exe를 가리킴)
 - **빌드 전 주의**: dist가 통째로 갈리므로 `dist\CoolmHelper\store\events.json`
-  (사용자 등록 일정)을 백업했다가 빌드 후 복원할 것
+  (사용자 등록 일정)과 `store\todos.json`(보드 위젯의 내 할 일)을 백업했다가 빌드 후 복원할 것
 - frozen 모드에서 BASE_DIR를 sys.path에 넣지 말 것 — store 데이터 폴더가
   store 모듈을 가려 두 번째 실행부터 죽는 버그의 원인이었음 (main.py 주석 참고)
 

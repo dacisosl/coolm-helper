@@ -71,6 +71,11 @@ DEFAULT_CONFIG = {
         # today: 오늘 할 일만 한 줄씩 — 투두리스트 (v1.5.0)
         "today":   {"enabled": False, "geometry": None, "opacity": 95,
                     "always_on_top": False, "font_scale": 100},
+        # board: 일정 · 할 일 2열 보드 (2026-11-10, 체킹 리디자인)
+        # view: "table"(일정↔할 일 한 줄씩) | "days"(일~토 하루씩)
+        "board":   {"enabled": False, "geometry": None, "opacity": 95,
+                    "always_on_top": False, "font_scale": 100,
+                    "view": "table"},
         "notes": [],   # 포스트잇: {event_id, geometry, opacity, always_on_top, font_scale}
     },
     # 자동으로 쪽지 프로그램을 못 찾는 학교용 — 실행파일 이름을 직접 적는다
@@ -90,7 +95,7 @@ DEFAULT_CONFIG = {
 }
 
 
-DESK_KINDS = ("planner", "simple", "weekly", "today")
+DESK_KINDS = ("planner", "simple", "weekly", "today", "board")
 
 
 def _desk_default() -> dict:
