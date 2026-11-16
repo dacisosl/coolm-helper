@@ -103,8 +103,8 @@ class PostItWidget(DeskWidgetBase):
         b.setIconSize(QSize(12, 12))
         b.setFixedHeight(20)
         b.setCursor(Qt.CursorShape.PointingHandCursor)
-        b.setToolTip("이 쪽지 보낸 사람에게 쪽지 쓰기 —\n"
-                     "쿨메신저에서 그 사람을 찾아 새 쪽지 창을 열어요")
+        b.setToolTip("이 쪽지에 회신 — 쿨메신저 메시지 관리함에서 이 쪽지를\n"
+                     "찾아 회신 창을 열어요 (못 찾으면 보낸 분께 새 쪽지)")
         b.clicked.connect(self._open_source)
         return b
 
