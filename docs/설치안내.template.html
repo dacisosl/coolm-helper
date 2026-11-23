@@ -1,0 +1,301 @@
+<title>COOL-비서 설치 안내</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 사용설명서와 같은 톤의 한 줄 원고(최대 760px). 단계마다 '한 줄 설명 + 큰 화면 그림',
+   눌러야 할 곳은 주황 테두리. 경고창은 캡처할 수 없어 실제 모양·문구를 따라 그린 예시 그림이다. */
+:root {
+  --bg: #f4f6f9; --card: #ffffff; --ink: #1a1c1e; --sub: #4a535c; --line: #dbe1e8;
+  --navy: #004d75; --blue: #006699; --orange: #f59300; --orange-ink: #a96800; --orange-soft: #fff1dd;
+  --display: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --body: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  /* 그림 속 윈도·크롬 화면은 늘 실제 색 그대로 */
+  --w-bg: #ffffff; --w-bar: #f1f3f4; --w-line: #dadce0; --w-ink: #202124; --w-sub: #5f6368;
+  --w-blue: #1a73e8; --ss-blue: #0b5fb0; --ss-btn: #e6e6e6; --inno: #f0f0f0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c; --card: #1a2028; --ink: #e8ebef; --sub: #a9b2bc; --line: #2d3540;
+    --navy: #8fcdf2; --blue: #5fb3e6; --orange: #f5a33a; --orange-ink: #f7b860; --orange-soft: #3a2a14;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161c; --card: #1a2028; --ink: #e8ebef; --sub: #a9b2bc; --line: #2d3540;
+  --navy: #8fcdf2; --blue: #5fb3e6; --orange: #f5a33a; --orange-ink: #f7b860; --orange-soft: #3a2a14;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.7 var(--body);
+  word-break: keep-all; overflow-wrap: anywhere; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 760px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2 { font-family: var(--display); color: var(--navy); margin: 0; line-height: 1.3; text-wrap: balance; }
+p { margin: 0; }
+b { font-weight: 700; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; border-radius: 6px; }
+
+.cover { padding-block: 36px 20px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; }
+.cover img { width: 96px; height: auto; }
+.cover h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+.cover p { margin-top: 6px; color: var(--sub); }
+.summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.summary span { font: 600 13px/1 var(--display); padding: 6px 10px; border-radius: 999px; background: var(--card);
+  border: 1px solid var(--line); color: var(--sub); }
+.summary span.warn { border-color: var(--orange); color: var(--orange-ink); }
+
+.steps { list-style: none; margin: 0; padding: 0 0 8px; display: grid; gap: 18px; counter-reset: s; }
+.step { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  padding: 20px; display: grid; gap: 14px; }
+.step.warn { border-color: var(--orange); }
+.head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.head::before { content: counter(s); width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--blue); color: #fff; font: 700 16px/1 var(--display); }
+.step.warn .head::before { background: var(--orange); }
+.head h2 { font-size: 20px; font-weight: 700; color: var(--ink); }
+.head p { color: var(--sub); margin-top: 2px; }
+.head p b { color: var(--ink); }
+.tag { display: inline-block; margin-left: 6px; font: 600 12px/1 var(--display); color: var(--orange-ink);
+  background: var(--orange-soft); padding: 4px 8px; border-radius: 999px; vertical-align: 3px; }
+.stage { background: #dfe4ea; border-radius: 14px; padding: 18px; display: grid; justify-items: center; gap: 14px; overflow: hidden; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; }
+.arrow { font: 700 22px/1 var(--display); color: #6b7682; }
+.cap { font-size: 12.5px; color: var(--sub); text-align: center; }
+.cap::before { content: "예시 화면 · "; color: var(--orange-ink); font-weight: 700; }
+.hint { font-size: 14px; color: var(--sub); background: var(--bg); border-radius: 10px; padding: 10px 14px; }
+.hint b { color: var(--ink); }
+.link { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.link code { font: 500 14px/1.4 ui-monospace, Consolas, monospace; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px; user-select: all; overflow-wrap: anywhere; }
+.link a { font: 700 14px/1 var(--display); color: #fff; background: var(--blue); padding: 9px 14px; border-radius: 9px; text-decoration: none; }
+
+/* 눌러야 할 곳 */
+.hit { position: relative; }
+.hit::after { content: ""; position: absolute; inset: -6px; border: 3px solid var(--orange); border-radius: 9px;
+  box-shadow: 0 0 0 4px rgba(245, 147, 0, .22); animation: pulse 1.6s ease-in-out infinite; pointer-events: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 9px rgba(245, 147, 0, .06); } }
+.ptr { position: absolute; right: -12px; bottom: -16px; width: 17px; height: 21px; z-index: 2;
+  clip-path: polygon(0 0, 0 82%, 26% 64%, 44% 100%, 58% 94%, 40% 58%, 76% 58%); background: #111;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+
+/* 공통 창 */
+.win { width: 100%; background: var(--w-bg); color: var(--w-ink); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 8px 26px rgba(10, 30, 50, .2); font: 400 13px/1.5 "Segoe UI", var(--body); }
+
+/* 깃허브 릴리스 */
+.gh { max-width: 520px; }
+.gh .top { background: #24292f; color: #fff; padding: 8px 12px; font-weight: 700; font-size: 13px; }
+.gh .pad { padding: 12px 14px; display: grid; gap: 8px; }
+.gh h3 { margin: 0; font: 700 17px/1.3 "Segoe UI", var(--body); }
+.gh .latest { display: inline-block; border: 1px solid #1a7f37; color: #1a7f37; border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 600; margin-left: 6px; }
+.assets { border: 1px solid var(--w-line); border-radius: 6px; }
+.assets .ah { background: #f6f8fa; padding: 6px 10px; font-weight: 700; border-bottom: 1px solid var(--w-line); }
+.asset { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; border-bottom: 1px solid #eaeef2; }
+.asset:last-child { border-bottom: 0; }
+.asset a { color: #0969da; font-weight: 600; text-decoration: none; }
+.asset .sz { color: var(--w-sub); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.asset.dim a { color: var(--w-sub); font-weight: 400; }
+
+/* 크롬 */
+.chrome { max-width: 560px; position: relative; }
+.ctabs { background: #dee1e6; padding: 6px 8px 0; display: flex; }
+.ctab { background: var(--w-bg); border-radius: 8px 8px 0 0; padding: 5px 12px; font-size: 12px; max-width: 220px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--w-line); }
+.omni { flex: 1; min-width: 0; background: var(--w-bar); border-radius: 999px; padding: 4px 12px; color: var(--w-sub);
+  font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dlicon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #e8f0fe; color: var(--w-blue); font-weight: 700; }
+.cbody { height: 230px; background: #fafafa; }
+.bubble { position: absolute; right: 10px; top: 76px; width: min(330px, calc(100% - 20px)); background: var(--w-bg);
+  border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .22); padding: 12px 14px; display: grid; gap: 8px; }
+.bubble .bt { font-weight: 700; font-size: 13px; }
+.dlrow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
+.warnico { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #fef7e0; color: #b06000; font-weight: 700; }
+.dlrow .fn { font-weight: 600; }
+.dlrow .ws { color: #b06000; font-size: 12px; }
+.btns { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.cbtn { border: 1px solid var(--w-line); border-radius: 999px; padding: 4px 14px; font-weight: 600; color: var(--w-blue); background: var(--w-bg); }
+.cbtn.fill { background: var(--w-blue); color: #fff; border-color: var(--w-blue); }
+
+/* 파란 보안창 (SmartScreen) */
+.ss { max-width: 470px; background: var(--ss-blue); color: #fff; border-radius: 4px; padding: 26px 26px 18px;
+  display: grid; gap: 12px; font: 400 13px/1.55 "Segoe UI", var(--body); box-shadow: 0 8px 26px rgba(10, 30, 50, .25); }
+.ss .x { justify-self: end; margin: -14px -12px 0 0; opacity: .8; }
+.ss h3 { margin: 0; font: 400 26px/1.25 "Segoe UI Light", "Segoe UI", var(--body); }
+.ss .more { color: #fff; text-decoration: underline; width: max-content; }
+.ss .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+.ss .btns { margin-top: 6px; }
+.ssbtn { background: var(--ss-blue); color: #fff; border: 2px solid #fff; padding: 5px 22px; font-weight: 600; }
+
+/* 설치 마법사 (Inno Setup) */
+.inno { max-width: 480px; background: var(--inno); font: 400 12.5px/1.5 "Segoe UI", var(--body); }
+.inno .it { background: var(--w-bg); padding: 6px 10px; border-bottom: 1px solid #cfcfcf; display: flex; justify-content: space-between; }
+.inno .ihead { background: var(--w-bg); padding: 12px 16px; border-bottom: 1px solid #cfcfcf; }
+.inno .ihead b { display: block; }
+.inno .ihead span { color: var(--w-sub); }
+.inno .ibody { padding: 14px 16px; min-height: 110px; display: grid; gap: 8px; align-content: start; }
+.inno .path { background: var(--w-bg); border: 1px solid #adadad; padding: 3px 6px; }
+.chk { display: flex; gap: 8px; align-items: center; }
+.chk i { width: 14px; height: 14px; border: 1px solid #333; background: var(--w-bg); display: grid; place-items: center; font-style: normal; font-size: 11px; line-height: 1; }
+.inno .ifoot { border-top: 1px solid #cfcfcf; padding: 10px 14px; display: flex; justify-content: flex-end; gap: 8px; }
+.wbtn { border: 1px solid #adadad; background: #e1e1e1; padding: 3px 16px; min-width: 76px; text-align: center; }
+.wbtn.def { border: 2px solid #0078d7; }
+.bar { height: 14px; background: var(--w-bg); border: 1px solid #bcbcbc; }
+.bar i { display: block; height: 100%; width: 64%; background: #06b025; }
+
+/* 첫 실행 */
+.desk { width: 100%; max-width: 560px; height: 200px; position: relative; border-radius: 8px; overflow: hidden;
+  background: linear-gradient(160deg, #5b7ea6, #2f4c6e); box-shadow: 0 8px 26px rgba(10, 30, 50, .2); }
+.desk img { position: absolute; right: 4px; top: 50%; width: 70px; height: auto; transform: translateY(-50%); }
+.desk .tbar { position: absolute; inset: auto 0 0; height: 26px; background: rgba(20, 24, 30, .85); }
+.desk .wall { position: absolute; right: 0; top: 0; bottom: 26px; width: 3px; background: rgba(245, 147, 0, .8); }
+
+.faq { display: grid; gap: 8px; padding-block: 20px 8px; }
+.faq h2 { font-size: 20px; }
+.faq details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.faq summary { cursor: pointer; font-weight: 700; }
+.faq details p { margin-top: 6px; color: var(--sub); }
+footer { padding-block: 28px 48px; color: var(--sub); font-size: 13px; text-align: center; }
+
+@media (max-width: 600px) {
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .pair .arrow { transform: rotate(90deg); justify-self: center; }
+  .cover { grid-template-columns: minmax(0, 1fr); }
+  .stage { padding: 12px; }
+  .ss h3 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .hit::after { animation: none; } }
+</style>
+
+<header class="wrap cover">
+  {{PENGUIN}}
+  <div>
+    <h1>COOL-비서 설치 안내</h1>
+    <p>5분이면 끝나요. 중간에 경고창이 <b>두 번</b> 뜨는데, 아래 그림대로 누르면 돼요.</p>
+    <div class="summary"><span>1 내려받기</span><span class="warn">2 [유지]</span><span class="warn">3 추가 정보 → [실행]</span><span>4 설치</span><span>5 펭귄 확인</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+<ol class="steps">
+
+  <li class="step">
+    <div class="head"><div><h2>설치파일 내려받기</h2>
+      <p>아래 주소에서 <b>CoolmHelper-Setup.exe</b>를 눌러요.</p></div></div>
+    <div class="link"><code>https://github.com/dacisosl/coolm-helper/releases/latest</code>
+      <a href="https://github.com/dacisosl/coolm-helper/releases/latest" target="_blank" rel="noopener">내려받기 페이지 열기</a></div>
+    <div class="stage">
+      <div class="win gh" role="img" aria-label="내려받기 페이지 예시">
+        <div class="top">GitHub · dacisosl / coolm-helper</div>
+        <div class="pad">
+          <h3>v{{VERSION}} <span class="latest">Latest</span></h3>
+          <div class="assets">
+            <div class="ah">▾ Assets</div>
+            <div class="asset"><a class="hit">CoolmHelper-Setup.exe<span class="ptr"></span></a><span class="sz">약 45 MB</span></div>
+            <div class="asset"><a>CoolmHelper-Setup.zip</a><span class="sz">약 45 MB</span></div>
+            <div class="asset dim"><a>Source code (zip)</a><span class="sz"></span></div>
+          </div>
+        </div>
+      </div>
+      <span class="cap">내려받기 페이지의 Assets</span>
+    </div>
+  </li>
+
+  <li class="step warn">
+    <div class="head"><div><h2>오른쪽 위 흰 창에서 [유지]<span class="tag">경고 1</span></h2>
+      <p>크롬이 "일반적으로 다운로드되지 않는 파일"이라고 막아요. <b>[유지]</b>를 눌러야 저장돼요.</p></div></div>
+    <div class="stage">
+      <div class="win chrome" role="img" aria-label="크롬 다운로드 경고 예시">
+        <div class="ctabs"><span class="ctab">Release v{{VERSION}} · dacisosl/coolm-helper</span></div>
+        <div class="cbar"><span class="omni">github.com/dacisosl/coolm-helper/releases/latest</span><span class="dlicon">↓</span></div>
+        <div class="cbody"></div>
+        <div class="bubble">
+          <span class="bt">최근 다운로드 기록</span>
+          <div class="dlrow"><span class="warnico">!</span>
+            <div><div class="fn">CoolmHelper-Setup.exe</div>
+              <div class="ws">일반적으로 다운로드되지 않는 파일입니다. 열기 전에 이 파일을 신뢰할 수 있는지 확인하세요.</div></div></div>
+          <div class="btns"><span class="cbtn">삭제</span><span class="cbtn fill hit">유지<span class="ptr"></span></span></div>
+        </div>
+      </div>
+      <span class="cap">크롬 — 주소창 오른쪽 ↓ 아래에 뜨는 창</span>
+    </div>
+    <p class="hint">창이 안 보이면 주소창 오른쪽 <b>↓</b>를 누르세요. 한 번 더 묻는 창이 뜨면 <b>[계속]</b>(또는 [유지])을 눌러요.<br>
+      <b>엣지</b>라면: 파일 옆 <b>…</b> → <b>[유지]</b> → <b>자세히 표시</b> → <b>[그래도 계속]</b></p>
+  </li>
+
+  <li class="step warn">
+    <div class="head"><div><h2>파란 창에서 추가 정보 → [실행]<span class="tag">경고 2</span></h2>
+      <p>내려받은 파일을 열면 파란 창이 떠요. 처음엔 [실행 안 함]만 보여요. <b>추가 정보</b>를 먼저 누르세요.</p></div></div>
+    <div class="stage">
+      <div class="pair">
+        <div class="ss" role="img" aria-label="Windows 보안 경고 첫 화면 예시">
+          <span class="x">✕</span>
+          <h3>Windows의 PC 보호</h3>
+          <p>Microsoft Defender SmartScreen에서 인식할 수 없는 앱의 시작을 차단했습니다. 이 앱을 실행하면 PC가 위험에 노출될 수 있습니다.</p>
+          <span class="more hit">추가 정보<span class="ptr"></span></span>
+          <div class="btns"><span class="ssbtn">실행 안 함</span></div>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="ss" role="img" aria-label="추가 정보를 누른 뒤 실행 버튼이 나온 화면 예시">
+          <span class="x">✕</span>
+          <h3>Windows의 PC 보호</h3>
+          <p>Microsoft Defender SmartScreen에서 인식할 수 없는 앱의 시작을 차단했습니다.</p>
+          <div class="kv"><span>앱:</span><span>CoolmHelper-Setup.exe</span><span>게시자:</span><span>알 수 없는 게시자</span></div>
+          <div class="btns"><span class="ssbtn hit">실행<span class="ptr"></span></span><span class="ssbtn">실행 안 함</span></div>
+        </div>
+      </div>
+      <span class="cap">Windows 보안 경고 (SmartScreen)</span>
+    </div>
+    <p class="hint"><b>"알 수 없는 게시자"는 정상이에요.</b> 개인이 만든 무료 프로그램이라 유료 인증서 서명이 없어서 뜨는 경고예요. 위 주소에서 받은 파일이면 안전해요.</p>
+  </li>
+
+  <li class="step">
+    <div class="head"><div><h2>[다음] → [설치] → [마침]</h2>
+      <p>바꿀 것 없이 그대로 누르면 돼요. 관리자 암호도 묻지 않아요.</p></div></div>
+    <div class="stage">
+      <div class="pair">
+        <div class="win inno" role="img" aria-label="설치 준비 화면 예시">
+          <div class="it"><span>설치 - COOL-비서</span><span>✕</span></div>
+          <div class="ihead"><b>설치 준비 완료</b><span>이제 COOL-비서를 설치할 준비가 되었습니다.</span></div>
+          <div class="ibody"><span>설치 위치:</span><span class="path">C:\Users\선생님\AppData\Local\Programs\CoolmHelper</span>
+            <span class="chk"><i>✓</i>바탕화면 아이콘 만들기</span></div>
+          <div class="ifoot"><span class="wbtn">&lt; 뒤로</span><span class="wbtn def hit">설치<span class="ptr"></span></span><span class="wbtn">취소</span></div>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="win inno" role="img" aria-label="설치 완료 화면 예시">
+          <div class="it"><span>설치 - COOL-비서</span><span>✕</span></div>
+          <div class="ihead"><b>COOL-비서 설치 완료</b><span>설치가 끝났습니다.</span></div>
+          <div class="ibody"><div class="bar"><i style="width:100%"></i></div>
+            <span class="chk"><i></i>개인정보 처리 안내 읽기</span>
+            <span class="chk"><i>✓</i>지금 실행</span></div>
+          <div class="ifoot"><span class="wbtn def hit">마침<span class="ptr"></span></span></div>
+        </div>
+      </div>
+      <span class="cap">설치 마법사 — 앞쪽 [다음] 화면들은 그대로 넘기면 돼요</span>
+    </div>
+  </li>
+
+  <li class="step">
+    <div class="head"><div><h2>화면 오른쪽에 펭귄이 오면 끝</h2>
+      <p>펭귄이 인사하고 <b>화면 오른쪽 벽</b>으로 날아가 붙어요. 클릭하면 다음 말로, [건너뛰기]로 바로 끝낼 수 있어요.</p></div></div>
+    <div class="stage">
+      <div class="desk" role="img" aria-label="바탕화면 오른쪽 가장자리에 붙은 펭귄">{{PENGUIN_DESK}}<span class="wall"></span><span class="tbar"></span></div>
+      <span class="cap">바탕화면 오른쪽 가장자리</span>
+    </div>
+    <p class="hint">다음부터는 <b>컴퓨터를 켜면 저절로</b> 켜져요. 쓰는 방법은 설치 폴더의 <b>사용설명서</b>를 보세요. 새 버전이 나오면 켤 때 업데이트 안내가 떠요.</p>
+  </li>
+</ol>
+
+<section class="faq" aria-label="막힐 때">
+  <h2>막힐 때</h2>
+  <details><summary>[유지]를 눌러도 파일이 지워지거나, 실행이 아예 안 돼요</summary>
+    <p>학교 백신이 막는 경우예요. 내려받기 페이지에서 <b>CoolmHelper-Setup.zip</b>을 받아 압축을 풀고, 나온 <b>CoolmHelper-Setup.exe</b>를 실행하세요. 같은 설치파일이라 업데이트도 똑같이 돼요.</p></details>
+  <details><summary>파란 창에 [실행] 버튼이 끝까지 안 보여요</summary>
+    <p>먼저 글 아래 <b>추가 정보</b>를 눌렀는지 확인하세요. 눌러도 없다면 학교 PC 정책으로 막힌 거라 정보부(전산 담당) 선생님께 설치를 부탁하세요.</p></details>
+  <details><summary>설치했는데 펭귄이 안 보여요</summary>
+    <p>작업표시줄 오른쪽 아래 <b>^</b>를 눌러 펭귄 아이콘을 클릭하세요. 펭귄이 다시 나와요.</p></details>
+</section>
+</main>
+<footer class="wrap">COOL-비서 v{{VERSION}} · 무료 · 쪽지 내용은 선생님 PC 밖으로 나가지 않아요.</footer>
