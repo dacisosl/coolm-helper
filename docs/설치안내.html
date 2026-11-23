@@ -32,6 +32,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.7 var(--body);
   word-break: keep-all; overflow-wrap: anywhere; -webkit-font-smoothing: antialiased; }
 .wrap { max-width: 760px; margin: 0 auto;
@@ -157,6 +158,48 @@ b { font-weight: 700; }
 .dpurl { color: var(--w-sub); font-size: 12px; }
 .btns.left { justify-content: flex-start; margin-top: 6px; }
 
+/* 브라우저 고르기 */
+.btabs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.btl { font-size: 14px; color: var(--sub); margin-right: 4px; }
+.btabs button { font: 700 15px/1 var(--display); padding: 9px 18px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--line); background: var(--card); color: var(--sub); }
+.btabs button[aria-selected="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.bpanel { display: grid; gap: 12px; }
+/* 엣지 */
+.edge { max-width: 560px; position: relative; }
+.etabs { background: #e9eaed; padding: 6px 8px 0; display: flex; }
+.etab { background: var(--w-bg); border-radius: 8px 8px 0 0; padding: 5px 12px; font-size: 12px; max-width: 220px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ebar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--w-line); }
+.eflyout { position: absolute; right: 10px; top: 76px; width: min(340px, calc(100% - 20px)); background: var(--w-bg);
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, .24); padding: 10px 12px 12px; display: grid; gap: 8px; }
+.efh { display: flex; justify-content: space-between; align-items: center; }
+.eicons { font-size: 11px; letter-spacing: 4px; color: var(--w-sub); }
+.erow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 6px; border-radius: 6px; }
+.erow.hover { background: #f3f3f3; }
+.emain { display: grid; gap: 2px; min-width: 0; }
+.ews { color: #8a5300; font-size: 12px; }
+.eact { display: flex; gap: 4px; }
+.ebtn { width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; background: var(--w-bg);
+  border: 1px solid var(--w-line); font-size: 12px; position: relative; }
+.ebtn.on { background: #e5e5e5; }
+.emenu { justify-self: end; width: 86%; background: var(--w-bg); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, .22);
+  padding: 4px; display: grid; margin-top: -4px; }
+.mi { padding: 6px 10px; border-radius: 5px; font-size: 12.5px; position: relative; }
+.mi.hit { width: max-content; }
+.edlg { max-width: 420px; }
+.edlg .pad { padding: 18px 20px 14px; display: grid; gap: 10px; }
+.edlg .dt { font-size: 15px; }
+.edlg p { color: var(--w-sub); }
+.eshield { font-size: 22px; }
+.edlg .more { color: #0f6cbd; width: max-content; position: relative; }
+.elist { display: grid; gap: 6px; padding-left: 4px; }
+.elist span { color: #0f6cbd; width: max-content; max-width: 100%; position: relative; }
+.elist .go { font-weight: 700; }
+.ebtn2 { border: 1px solid var(--w-line); border-radius: 4px; padding: 5px 18px; background: var(--w-bg); font-weight: 600; }
+.ebtn2.fill { background: #0f6cbd; color: #fff; border-color: #0f6cbd; }
+.eopen { color: #0f6cbd; font-weight: 600; width: max-content; position: relative; margin-top: 4px; }
+
 /* 파란 보안창 (SmartScreen) */
 .ss { max-width: 470px; background: var(--ss-blue); color: #fff; border-radius: 4px; padding: 26px 26px 18px;
   display: grid; gap: 12px; font: 400 13px/1.55 "Segoe UI", var(--body); box-shadow: 0 8px 26px rgba(10, 30, 50, .25); }
@@ -213,7 +256,7 @@ footer { padding-block: 28px 48px; color: var(--sub); font-size: 13px; text-alig
   <div>
     <h1>COOL-비서 설치 안내</h1>
     <p>5분이면 끝나요. 중간에 경고창이 <b>두 번</b> 뜨는데, 아래 그림대로 누르면 돼요.</p>
-    <div class="summary"><span>1 내려받기</span><span class="warn">2 [유지] (5장)</span><span class="warn">3 추가 정보 → [실행]</span><span>4 설치</span><span>5 펭귄 확인</span></div>
+    <div class="summary"><span>1 내려받기</span><span class="warn">2 [유지] (크롬·엣지)</span><span class="warn">3 추가 정보 → [실행]</span><span>4 설치</span><span>5 펭귄 확인</span></div>
   </div>
 </header>
 
@@ -244,7 +287,13 @@ footer { padding-block: 28px 48px; color: var(--sub); font-size: 13px; text-alig
 
   <li class="step warn">
     <div class="head"><div><h2>오른쪽 위 흰 창에서 [유지]<span class="tag">경고 1</span></h2>
-      <p>크롬이 처음 보는 설치파일이라 <b>저장을 멈추고</b> 물어봐요. 아래 순서대로 누르면 저장돼요.</p></div></div>
+      <p>브라우저가 처음 보는 설치파일이라 <b>저장을 멈추고</b> 물어봐요. 쓰는 브라우저를 고르고 순서대로 누르세요.</p></div></div>
+    <div class="btabs" role="tablist" aria-label="쓰는 브라우저">
+      <span class="btl">쓰는 브라우저를 고르세요</span>
+      <button type="button" id="tab-chrome" role="tab" aria-selected="true" aria-controls="b-chrome" data-b="chrome">크롬</button>
+      <button type="button" id="tab-edge" role="tab" aria-selected="false" aria-controls="b-edge" data-b="edge">엣지</button>
+    </div>
+    <div class="bpanel" id="b-chrome">
     <ol class="subs">
       <li class="sub">
         <div class="stxt"><span class="sn">2-1</span><b>주소창 오른쪽 ↓ 를 봐요</b>
@@ -332,7 +381,117 @@ footer { padding-block: 28px 48px; color: var(--sub); font-size: 13px; text-alig
         </div>
       </li>
     </ol>
-    <p class="hint"><b>엣지</b>라면: 파일 옆 <b>…</b> → <b>[유지]</b> → <b>자세히 표시</b> → <b>[그래도 계속]</b></p>
+    </div>
+    <div class="bpanel" id="b-edge" hidden>
+    <ol class="subs">
+      <li class="sub">
+        <div class="stxt"><span class="sn">2-1</span><b>파일에 마우스를 올리고 … 를 눌러요</b>
+          <p>오른쪽 위 <b>다운로드 창</b>에 경고가 떠요. 파일 줄에 마우스를 올리면 휴지통과 <b>…</b>(추가 작업)이 나와요.</p></div>
+        <div class="stage">
+          <div class="win edge" role="img" aria-label="엣지 다운로드 창에서 파일 옆 점 세 개를 누르는 모습">
+            <div class="etabs"><span class="etab">Release v3.1.0 · dacisosl/coolm-helper</span></div>
+            <div class="ebar"><span class="omni">github.com/dacisosl/coolm-helper/releases/latest</span><span class="dlicon warnbadge">↓</span><span class="dots">⋯</span></div>
+            <div class="cbody"></div>
+            <div class="eflyout">
+              <div class="efh"><b>다운로드</b><span class="eicons">📁 🔍 ⋯ 📌</span></div>
+              <div class="erow hover">
+                <span class="warnico">!</span>
+                <div class="emain"><span class="fn">CoolmHelper-Setup.exe</span>
+                  <span class="ews">CoolmHelper-Setup.exe은(는) 일반적으로 다운로드되지 않습니다. 열기 전에 신뢰할 수 있는지 확인하세요.</span></div>
+                <div class="eact"><span class="ebtn">🗑</span><span class="ebtn hit">⋯<span class="ptr"></span></span></div>
+              </div>
+            </div>
+          </div>
+          <span class="cap">엣지 오른쪽 위 다운로드 창</span>
+        </div>
+      </li>
+      <li class="sub">
+        <div class="stxt"><span class="sn">2-2</span><b>메뉴에서 [유지]를 골라요</b>
+          <p>…를 누르면 작은 메뉴가 열려요. 맨 위의 <b>[유지]</b>를 눌러요.</p></div>
+        <div class="stage">
+          <div class="win edge" role="img" aria-label="엣지 추가 작업 메뉴에서 유지를 고르는 모습">
+            <div class="etabs"><span class="etab">Release v3.1.0 · dacisosl/coolm-helper</span></div>
+            <div class="ebar"><span class="omni">github.com/dacisosl/coolm-helper/releases/latest</span><span class="dlicon warnbadge">↓</span><span class="dots">⋯</span></div>
+            <div class="cbody"></div>
+            <div class="eflyout">
+              <div class="efh"><b>다운로드</b><span class="eicons">📁 🔍 ⋯ 📌</span></div>
+              <div class="erow hover">
+                <span class="warnico">!</span>
+                <div class="emain"><span class="fn">CoolmHelper-Setup.exe</span>
+                  <span class="ews">일반적으로 다운로드되지 않습니다.</span></div>
+                <div class="eact"><span class="ebtn">🗑</span><span class="ebtn on">⋯</span></div>
+              </div>
+              <div class="emenu">
+                <span class="mi hit">유지<span class="ptr"></span></span>
+                <span class="mi">Microsoft에 이 파일이 안전하다고 보고</span>
+                <span class="mi">자세히 알아보기</span>
+                <span class="mi">다운로드 링크 복사</span>
+              </div>
+            </div>
+          </div>
+          <span class="cap">… 를 누르면 열리는 메뉴</span>
+        </div>
+      </li>
+      <li class="sub">
+        <div class="stxt"><span class="sn">2-3</span><b>새 창에서 '자세히 표시'를 눌러요</b>
+          <p>"이 앱을 열기 전에 신뢰할 수 있는지 확인하세요" 창이 떠요. 버튼은 [삭제]·[취소]뿐이에요. 아래 <b>자세히 표시 ⌄</b>를 눌러 펼쳐요.</p></div>
+        <div class="stage">
+          <div class="win edlg" role="img" aria-label="엣지 확인 창에서 자세히 표시를 누르는 모습">
+            <div class="pad">
+              <span class="eshield">🛡</span>
+              <b class="dt">CoolmHelper-Setup.exe을(를) 열기 전에 신뢰할 수 있는지 확인하세요</b>
+              <p>Microsoft Defender SmartScreen에서 이 앱이 안전한지 확인할 수 없습니다. 일반적으로 다운로드되지 않는 앱입니다.</p>
+              <span class="more hit">자세히 표시 ⌄<span class="ptr"></span></span>
+              <div class="btns"><span class="ebtn2 fill">삭제</span><span class="ebtn2">취소</span></div>
+            </div>
+          </div>
+          <span class="cap">화면 가운데 뜨는 엣지 확인 창</span>
+        </div>
+      </li>
+      <li class="sub">
+        <div class="stxt"><span class="sn">2-4</span><b>펼쳐진 곳의 [그래도 계속]을 눌러요</b>
+          <p>숨어 있던 줄이 나와요. <b>그래도 계속</b>을 누르면 파일이 저장돼요. [삭제]는 누르지 마세요.</p></div>
+        <div class="stage">
+          <div class="win edlg" role="img" aria-label="펼쳐진 확인 창에서 그래도 계속을 누르는 모습">
+            <div class="pad">
+              <span class="eshield">🛡</span>
+              <b class="dt">CoolmHelper-Setup.exe을(를) 열기 전에 신뢰할 수 있는지 확인하세요</b>
+              <p>Microsoft Defender SmartScreen에서 이 앱이 안전한지 확인할 수 없습니다.</p>
+              <span class="more">간단히 표시 ⌃</span>
+              <div class="elist">
+                <span>Microsoft에 이 앱이 안전하다고 보고</span>
+                <span>자세히 알아보기</span>
+                <span class="go hit">그래도 계속<span class="ptr"></span></span>
+              </div>
+              <div class="btns"><span class="ebtn2 fill">삭제</span><span class="ebtn2">취소</span></div>
+            </div>
+          </div>
+          <span class="cap">'자세히 표시'를 펼친 모습</span>
+        </div>
+      </li>
+      <li class="sub">
+        <div class="stxt"><span class="sn">2-5</span><b>[파일 열기]를 눌러요</b>
+          <p>경고가 사라지고 <b>파일 열기</b>가 보이면 저장된 거예요. 누르면 3번 파란 창으로 넘어가요.</p></div>
+        <div class="stage">
+          <div class="win edge" role="img" aria-label="저장이 끝나 파일 열기를 누르는 모습">
+            <div class="etabs"><span class="etab">Release v3.1.0 · dacisosl/coolm-helper</span></div>
+            <div class="ebar"><span class="omni">github.com/dacisosl/coolm-helper/releases/latest</span><span class="dlicon">↓</span><span class="dots">⋯</span></div>
+            <div class="cbody short"></div>
+            <div class="eflyout">
+              <div class="efh"><b>다운로드</b><span class="eicons">📁 🔍 ⋯ 📌</span></div>
+              <div class="erow">
+                <span class="okico">▣</span>
+                <div class="emain"><span class="fn">CoolmHelper-Setup.exe</span>
+                  <span class="eopen hit">파일 열기<span class="ptr"></span></span></div>
+              </div>
+            </div>
+          </div>
+          <span class="cap">경고 없이 '파일 열기'가 보이면 성공</span>
+        </div>
+      </li>
+    </ol>
+    <p class="hint">다운로드 창을 놓쳤다면 <span class="kbd">Ctrl</span> + <span class="kbd">J</span>를 누르세요. 같은 목록이 열려요.</p>
+    </div>
   </li>
 
   <li class="step warn">
@@ -409,5 +568,22 @@ footer { padding-block: 28px 48px; color: var(--sub); font-size: 13px; text-alig
 </section>
 </main>
 <footer class="wrap">COOL-비서 v3.1.0 · 무료 · 쪽지 내용은 선생님 PC 밖으로 나가지 않아요.</footer>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.btabs button');
+  function pick(b) {
+    tabs.forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.b === b)); });
+    document.getElementById('b-chrome').hidden = b !== 'chrome';
+    document.getElementById('b-edge').hidden = b !== 'edge';
+    try { localStorage.setItem('coolm-browser', b); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { pick(t.dataset.b); }); });
+  var saved = null;
+  try { saved = localStorage.getItem('coolm-browser'); } catch (e) {}
+  if (!saved && /Edg\//.test(navigator.userAgent)) saved = 'edge';
+  if (saved === 'edge') pick('edge');
+})();
+</script>
 
 </html>
